@@ -5,11 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 // actions kept distinct on purpose. Event browsing, event detail, and guest
 // registration must stay open -- only page-level routes that always require
 // an account are listed here. Join/rate/chat actions live on pages that
-// don't exist yet (Phase 4+); protect those with the same requireUser()
-// pattern (src/lib/supabase/server.ts) inside their own Server Actions, since
-// a proxy matcher change can silently stop covering a route (see Next.js
+// aren't all built yet; protect those with the same requireUser() pattern
+// (src/lib/supabase/server.ts) inside their own Server Actions, since a
+// proxy matcher change can silently stop covering a route (see Next.js
 // proxy docs) -- don't rely on this list alone for those.
-const PROTECTED_PREFIXES = ["/profile", "/host"];
+const PROTECTED_PREFIXES = ["/profile", "/host", "/communities/new"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
