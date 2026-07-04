@@ -14,12 +14,14 @@ import {
 } from "@/lib/queries/membership";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
+import { getMyRating } from "@/lib/queries/ratings";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { JoinSection } from "@/components/communities/JoinSection";
 import { GroupList } from "@/components/communities/GroupList";
 import { MemberList } from "@/components/communities/MemberList";
 import { PendingRequests } from "@/components/communities/PendingRequests";
+import { RatingSection } from "@/components/communities/RatingSection";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,6 +61,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
   const members = isNative ? await getCommunityMembers(supabase, id) : [];
   const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
+  const myRating = isNative && user ? await getMyRating(supabase, id, user.id) : null;
 
   return (
     <div className="flex-1 pb-10">
@@ -127,14 +130,17 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
         {isNative && (
           <div className="mt-8 flex flex-col gap-8">
-            <JoinSection
-              communityId={community.id}
-              joinMode={community.join_mode}
-              isMember={isMember}
-              isLoggedIn={!!user}
-              pendingStatus={pendingStatus}
-              formFields={formFields}
-            />
+            <div className="flex flex-wrap gap-3">
+              <JoinSection
+                communityId={community.id}
+                joinMode={community.join_mode}
+                isMember={isMember}
+                isLoggedIn={!!user}
+                pendingStatus={pendingStatus}
+                formFields={formFields}
+              />
+              <RatingSection communityId={community.id} isLoggedIn={!!user} myRating={myRating} />
+            </div>
 
             <section>
               <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Groups</h2>
