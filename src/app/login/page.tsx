@@ -33,11 +33,7 @@ function LoginForm() {
   }
 
   if (status === "sent") {
-    return (
-      <p className="text-center text-zinc-500 dark:text-zinc-400">
-        Check {email} for a sign-in link.
-      </p>
-    );
+    return <p className="text-center text-text2">Check {email} for a sign-in link.</p>;
   }
 
   return (
@@ -48,16 +44,16 @@ function LoginForm() {
         placeholder="you@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-text placeholder:text-text3"
       />
       <button
         type="submit"
         disabled={status === "sending"}
-        className="rounded-md bg-zinc-900 px-3 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-full bg-green px-3 py-2 font-bold text-green-dark disabled:opacity-50"
       >
         {status === "sending" ? "Sending..." : "Send magic link"}
       </button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-pink">{error}</p>}
     </form>
   );
 }
@@ -65,7 +61,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
-      <h1 className="text-2xl font-semibold">Sign in to Close.Connect</h1>
+      <h1 className="font-heading text-2xl font-bold">Sign in to Close.Connect</h1>
       <Suspense>
         <LoginForm />
       </Suspense>
