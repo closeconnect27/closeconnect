@@ -133,7 +133,7 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
           </div>
           <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
             {communities.map((c) => (
-              <div key={c.id} className="w-44 shrink-0">
+              <div key={c.id} className="w-56 shrink-0">
                 <CommunityCard community={c} />
               </div>
             ))}

@@ -8,6 +8,8 @@ import {
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformStats } from "@/lib/queries/stats";
+import { CATEGORIES } from "@/lib/categories";
+import { CategoryImage } from "@/components/ui/CategoryImage";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -15,19 +17,33 @@ export default async function Home() {
 
   return (
     <div className="flex-1">
-      {/* HERO */}
-      <section className="flex flex-col items-center gap-6 px-6 pb-16 pt-16 text-center sm:pt-24">
-        <h1 className="font-heading text-[40px] font-extrabold leading-none sm:text-[56px]">
-          close<span className="text-green">.connect</span>
-        </h1>
-        <p className="max-w-md text-[16px] text-text2">Find your people. Host what you love.</p>
-        <div className="mt-2 flex gap-3">
-          <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
-            Browse communities
-          </Link>
-          <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
-            Search
-          </Link>
+      {/* HERO -- real category photography behind the headline (Meetup/
+          AllEvents both lead with photography, not plain text on a flat
+          background), using the same verified Unsplash set every card
+          already draws from rather than any new/fabricated imagery. */}
+      <section className="relative overflow-hidden border-b border-border">
+        <div className="pointer-events-none absolute inset-0 grid grid-cols-4 gap-0.5 opacity-50 sm:opacity-70">
+          {CATEGORIES.slice(0, 4).map((c) => (
+            <div key={c.slug} className="relative" style={{ background: c.bg }}>
+              <CategoryImage slug={c.slug} seed={2} alt="" fill sizes="25vw" className="object-cover" />
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/30 via-bg/85 to-bg" />
+
+        <div className="relative flex flex-col items-center gap-6 px-6 pb-16 pt-16 text-center sm:pt-24">
+          <h1 className="font-heading text-[28px] font-extrabold leading-none min-[480px]:text-[40px] sm:text-[56px]">
+            close<span className="text-green">.connect</span>
+          </h1>
+          <p className="max-w-md text-[16px] text-text2">Find your people. Host what you love.</p>
+          <div className="mt-2 flex gap-3">
+            <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
+              Browse communities
+            </Link>
+            <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
+              Search
+            </Link>
+          </div>
         </div>
       </section>
 
