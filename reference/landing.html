@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>close.connect — home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1a1a1a;
+  --border:#222;--border2:#2a2a2a;
+  --text:#f0f0f0;--text2:#888;--text3:#444;
+  --green:#5DCAA5;--green-dark:#0d2218;--green-mid:#1D9E75;
+  --pink:#D4537E;--purple:#7F77DD;
+  --radius:14px;--radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+
+/* TOPBAR */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,10,10,0.95);
+  backdrop-filter:blur(12px);
+  border-bottom:0.5px solid var(--border);
+  padding:12px 20px;
+  display:flex;align-items:center;gap:12px;
+}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;color:var(--text);white-space:nowrap}
+.logo span{color:var(--green)}
+.search-pill{
+  flex:1;
+  background:var(--bg3);border:0.5px solid var(--border2);
+  border-radius:999px;display:flex;align-items:center;
+  padding:0 16px;height:40px;gap:10px;cursor:pointer;
+  transition:border-color .15s;
+}
+.search-pill:hover{border-color:#3a3a3a}
+.search-pill i{color:var(--text3);font-size:15px}
+.search-pill span{font-size:13px;color:var(--text3)}
+.tb-right{display:flex;gap:8px;align-items:center}
+.tib{
+  width:38px;height:38px;border-radius:50%;
+  border:0.5px solid var(--border2);background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text2);font-size:17px;cursor:pointer;position:relative;
+  transition:all .15s;text-decoration:none;
+}
+.tib:hover{background:#222;border-color:#3a3a3a}
+.tib.create{background:var(--green);border-color:var(--green);color:#04342C}
+.tib.create:hover{background:var(--green-mid)}
+.ndot{width:8px;height:8px;background:var(--pink);border-radius:50%;border:2px solid var(--bg);position:absolute;top:-2px;right:-2px}
+
+/* CREATE DROPDOWN */
+.create-wrap{position:relative}
+.create-menu{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:#111;border:0.5px solid var(--border2);
+  border-radius:var(--radius-sm);overflow:hidden;
+  min-width:180px;z-index:200;
+  opacity:0;pointer-events:none;transform:translateY(-6px);
+  transition:opacity .18s,transform .18s;
+}
+.create-menu.open{opacity:1;pointer-events:all;transform:translateY(0)}
+.cm-item{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;font-size:13px;font-weight:500;
+  color:var(--text2);cursor:pointer;transition:background .12s,color .12s;
+}
+.cm-item:hover{background:var(--bg3);color:var(--text)}
+.cm-item i{font-size:16px;color:var(--green)}
+
+/* MAP STRIP */
+.map-strip{
+  margin:16px 20px;border-radius:var(--radius);overflow:hidden;
+  border:0.5px solid var(--border);height:150px;
+  background:#0d1710;position:relative;cursor:pointer;
+}
+.map-strip:hover .map-overlay{opacity:1}
+.mgrid{position:absolute;inset:0;background-image:linear-gradient(#162016 1px,transparent 1px),linear-gradient(90deg,#162016 1px,transparent 1px);background-size:26px 26px}
+.mroad-h{position:absolute;left:0;right:0;height:8px;background:#141414}
+.mroad-v{position:absolute;top:0;bottom:0;width:8px;background:#141414}
+.mpin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;animation:pinpop .4s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes pinpop{from{opacity:0;transform:translate(-50%,-120%)}to{opacity:1;transform:translate(-50%,-100%)}}
+.mbub{padding:4px 10px;border-radius:999px;font-size:10px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:3px}
+.mbub.ev{background:#1e3a5f;color:#93c5fd;border:.5px solid #2d5a8f}
+.mbub.cm{background:#14401f;color:#6ee7b7;border:.5px solid #1d6130}
+.mbub.pp{background:#3b1a5a;color:#d8b4fe;border:.5px solid #5c2a8f}
+.mbub.ht{background:#4a1a1a;color:#fca5a5;border:.5px solid #7a2a2a}
+.mtail{width:2px;height:7px;margin-top:-1px}
+.map-badge{position:absolute;bottom:10px;left:12px;background:rgba(10,10,10,.85);border:.5px solid #2a3a2f;padding:4px 12px;border-radius:999px;font-size:11px;color:var(--green);display:flex;align-items:center;gap:5px;font-weight:500}
+.map-live{position:absolute;top:10px;right:10px;background:var(--pink);color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:999px;display:flex;align-items:center;gap:4px;letter-spacing:.5px}
+.ldot{width:5px;height:5px;background:#fff;border-radius:50%;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.map-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;border-radius:var(--radius)}
+.map-overlay span{background:var(--green);color:#04342C;font-size:12px;font-weight:700;padding:8px 18px;border-radius:999px}
+
+/* PILLS */
+.pills{display:flex;gap:8px;overflow-x:auto;padding:4px 20px 0;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{padding:7px 16px;border-radius:999px;border:.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:inherit;transition:all .12s;flex-shrink:0}
+.pill.on{background:var(--green);border-color:var(--green);color:#04342C}
+.pill:hover:not(.on){background:#222;color:var(--text);border-color:#3a3a3a}
+
+/* SECTIONS */
+.section{margin:24px 0 0}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin-bottom:14px}
+.sec-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px}
+.sec-title i{font-size:16px;color:var(--text3)}
+.see-all{padding:6px 14px;border-radius:999px;border:.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;transition:all .12s}
+.see-all:hover{background:var(--bg3);color:var(--text)}
+.see-all i{font-size:12px}
+.hscroll{display:flex;gap:12px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none}
+.hscroll::-webkit-scrollbar{display:none}
+
+/* EVENT CARDS */
+.ecard{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);min-width:180px;max-width:180px;overflow:hidden;cursor:pointer;flex-shrink:0;transition:border-color .15s,transform .15s}
+.ecard:hover{border-color:#333;transform:translateY(-2px)}
+.ethumb{height:100px;display:flex;align-items:center;justify-content:center;font-size:36px;position:relative}
+.edist{position:absolute;bottom:7px;left:7px;background:rgba(0,0,0,.7);border:.5px solid rgba(255,255,255,.08);padding:2px 8px;border-radius:999px;font-size:9px;color:var(--green);font-weight:500;display:flex;align-items:center;gap:3px}
+.edist i{font-size:9px}
+.ebody{padding:10px 12px 12px}
+.etag{display:inline-block;margin-bottom:6px;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.3px}
+.ename{font-size:13px;font-weight:500;color:#e8e8e8;line-height:1.3;margin-bottom:5px}
+.emeta{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text3)}
+.emeta i{font-size:10px}
+
+/* COMMUNITY CARDS */
+.ccard{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);min-width:160px;max-width:160px;padding:14px;cursor:pointer;flex-shrink:0;transition:border-color .15s,transform .15s}
+.ccard:hover{border-color:#333;transform:translateY(-2px)}
+.cicon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px}
+.cname{font-size:13px;font-weight:500;color:#e8e8e8;margin-bottom:5px;line-height:1.3}
+.cmem{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:3px}
+.cmem i{font-size:10px}
+
+/* PEOPLE */
+.people-row{display:flex;gap:18px;overflow-x:auto;padding:0 20px 8px;scrollbar-width:none;align-items:flex-start}
+.people-row::-webkit-scrollbar{display:none}
+.pcard{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;flex-shrink:0;width:72px}
+.pring{width:64px;height:64px;border-radius:50%;padding:3px;border:2px solid var(--border2);position:relative;transition:border-color .15s}
+.pring:hover{border-color:var(--green)}
+.pring.online{border-color:var(--green)}
+.pring.active{border-color:var(--pink)}
+.pring-inner{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.odot{position:absolute;bottom:2px;right:2px;width:11px;height:11px;background:var(--green);border-radius:50%;border:2.5px solid var(--bg)}
+.pname{font-size:11px;font-weight:500;color:#ccc;text-align:center;line-height:1.3}
+.pdist{font-size:10px;color:var(--text3);text-align:center}
+.padd .pring{border-style:dashed;border-color:#2a2a2a}
+.padd .pring-inner{background:var(--bg2);color:var(--green);font-size:20px}
+.padd .pname{color:var(--text3)}
+
+/* SCROLL HINT */
+.scroll-hint{position:relative}
+.scroll-hint::after{content:'';position:absolute;top:0;right:0;bottom:4px;width:60px;background:linear-gradient(to right,transparent,#0a0a0a);pointer-events:none;border-radius:0 var(--radius) var(--radius) 0}
+
+footer{height:32px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">close<span>.</span>connect</span>
+  <a href="search.html" class="search-pill">
+    <i class="ti ti-search"></i>
+    <span>people, events, vibes…</span>
+  </a>
+  <div class="tb-right">
+    <div class="create-wrap">
+      <button class="tib create" id="create-btn" aria-label="Create">
+        <i class="ti ti-plus"></i>
+      </button>
+      <div class="create-menu" id="create-menu">
+        <div class="cm-item"><i class="ti ti-users"></i>create community</div>
+        <div class="cm-item"><i class="ti ti-calendar-event"></i>create event</div>
+      </div>
+    </div>
+    <a href="#" class="tib" aria-label="Notifications">
+      <i class="ti ti-bell"></i>
+      <span class="ndot"></span>
+    </a>
+    <a href="#" class="tib" aria-label="Profile">
+      <i class="ti ti-user"></i>
+    </a>
+  </div>
+</div>
+
+<!-- MAP STRIP -->
+<a href="map.html" class="map-strip" style="display:block">
+  <div class="mgrid"></div>
+  <div class="mroad-h" style="top:42%"></div>
+  <div class="mroad-h" style="top:72%"></div>
+  <div class="mroad-v" style="left:28%"></div>
+  <div class="mroad-v" style="left:60%"></div>
+  <div class="mroad-v" style="left:80%"></div>
+  <div class="mpin" style="left:18%;top:52%;animation-delay:.05s"><div class="mbub ht"><i class="ti ti-flame" style="font-size:9px"></i>Sketch Walk</div><div class="mtail" style="background:#7a2a2a"></div></div>
+  <div class="mpin" style="left:33%;top:38%;animation-delay:.15s"><div class="mbub ev"><i class="ti ti-calendar-event" style="font-size:9px"></i>Jazz Night</div><div class="mtail" style="background:#2d5a8f"></div></div>
+  <div class="mpin" style="left:52%;top:55%;animation-delay:.25s"><div class="mbub pp"><i class="ti ti-user" style="font-size:9px"></i>Priya S.</div><div class="mtail" style="background:#5c2a8f"></div></div>
+  <div class="mpin" style="left:66%;top:32%;animation-delay:.35s"><div class="mbub cm"><i class="ti ti-users" style="font-size:9px"></i>Runners</div><div class="mtail" style="background:#1d6130"></div></div>
+  <div class="map-badge"><i class="ti ti-current-location"></i>Bengaluru · 12 nearby</div>
+  <div class="map-live"><span class="ldot"></span>LIVE</div>
+  <div class="map-overlay"><span>open map view →</span></div>
+</a>
+
+<!-- FILTER PILLS -->
+<div class="pills">
+  <button class="pill on" onclick="filterPill(this)">all</button>
+  <button class="pill" onclick="filterPill(this)">events</button>
+  <button class="pill" onclick="filterPill(this)">communities</button>
+  <button class="pill" onclick="filterPill(this)">people</button>
+  <button class="pill" onclick="filterPill(this)">this weekend</button>
+  <button class="pill" onclick="filterPill(this)">free</button>
+  <button class="pill" onclick="filterPill(this)">outdoors</button>
+</div>
+
+<!-- NEARBY EVENTS -->
+<div class="section">
+  <div class="sec-head">
+    <span class="sec-title"><i class="ti ti-calendar-event"></i>nearby events</span>
+    <button class="see-all">see all <i class="ti ti-arrow-right"></i></button>
+  </div>
+  <div class="hscroll scroll-hint">
+    <div class="ecard">
+      <div class="ethumb" style="background:#0d1a2e">🎸<span class="edist"><i class="ti ti-map-pin"></i>0.4 km</span></div>
+      <div class="ebody"><div class="etag" style="background:#0d1a2e;color:#93c5fd">music</div><div class="ename">Jazz &amp; Blues Night</div><div class="emeta"><i class="ti ti-clock"></i>Tonight · 8 PM</div></div>
+    </div>
+    <div class="ecard">
+      <div class="ethumb" style="background:#1a0d2e">💻<span class="edist"><i class="ti ti-map-pin"></i>1.1 km</span></div>
+      <div class="ebody"><div class="etag" style="background:#1a0d2e;color:#c4b5fd">tech</div><div class="ename">Founders Meetup</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 10 AM</div></div>
+    </div>
+    <div class="ecard">
+      <div class="ethumb" style="background:#0d2218">🧘<span class="edist"><i class="ti ti-map-pin"></i>0.8 km</span></div>
+      <div class="ebody"><div class="etag" style="background:#0d2218;color:#6ee7b7">wellness</div><div class="ename">Morning Yoga</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 6:30 AM</div></div>
+    </div>
+    <div class="ecard">
+      <div class="ethumb" style="background:#2a0e0e">🎨<span class="edist"><i class="ti ti-map-pin"></i>2.3 km</span></div>
+      <div class="ebody"><div class="etag" style="background:#2a0e0e;color:#fca5a5">art</div><div class="ename">Sketching Walk</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 4 PM</div></div>
+    </div>
+    <div class="ecard">
+      <div class="ethumb" style="background:#1a1a0d">🎤<span class="edist"><i class="ti ti-map-pin"></i>3.1 km</span></div>
+      <div class="ebody"><div class="etag" style="background:#1a1a0d;color:#fde68a">open mic</div><div class="ename">Open Mic Night</div><div class="emeta"><i class="ti ti-clock"></i>Fri · 7 PM</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITIES -->
+<div class="section">
+  <div class="sec-head">
+    <span class="sec-title"><i class="ti ti-users"></i>communities</span>
+    <button class="see-all">see all <i class="ti ti-arrow-right"></i></button>
+  </div>
+  <div class="hscroll scroll-hint">
+    <div class="ccard"><div class="cicon" style="background:#0d2218">🏃</div><div class="cname">Weekend Runners</div><div class="cmem"><i class="ti ti-users"></i>1.2k members</div></div>
+    <div class="ccard"><div class="cicon" style="background:#1a0d2e">📸</div><div class="cname">BLR Photographers</div><div class="cmem"><i class="ti ti-users"></i>840 members</div></div>
+    <div class="ccard"><div class="cicon" style="background:#0d1a2e">🎮</div><div class="cname">Game Dev Circle</div><div class="cmem"><i class="ti ti-users"></i>560 members</div></div>
+    <div class="ccard"><div class="cicon" style="background:#2a0e0e">🌱</div><div class="cname">Urban Gardeners</div><div class="cmem"><i class="ti ti-users"></i>390 members</div></div>
+    <div class="ccard"><div class="cicon" style="background:#1a1a0d">🎵</div><div class="cname">Indie Music Lab</div><div class="cmem"><i class="ti ti-users"></i>210 members</div></div>
+  </div>
+</div>
+
+<!-- PEOPLE NEARBY -->
+<div class="section">
+  <div class="sec-head">
+    <span class="sec-title"><i class="ti ti-user-search"></i>people nearby</span>
+    <button class="see-all">see all <i class="ti ti-arrow-right"></i></button>
+  </div>
+  <div class="people-row">
+    <div class="pcard"><div class="pring online"><div class="pring-inner" style="background:#0d2218;color:#5DCAA5">AK</div><span class="odot"></span></div><div class="pname">Aarav K.</div><div class="pdist">0.3 km</div></div>
+    <div class="pcard"><div class="pring active"><div class="pring-inner" style="background:#1a0d2e;color:#D4537E">PS</div></div><div class="pname">Priya S.</div><div class="pdist">0.8 km</div></div>
+    <div class="pcard"><div class="pring online"><div class="pring-inner" style="background:#2a0e0e;color:#f87171">RV</div><span class="odot"></span></div><div class="pname">Rohan V.</div><div class="pdist">1.2 km</div></div>
+    <div class="pcard"><div class="pring" style="border-color:#222"><div class="pring-inner" style="background:#1a0d2e;color:#7F77DD">NM</div></div><div class="pname">Neha M.</div><div class="pdist">1.7 km</div></div>
+    <div class="pcard"><div class="pring active"><div class="pring-inner" style="background:#0d1a2e;color:#60a5fa">DG</div></div><div class="pname">Dev G.</div><div class="pdist">2.1 km</div></div>
+    <div class="pcard"><div class="pring online"><div class="pring-inner" style="background:#0d2218;color:#34d399">SK</div><span class="odot"></span></div><div class="pname">Sneha K.</div><div class="pdist">2.4 km</div></div>
+    <div class="pcard"><div class="pring" style="border-color:#222"><div class="pring-inner" style="background:#1f120a;color:#fb923c">MR</div></div><div class="pname">Maya R.</div><div class="pdist">2.9 km</div></div>
+    <div class="pcard padd"><div class="pring"><div class="pring-inner"><i class="ti ti-plus"></i></div></div><div class="pname">invite friends</div></div>
+  </div>
+</div>
+
+<footer></footer>
+
+<script>
+document.getElementById('create-btn').addEventListener('click',function(e){
+  e.stopPropagation();
+  document.getElementById('create-menu').classList.toggle('open');
+});
+document.addEventListener('click',function(){
+  document.getElementById('create-menu').classList.remove('open');
+});
+function filterPill(el){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+}
+</script>
+</body>
+</html>

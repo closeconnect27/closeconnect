@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>close.connect — profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1a1a1a;
+  --border:#222;--border2:#2a2a2a;
+  --text:#f0f0f0;--text2:#888;--text3:#444;
+  --green:#5DCAA5;--green-dark:#0d2218;--green-mid:#1D9E75;
+  --pink:#D4537E;--purple:#7F77DD;
+  --radius:14px;--radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,10,10,.96);backdrop-filter:blur(12px);
+  border-bottom:.5px solid var(--border);
+  padding:12px 20px;
+  display:flex;align-items:center;gap:12px;
+}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-.5px;color:var(--text)}
+.logo span{color:var(--green)}
+.back-btn{width:36px;height:36px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:16px;cursor:pointer;text-decoration:none;transition:all .15s;flex-shrink:0}
+.back-btn:hover{background:#222;border-color:#3a3a3a}
+.tb-spacer{flex:1}
+.tib{width:36px;height:36px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:17px;cursor:pointer;text-decoration:none;transition:all .15s;flex-shrink:0;position:relative}
+.tib:hover{background:#222;border-color:#3a3a3a}
+.ndot{width:7px;height:7px;background:var(--pink);border-radius:50%;border:2px solid var(--bg);position:absolute;top:-1px;right:-1px}
+
+/* ── SETTINGS DRAWER ── */
+.settings-drawer{
+  background:#111;border-bottom:.5px solid var(--border);
+  max-height:0;overflow:hidden;
+  transition:max-height .3s ease;
+}
+.settings-drawer.open{max-height:400px}
+.sd-inner{padding:16px 20px}
+.sd-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:.5px solid var(--border);cursor:pointer;transition:color .12s}
+.sd-item:last-child{border-bottom:none}
+.sd-item:hover .sd-label{color:var(--text)}
+.sd-icon{width:34px;height:34px;border-radius:var(--radius-sm);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2);flex-shrink:0}
+.sd-label{font-size:14px;color:var(--text2);flex:1}
+.sd-arrow{font-size:14px;color:var(--text3)}
+.sd-danger .sd-icon{background:#2a0e0e}
+.sd-danger .sd-label{color:#f87171}
+.sd-danger:hover .sd-label{color:#fca5a5}
+
+/* ── PROFILE HEADER ── */
+.profile-header{padding:24px 20px 0;position:relative}
+.cover-strip{position:absolute;top:0;left:0;right:0;height:90px;background:#0d1710;border-bottom:.5px solid var(--border);overflow:hidden}
+.cover-pattern{position:absolute;inset:0;background-image:linear-gradient(#162016 1px,transparent 1px),linear-gradient(90deg,#162016 1px,transparent 1px);background-size:22px 22px;opacity:.6}
+.cover-strip .edit-cover{position:absolute;bottom:8px;right:12px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.6);border:.5px solid var(--border2);font-size:10px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px}
+.cover-strip .edit-cover i{font-size:10px}
+
+.avatar-wrap{position:relative;width:80px;height:80px;margin-bottom:12px;margin-top:50px;z-index:2}
+.avatar{width:80px;height:80px;border-radius:50%;background:var(--green-dark);border:3px solid var(--bg);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:var(--green)}
+.avatar-online{position:absolute;bottom:3px;right:3px;width:14px;height:14px;background:var(--green);border-radius:50%;border:2.5px solid var(--bg)}
+.edit-avatar-btn{position:absolute;bottom:0;right:-4px;width:26px;height:26px;background:var(--bg3);border:1px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--text2);transition:all .15s}
+.edit-avatar-btn:hover{background:#222;border-color:#3a3a3a}
+
+.profile-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.3px;margin-bottom:3px}
+.profile-handle{font-size:13px;color:var(--text3);margin-bottom:8px}
+.profile-bio{font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:12px;max-width:340px}
+
+/* INTEREST TAGS */
+.interest-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.itag{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:500;cursor:pointer;transition:all .12s;border:.5px solid transparent}
+.itag:hover{filter:brightness(1.1)}
+
+/* STATS ROW */
+.stats-row{display:flex;gap:0;margin-bottom:20px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.stat-item{flex:1;padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:background .15s;border-right:.5px solid var(--border)}
+.stat-item:last-child{border-right:none}
+.stat-item:hover{background:var(--bg3)}
+.stat-n{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text)}
+.stat-l{font-size:10px;color:var(--text3);font-weight:500;text-align:center}
+
+/* RATING */
+.rating-row{display:flex;align-items:center;gap:6px;margin-bottom:20px;padding:12px 14px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius)}
+.rating-stars{display:flex;gap:2px}
+.star{font-size:16px;color:#333}
+.star.filled{color:#facc15}
+.star.half{color:#facc15;opacity:.5}
+.rating-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text)}
+.rating-label{font-size:12px;color:var(--text3);flex:1}
+.rating-count{font-size:11px;color:var(--text3)}
+
+/* ACTION BUTTONS */
+.action-btns{display:flex;gap:10px;margin-bottom:20px}
+.btn-edit{flex:1;padding:11px 0;border-radius:999px;border:.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s}
+.btn-edit:hover{background:#222;border-color:#3a3a3a;color:var(--text)}
+.btn-share{flex:1;padding:11px 0;border-radius:999px;border:.5px solid var(--green);background:transparent;color:var(--green);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s}
+.btn-share:hover{background:var(--green-dark)}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:.5px solid var(--border);padding:0 20px;position:sticky;top:65px;z-index:50;background:rgba(10,10,10,.97);backdrop-filter:blur(12px)}
+.tab{flex:1;padding:12px 0;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;background:transparent;border-left:none;border-right:none;border-top:none}
+.tab:hover{color:var(--text2)}
+.tab.on{color:var(--green);border-bottom-color:var(--green)}
+
+/* ── TAB CONTENT ── */
+.tab-content{display:none;padding:20px 20px 40px;animation:fadeUp .2s ease both}
+.tab-content.visible{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION LABEL */
+.sec-label{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.sec-label span{font-size:11px;color:var(--green);cursor:pointer;font-weight:500}
+
+/* ── FRIENDS ── */
+.friends-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.friend-card{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:11px;cursor:pointer;transition:border-color .15s,background .15s}
+.friend-card:hover{border-color:var(--border2);background:#161616}
+.fa-ring{width:46px;height:46px;border-radius:50%;padding:2.5px;border:2px solid var(--border2);flex-shrink:0}
+.fa-ring.online{border-color:var(--green)}
+.fa-ring.active{border-color:var(--pink)}
+.fa-inner{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.friend-info{min-width:0}
+.fn-name{font-size:13px;font-weight:500;color:#e0e0e0;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fn-tag{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fn-dist{font-size:10px;color:var(--green);font-weight:500;margin-top:2px;display:flex;align-items:center;gap:3px}
+.fn-dist i{font-size:9px}
+
+/* ── COMMUNITIES ── */
+.community-list{display:flex;flex-direction:column;gap:10px}
+.comm-card{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.comm-card:hover{border-color:var(--border2);background:#161616}
+.comm-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.comm-info{flex:1;min-width:0}
+.comm-name{font-size:14px;font-weight:500;color:#e0e0e0;margin-bottom:3px}
+.comm-meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px}
+.comm-meta i{font-size:11px}
+.comm-role{padding:3px 9px;border-radius:999px;font-size:9px;font-weight:700;flex-shrink:0}
+
+/* ── STATS TAB ── */
+.stats-big-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:16px}
+.sc-label{font-size:11px;color:var(--text3);font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.sc-label i{font-size:11px}
+.sc-value{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px}
+.sc-sub{font-size:10px;color:var(--text3)}
+.sc-green{color:var(--green)}
+.sc-pink{color:var(--pink)}
+
+.events-attended-list{display:flex;flex-direction:column;gap:8px}
+.ea-item{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .15s}
+.ea-item:hover{border-color:var(--border2)}
+.ea-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ea-body{flex:1;min-width:0}
+.ea-name{font-size:13px;font-weight:500;color:#ddd;margin-bottom:2px}
+.ea-meta{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px}
+.ea-meta i{font-size:10px}
+.ea-rating{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.ea-star{font-size:12px;color:#facc15}
+.ea-val{font-size:11px;color:var(--text2);font-weight:500}
+
+/* ── EDIT MODAL ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:#111;border-top:.5px solid var(--border2);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:600px;animation:slideUp .25s ease both}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:36px;height:3px;background:var(--border2);border-radius:999px;margin:0 auto 18px}
+.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:18px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.4px;margin-bottom:6px}
+.field input,.field textarea{width:100%;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .15s;resize:none}
+.field input:focus,.field textarea:focus{border-color:#3a3a3a}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3)}
+.modal-btns{display:flex;gap:10px;margin-top:6px}
+.mbtn-cancel{flex:1;padding:12px 0;border-radius:999px;border:.5px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s}
+.mbtn-cancel:hover{background:var(--bg3)}
+.mbtn-save{flex:1;padding:12px 0;border-radius:999px;border:none;background:var(--green);color:#04342C;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s}
+.mbtn-save:hover{background:var(--green-mid);color:#fff}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <a href="landing.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+  <span class="logo">close<span>.</span>connect</span>
+  <div class="tb-spacer"></div>
+  <a href="search.html" class="tib"><i class="ti ti-search"></i></a>
+  <button class="tib" id="settings-toggle" aria-label="Settings"><i class="ti ti-menu-2"></i></button>
+</div>
+
+<!-- SETTINGS DRAWER -->
+<div class="settings-drawer" id="settings-drawer">
+  <div class="sd-inner">
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-user-edit"></i></div><span class="sd-label">edit profile</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-bell"></i></div><span class="sd-label">notifications</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-lock"></i></div><span class="sd-label">privacy &amp; safety</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-map-pin"></i></div><span class="sd-label">location settings</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-palette"></i></div><span class="sd-label">appearance</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item"><div class="sd-icon"><i class="ti ti-help"></i></div><span class="sd-label">help &amp; support</span><i class="ti ti-chevron-right sd-arrow"></i></div>
+    <div class="sd-item sd-danger"><div class="sd-icon"><i class="ti ti-logout" style="color:#f87171"></i></div><span class="sd-label">log out</span></div>
+  </div>
+</div>
+
+<!-- PROFILE HEADER -->
+<div class="profile-header">
+  <div class="cover-strip">
+    <div class="cover-pattern"></div>
+    <div class="edit-cover"><i class="ti ti-camera"></i>edit cover</div>
+  </div>
+
+  <div class="avatar-wrap">
+    <div class="avatar">SK</div>
+    <span class="avatar-online"></span>
+    <button class="edit-avatar-btn" onclick="openEdit()"><i class="ti ti-camera"></i></button>
+  </div>
+
+  <div class="profile-name">Srikeerthi</div>
+  <div class="profile-handle">@srikeerthi · Bengaluru</div>
+  <div class="profile-bio">Tech Support Engineer · AI tooling nerd · building things that connect people ✦</div>
+
+  <div class="interest-row">
+    <span class="itag" style="background:#0d1a2e;color:#93c5fd;border-color:#1e3a5f">💻 tech</span>
+    <span class="itag" style="background:#0d2218;color:#6ee7b7;border-color:#1d6130">🏃 running</span>
+    <span class="itag" style="background:#1a0d2e;color:#c4b5fd;border-color:#2d1a5f">🤖 AI/ML</span>
+    <span class="itag" style="background:#2a0e0e;color:#fca5a5;border-color:#5a1a1a">🎨 art</span>
+    <span class="itag" style="background:#1a1a0d;color:#fde68a;border-color:#3a3a1a">☕ coffee</span>
+    <span class="itag" style="background:#1a0d1a;color:#e879f9;border-color:#3a1a3a">🎵 music</span>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-item" onclick="setTab('friends')">
+      <span class="stat-n">24</span>
+      <span class="stat-l">friends</span>
+    </div>
+    <div class="stat-item" onclick="setTab('communities')">
+      <span class="stat-n">6</span>
+      <span class="stat-l">communities</span>
+    </div>
+    <div class="stat-item" onclick="setTab('stats')">
+      <span class="stat-n">18</span>
+      <span class="stat-l">events</span>
+    </div>
+    <div class="stat-item" onclick="setTab('stats')">
+      <span class="stat-n" style="color:var(--green)">4.8</span>
+      <span class="stat-l">rating</span>
+    </div>
+  </div>
+
+  <div class="action-btns">
+    <button class="btn-edit" onclick="openEdit()"><i class="ti ti-edit" style="font-size:15px"></i>edit profile</button>
+    <button class="btn-share" onclick="shareProfile()"><i class="ti ti-share" style="font-size:15px"></i>share profile</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on" onclick="setTab('friends')">friends</button>
+  <button class="tab" onclick="setTab('communities')">communities</button>
+  <button class="tab" onclick="setTab('stats')">stats</button>
+</div>
+
+<!-- ── FRIENDS TAB ── -->
+<div class="tab-content visible" id="tab-friends">
+  <div class="sec-label">all friends <span>add friends →</span></div>
+  <div class="friends-grid">
+
+    <div class="friend-card">
+      <div class="fa-ring online"><div class="fa-inner" style="background:#0d2218;color:#5DCAA5">AK</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Aarav Kumar</div>
+        <div class="fn-tag">Product Designer</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>0.3 km</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring active"><div class="fa-inner" style="background:#1a0d2e;color:#D4537E">PS</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Priya Sharma</div>
+        <div class="fn-tag">ML Engineer</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>0.8 km</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring online"><div class="fa-inner" style="background:#2a0e0e;color:#f87171">RV</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Rohan Verma</div>
+        <div class="fn-tag">Photographer</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>1.2 km</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring"><div class="fa-inner" style="background:#1a0d2e;color:#7F77DD;border-color:#222">NM</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Neha Menon</div>
+        <div class="fn-tag">Startup Founder</div>
+        <div class="fn-dist" style="color:var(--text3)"><i class="ti ti-clock"></i>2h ago</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring active"><div class="fa-inner" style="background:#0d1a2e;color:#60a5fa">DG</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Dev Gupta</div>
+        <div class="fn-tag">Jazz Musician</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>2.1 km</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring online"><div class="fa-inner" style="background:#0d2218;color:#34d399">SK</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Sneha Krishnan</div>
+        <div class="fn-tag">UX Researcher</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>2.4 km</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring"><div class="fa-inner" style="background:#1f120a;color:#fb923c">MR</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Maya Rao</div>
+        <div class="fn-tag">Data Scientist</div>
+        <div class="fn-dist" style="color:var(--text3)"><i class="ti ti-clock"></i>1d ago</div>
+      </div>
+    </div>
+
+    <div class="friend-card">
+      <div class="fa-ring online"><div class="fa-inner" style="background:#1a0d2e;color:#a78bfa">VN</div></div>
+      <div class="friend-info">
+        <div class="fn-name">Vivek Nair</div>
+        <div class="fn-tag">Backend Eng.</div>
+        <div class="fn-dist"><i class="ti ti-map-pin"></i>3.0 km</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── COMMUNITIES TAB ── -->
+<div class="tab-content" id="tab-communities">
+  <div class="sec-label">my communities <span>browse all →</span></div>
+  <div class="community-list">
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#0d2218">🏃</div>
+      <div class="comm-info">
+        <div class="comm-name">Weekend Runners</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>1.2k members · <i class="ti ti-map-pin"></i>1.1 km</div>
+      </div>
+      <span class="comm-role" style="background:#0d2218;color:#6ee7b7">admin</span>
+    </div>
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#1a0d2e">🤖</div>
+      <div class="comm-info">
+        <div class="comm-name">AI Builders BLR</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>820 members · <i class="ti ti-map-pin"></i>2.4 km</div>
+      </div>
+      <span class="comm-role" style="background:#1a0d2e;color:#c4b5fd">member</span>
+    </div>
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#1a0d2e">📸</div>
+      <div class="comm-info">
+        <div class="comm-name">BLR Photographers</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>840 members · <i class="ti ti-map-pin"></i>1.8 km</div>
+      </div>
+      <span class="comm-role" style="background:#1a0d2e;color:#c4b5fd">member</span>
+    </div>
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#0d0d2e">🎮</div>
+      <div class="comm-info">
+        <div class="comm-name">Game Dev Circle</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>560 members · <i class="ti ti-map-pin"></i>1.5 km</div>
+      </div>
+      <span class="comm-role" style="background:#0d0d2e;color:#818cf8">moderator</span>
+    </div>
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#2a1a0a">☕</div>
+      <div class="comm-info">
+        <div class="comm-name">Specialty Coffee Club</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>490 members · <i class="ti ti-map-pin"></i>0.5 km</div>
+      </div>
+      <span class="comm-role" style="background:#2a1a0a;color:#fdba74">member</span>
+    </div>
+
+    <div class="comm-card">
+      <div class="comm-icon" style="background:#0d1a2e">🚀</div>
+      <div class="comm-info">
+        <div class="comm-name">Startup Founders</div>
+        <div class="comm-meta"><i class="ti ti-users"></i>440 members · <i class="ti ti-map-pin"></i>1.8 km</div>
+      </div>
+      <span class="comm-role" style="background:#0d1a2e;color:#93c5fd">member</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── STATS TAB ── -->
+<div class="tab-content" id="tab-stats">
+
+  <div class="stats-big-grid">
+    <div class="stat-card">
+      <div class="sc-label"><i class="ti ti-calendar-check"></i>events attended</div>
+      <div class="sc-value sc-green">18</div>
+      <div class="sc-sub">↑ 4 this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label"><i class="ti ti-star"></i>profile rating</div>
+      <div class="sc-value sc-green">4.8</div>
+      <div class="sc-sub">from 31 reviews</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label"><i class="ti ti-users"></i>connections</div>
+      <div class="sc-value">24</div>
+      <div class="sc-sub">↑ 3 this week</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label"><i class="ti ti-map-pin"></i>places visited</div>
+      <div class="sc-value">12</div>
+      <div class="sc-sub">across Bengaluru</div>
+    </div>
+  </div>
+
+  <!-- RATING -->
+  <div class="rating-row">
+    <div class="rating-stars">
+      <span class="star filled">★</span>
+      <span class="star filled">★</span>
+      <span class="star filled">★</span>
+      <span class="star filled">★</span>
+      <span class="star half">★</span>
+    </div>
+    <span class="rating-val">4.8</span>
+    <span class="rating-label">rating of my profile</span>
+    <span class="rating-count">31 reviews</span>
+  </div>
+
+  <div class="sec-label" style="margin-bottom:12px">events attended <span>see all →</span></div>
+  <div class="events-attended-list">
+
+    <div class="ea-item">
+      <div class="ea-icon" style="background:#0d1a2e">🎸</div>
+      <div class="ea-body">
+        <div class="ea-name">Jazz &amp; Blues Night</div>
+        <div class="ea-meta"><i class="ti ti-calendar"></i>12 May 2025 · Koramangala</div>
+      </div>
+      <div class="ea-rating"><span class="ea-star">★</span><span class="ea-val">5.0</span></div>
+    </div>
+
+    <div class="ea-item">
+      <div class="ea-icon" style="background:#1a0d2e">💻</div>
+      <div class="ea-body">
+        <div class="ea-name">AI Builders Night</div>
+        <div class="ea-meta"><i class="ti ti-calendar"></i>8 May 2025 · Indiranagar</div>
+      </div>
+      <div class="ea-rating"><span class="ea-star">★</span><span class="ea-val">4.5</span></div>
+    </div>
+
+    <div class="ea-item">
+      <div class="ea-icon" style="background:#0d2218">🏃</div>
+      <div class="ea-body">
+        <div class="ea-name">5K Morning Run</div>
+        <div class="ea-meta"><i class="ti ti-calendar"></i>3 May 2025 · Cubbon Park</div>
+      </div>
+      <div class="ea-rating"><span class="ea-star">★</span><span class="ea-val">5.0</span></div>
+    </div>
+
+    <div class="ea-item">
+      <div class="ea-icon" style="background:#2a0e0e">🎨</div>
+      <div class="ea-body">
+        <div class="ea-name">Sketching Walk</div>
+        <div class="ea-meta"><i class="ti ti-calendar"></i>27 Apr 2025 · HSR Layout</div>
+      </div>
+      <div class="ea-rating"><span class="ea-star">★</span><span class="ea-val">4.0</span></div>
+    </div>
+
+    <div class="ea-item">
+      <div class="ea-icon" style="background:#1a0d2e">🚀</div>
+      <div class="ea-body">
+        <div class="ea-name">Pitch &amp; Chill</div>
+        <div class="ea-meta"><i class="ti ti-calendar"></i>20 Apr 2025 · Whitefield</div>
+      </div>
+      <div class="ea-rating"><span class="ea-star">★</span><span class="ea-val">4.5</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">edit profile</div>
+    <div class="field"><label>display name</label><input type="text" value="Srikeerthi" /></div>
+    <div class="field"><label>handle</label><input type="text" value="@srikeerthi" /></div>
+    <div class="field"><label>bio</label><textarea rows="2">Tech Support Engineer · AI tooling nerd · building things that connect people ✦</textarea></div>
+    <div class="field"><label>location</label><input type="text" value="Bengaluru" /></div>
+    <div class="modal-btns">
+      <button class="mbtn-cancel" onclick="closeEdit()">cancel</button>
+      <button class="mbtn-save" onclick="closeEdit()">save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* settings toggle */
+document.getElementById('settings-toggle').addEventListener('click',function(){
+  document.getElementById('settings-drawer').classList.toggle('open');
+});
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#settings-drawer')&&!e.target.closest('#settings-toggle')){
+    document.getElementById('settings-drawer').classList.remove('open');
+  }
+});
+
+/* tabs */
+function setTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['friends','communities','stats'];
+    t.classList.toggle('on',names[i]===name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('visible'));
+  document.getElementById('tab-'+name).classList.add('visible');
+  document.getElementById('tab-'+name).scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* edit modal */
+function openEdit(){
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeEdit(){
+  document.getElementById('edit-modal').classList.remove('open');
+}
+document.getElementById('edit-modal').addEventListener('click',function(e){
+  if(e.target===this) closeEdit();
+});
+
+/* share */
+function shareProfile(){
+  const btn=document.querySelector('.btn-share');
+  btn.innerHTML='<i class="ti ti-check" style="font-size:15px"></i>link copied!';
+  btn.style.background='var(--green-dark)';
+  setTimeout(()=>{
+    btn.innerHTML='<i class="ti ti-share" style="font-size:15px"></i>share profile';
+    btn.style.background='';
+  },2000);
+}
+</script>
+</body>
+</html>

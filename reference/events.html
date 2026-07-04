@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>close.connect — events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1a1a1a;
+  --border:#222;--border2:#2a2a2a;
+  --text:#f0f0f0;--text2:#888;--text3:#444;
+  --green:#5DCAA5;--green-dark:#0d2218;--green-mid:#1D9E75;
+  --pink:#D4537E;--radius:14px;--radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* TOPBAR */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,10,10,0.96);
+  backdrop-filter:blur(12px);
+  border-bottom:0.5px solid var(--border);
+  padding:12px 20px;
+  display:flex;align-items:center;gap:12px;
+}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;color:var(--text)}
+.logo span{color:var(--green)}
+.back-btn{width:36px;height:36px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:16px;cursor:pointer;text-decoration:none;transition:all .15s;flex-shrink:0}
+.back-btn:hover{background:#222;border-color:#3a3a3a}
+.page-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--text);flex:1}
+.tib{width:36px;height:36px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:16px;cursor:pointer;text-decoration:none;transition:all .15s;flex-shrink:0;position:relative}
+.tib:hover{background:#222;border-color:#3a3a3a}
+.ndot{width:7px;height:7px;background:var(--pink);border-radius:50%;border:2px solid var(--bg);position:absolute;top:-1px;right:-1px}
+
+/* SEARCH + FILTER BAR */
+.bar{display:flex;gap:10px;padding:14px 20px 0;align-items:center}
+.search-pill{flex:1;background:var(--bg3);border:.5px solid var(--border2);border-radius:999px;display:flex;align-items:center;padding:0 14px;height:40px;gap:8px;cursor:pointer;text-decoration:none;transition:border-color .15s}
+.search-pill:hover{border-color:#3a3a3a}
+.search-pill i{color:var(--text3);font-size:14px}
+.search-pill span{font-size:13px;color:var(--text3)}
+.filter-btn{width:40px;height:40px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:17px;cursor:pointer;flex-shrink:0;transition:all .15s;position:relative}
+.filter-btn:hover,.filter-btn.open{background:var(--green-dark);border-color:var(--green);color:var(--green)}
+.filter-dot{width:7px;height:7px;background:var(--green);border-radius:50%;border:2px solid var(--bg);position:absolute;top:-1px;right:-1px}
+
+/* FILTER DRAWER */
+.filter-drawer{
+  background:#111;border-bottom:.5px solid var(--border);
+  padding:0 20px;max-height:0;overflow:hidden;
+  transition:max-height .3s ease,padding .3s ease;
+}
+.filter-drawer.open{max-height:300px;padding:16px 20px}
+.fd-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.fd-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:8px}
+.fd-pill{padding:5px 12px;border-radius:999px;border:.5px solid var(--border2);background:var(--bg3);color:var(--text3);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .12s}
+.fd-pill.on{background:var(--green);border-color:var(--green);color:#04342C}
+.fd-pill:hover:not(.on){border-color:#3a3a3a;color:var(--text2)}
+
+/* CATEGORY TABS */
+.cat-tabs{display:flex;gap:0;overflow-x:auto;padding:14px 20px 0;scrollbar-width:none;border-bottom:.5px solid var(--border)}
+.cat-tabs::-webkit-scrollbar{display:none}
+.cat-tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;background:transparent;border-left:none;border-right:none;border-top:none}
+.cat-tab:hover{color:var(--text2)}
+.cat-tab.on{color:var(--green);border-bottom-color:var(--green)}
+
+/* BODY */
+.body{padding:0 0 40px}
+
+/* CATEGORY SECTION */
+.cat-section{margin-top:28px;animation:fadeUp .3s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.cat-head{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin-bottom:14px}
+.cat-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.cat-emoji{font-size:16px}
+.cat-count{font-size:11px;color:var(--text3);font-weight:400;font-family:'DM Sans',sans-serif}
+.cat-more{font-size:12px;color:var(--green);font-weight:500;cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;gap:3px}
+.cat-more i{font-size:12px}
+
+/* HORIZONTAL SCROLL ROW */
+.hrow{display:flex;gap:12px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none;position:relative}
+.hrow::-webkit-scrollbar{display:none}
+.hrow::after{content:'';position:absolute;top:0;right:0;bottom:4px;width:50px;background:linear-gradient(to right,transparent,#0a0a0a);pointer-events:none}
+
+/* EVENT CARD */
+.ecard{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);min-width:175px;max-width:175px;overflow:hidden;cursor:pointer;flex-shrink:0;transition:border-color .15s,transform .15s}
+.ecard:hover{border-color:#2a2a2a;transform:translateY(-2px)}
+.ethumb{height:95px;display:flex;align-items:center;justify-content:center;font-size:34px;position:relative}
+.edist{position:absolute;bottom:7px;left:7px;background:rgba(0,0,0,.72);border:.5px solid rgba(255,255,255,.07);padding:2px 8px;border-radius:999px;font-size:9px;color:var(--green);font-weight:500;display:flex;align-items:center;gap:3px}
+.edist i{font-size:9px}
+.ehot{position:absolute;top:7px;right:7px;background:var(--pink);color:#fff;font-size:8px;font-weight:700;padding:2px 7px;border-radius:999px}
+.ebody{padding:10px 12px 12px}
+.etag{display:inline-block;margin-bottom:6px;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.3px}
+.ename{font-size:13px;font-weight:500;color:#e0e0e0;line-height:1.3;margin-bottom:5px}
+.emeta{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text3)}
+.emeta i{font-size:10px}
+.egoing{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text3);margin-top:3px}
+.egoing i{font-size:10px}
+
+/* SHOW MORE ROW */
+.show-more-row{margin:20px 20px 0;padding:14px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);font-weight:500;transition:all .15s}
+.show-more-row:hover{border-color:var(--border2);color:var(--text)}
+.show-more-row i{font-size:15px;color:var(--green)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="landing.html" class="back-btn"><i class="ti ti-arrow-left"></i></a>
+  <span class="page-title">events</span>
+  <a href="search.html" class="tib"><i class="ti ti-search"></i></a>
+  <a href="map.html" class="tib"><i class="ti ti-map-pin"></i></a>
+  <a href="#" class="tib"><i class="ti ti-bell"></i><span class="ndot"></span></a>
+</div>
+
+<!-- SEARCH + FILTER -->
+<div class="bar">
+  <a href="search.html" class="search-pill">
+    <i class="ti ti-search"></i>
+    <span>search events…</span>
+  </a>
+  <button class="filter-btn" id="filter-toggle"><i class="ti ti-adjustments-horizontal"></i><span class="filter-dot"></span></button>
+</div>
+
+<!-- FILTER DRAWER -->
+<div class="filter-drawer" id="filter-drawer">
+  <div class="fd-label">when</div>
+  <div class="fd-row">
+    <button class="fd-pill on" onclick="tog(this)">today</button>
+    <button class="fd-pill" onclick="tog(this)">this weekend</button>
+    <button class="fd-pill" onclick="tog(this)">this week</button>
+    <button class="fd-pill" onclick="tog(this)">this month</button>
+  </div>
+  <div class="fd-label">price</div>
+  <div class="fd-row">
+    <button class="fd-pill on" onclick="tog(this)">all</button>
+    <button class="fd-pill" onclick="tog(this)">free</button>
+    <button class="fd-pill" onclick="tog(this)">paid</button>
+  </div>
+  <div class="fd-label">distance</div>
+  <div class="fd-row">
+    <button class="fd-pill" onclick="tog(this)">0.5 km</button>
+    <button class="fd-pill on" onclick="tog(this)">2 km</button>
+    <button class="fd-pill" onclick="tog(this)">5 km</button>
+    <button class="fd-pill" onclick="tog(this)">10 km</button>
+  </div>
+</div>
+
+<!-- CATEGORY TABS -->
+<div class="cat-tabs">
+  <button class="cat-tab on" onclick="setTab(this)">all</button>
+  <button class="cat-tab" onclick="setTab(this)">music</button>
+  <button class="cat-tab" onclick="setTab(this)">tech</button>
+  <button class="cat-tab" onclick="setTab(this)">wellness</button>
+  <button class="cat-tab" onclick="setTab(this)">art</button>
+  <button class="cat-tab" onclick="setTab(this)">food</button>
+  <button class="cat-tab" onclick="setTab(this)">sports</button>
+  <button class="cat-tab" onclick="setTab(this)">social</button>
+</div>
+
+<div class="body">
+
+  <!-- MUSIC -->
+  <div class="cat-section">
+    <div class="cat-head">
+      <span class="cat-name"><span class="cat-emoji">🎵</span>music <span class="cat-count">· 8 events</span></span>
+      <button class="cat-more">see all <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div class="hrow">
+      <div class="ecard">
+        <div class="ethumb" style="background:#0d1a2e">🎸<span class="edist"><i class="ti ti-map-pin"></i>0.4 km</span><span class="ehot">tonight</span></div>
+        <div class="ebody"><div class="etag" style="background:#0d1a2e;color:#93c5fd">music · free</div><div class="ename">Jazz &amp; Blues Night</div><div class="emeta"><i class="ti ti-clock"></i>Tonight · 8 PM</div><div class="egoing"><i class="ti ti-users"></i>34 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a0d1a">🎤<span class="edist"><i class="ti ti-map-pin"></i>3.1 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a0d1a;color:#e879f9">open mic</div><div class="ename">Open Mic Night</div><div class="emeta"><i class="ti ti-clock"></i>Fri · 7 PM</div><div class="egoing"><i class="ti ti-users"></i>18 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a1a0d">🥁<span class="edist"><i class="ti ti-map-pin"></i>2.2 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a1a0d;color:#fde68a">indie</div><div class="ename">Indie Music Lab</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 6 PM</div><div class="egoing"><i class="ti ti-users"></i>52 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#0d1a2e">🎹<span class="edist"><i class="ti ti-map-pin"></i>4.8 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#0d1a2e;color:#93c5fd">classical</div><div class="ename">Piano Recital</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 5 PM</div><div class="egoing"><i class="ti ti-users"></i>29 going</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TECH -->
+  <div class="cat-section">
+    <div class="cat-head">
+      <span class="cat-name"><span class="cat-emoji">💻</span>tech <span class="cat-count">· 5 events</span></span>
+      <button class="cat-more">see all <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div class="hrow">
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a0d2e">💻<span class="edist"><i class="ti ti-map-pin"></i>1.1 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a0d2e;color:#c4b5fd">tech</div><div class="ename">Founders Meetup</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 10 AM</div><div class="egoing"><i class="ti ti-users"></i>67 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#0d0d2e">🤖<span class="edist"><i class="ti ti-map-pin"></i>2.4 km</span><span class="ehot">trending</span></div>
+        <div class="ebody"><div class="etag" style="background:#0d0d2e;color:#818cf8">AI/ML</div><div class="ename">AI Builders Night</div><div class="emeta"><i class="ti ti-clock"></i>Thu · 7 PM</div><div class="egoing"><i class="ti ti-users"></i>112 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#0a1a1a">🎮<span class="edist"><i class="ti ti-map-pin"></i>1.5 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#0a1a1a;color:#6ee7b7">gaming</div><div class="ename">Game Dev Jam</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 2 PM</div><div class="egoing"><i class="ti ti-users"></i>38 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a0d2e">🚀<span class="edist"><i class="ti ti-map-pin"></i>3.2 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a0d2e;color:#c4b5fd">startup</div><div class="ename">Pitch &amp; Chill</div><div class="emeta"><i class="ti ti-clock"></i>Fri · 6 PM</div><div class="egoing"><i class="ti ti-users"></i>45 going</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WELLNESS -->
+  <div class="cat-section">
+    <div class="cat-head">
+      <span class="cat-name"><span class="cat-emoji">🧘</span>wellness <span class="cat-count">· 6 events</span></span>
+      <button class="cat-more">see all <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div class="hrow">
+      <div class="ecard">
+        <div class="ethumb" style="background:#0d2218">🧘<span class="edist"><i class="ti ti-map-pin"></i>0.8 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#0d2218;color:#6ee7b7">wellness · free</div><div class="ename">Morning Yoga</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 6:30 AM</div><div class="egoing"><i class="ti ti-users"></i>22 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a1a0d">🏃<span class="edist"><i class="ti ti-map-pin"></i>0.3 km</span><span class="ehot">tomorrow</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a1a0d;color:#fde68a">running</div><div class="ename">5K Morning Run</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 6 AM</div><div class="egoing"><i class="ti ti-users"></i>89 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#0d2218">🌿<span class="edist"><i class="ti ti-map-pin"></i>1.9 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#0d2218;color:#6ee7b7">meditation</div><div class="ename">Mindful Morning</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 7 AM</div><div class="egoing"><i class="ti ti-users"></i>15 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a0d1a">🏊<span class="edist"><i class="ti ti-map-pin"></i>2.6 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a0d1a;color:#e879f9">fitness</div><div class="ename">Swim &amp; Stretch</div><div class="emeta"><i class="ti ti-clock"></i>Mon · 7 AM</div><div class="egoing"><i class="ti ti-users"></i>11 going</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ART -->
+  <div class="cat-section">
+    <div class="cat-head">
+      <span class="cat-name"><span class="cat-emoji">🎨</span>art <span class="cat-count">· 4 events</span></span>
+      <button class="cat-more">see all <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div class="hrow">
+      <div class="ecard">
+        <div class="ethumb" style="background:#2a0e0e">🎨<span class="edist"><i class="ti ti-map-pin"></i>2.3 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#2a0e0e;color:#fca5a5">art · free</div><div class="ename">Sketching Walk</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 4 PM</div><div class="egoing"><i class="ti ti-users"></i>42 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a0a0a">🖼️<span class="edist"><i class="ti ti-map-pin"></i>3.5 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a0a0a;color:#fca5a5">gallery</div><div class="ename">Pop-Up Gallery</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 3 PM</div><div class="egoing"><i class="ti ti-users"></i>33 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a1a0a">📷<span class="edist"><i class="ti ti-map-pin"></i>1.8 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a1a0a;color:#fde68a">photography</div><div class="ename">Golden Hour Shoot</div><div class="emeta"><i class="ti ti-clock"></i>Fri · 5:30 PM</div><div class="egoing"><i class="ti ti-users"></i>20 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#0a1a1a">🎭<span class="edist"><i class="ti ti-map-pin"></i>4.1 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#0a1a1a;color:#6ee7b7">theatre</div><div class="ename">Improv Night</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 8 PM</div><div class="egoing"><i class="ti ti-users"></i>28 going</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOD -->
+  <div class="cat-section">
+    <div class="cat-head">
+      <span class="cat-name"><span class="cat-emoji">🍜</span>food <span class="cat-count">· 7 events</span></span>
+      <button class="cat-more">see all <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div class="hrow">
+      <div class="ecard">
+        <div class="ethumb" style="background:#2a1a0a">🍜<span class="edist"><i class="ti ti-map-pin"></i>1.0 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#2a1a0a;color:#fdba74">food</div><div class="ename">Ramen Pop-Up</div><div class="emeta"><i class="ti ti-clock"></i>Sat · 12 PM</div><div class="egoing"><i class="ti ti-users"></i>55 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#1a2a0a">🥗<span class="edist"><i class="ti ti-map-pin"></i>0.6 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#1a2a0a;color:#a3e635">vegan</div><div class="ename">Vegan Market</div><div class="emeta"><i class="ti ti-clock"></i>Sun · 10 AM</div><div class="egoing"><i class="ti ti-users"></i>70 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#2a1a0a">☕<span class="edist"><i class="ti ti-map-pin"></i>0.2 km</span><span class="ehot">now</span></div>
+        <div class="ebody"><div class="etag" style="background:#2a1a0a;color:#fdba74">coffee</div><div class="ename">Specialty Coffee Walk</div><div class="emeta"><i class="ti ti-clock"></i>Today · 9 AM</div><div class="egoing"><i class="ti ti-users"></i>19 going</div></div>
+      </div>
+      <div class="ecard">
+        <div class="ethumb" style="background:#2a0a0a">🍕<span class="edist"><i class="ti ti-map-pin"></i>2.0 km</span></div>
+        <div class="ebody"><div class="etag" style="background:#2a0a0a;color:#fca5a5">social</div><div class="ename">Pizza &amp; Board Games</div><div class="emeta"><i class="ti ti-clock"></i>Fri · 7 PM</div><div class="egoing"><i class="ti ti-users"></i>31 going</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOW MORE -->
+  <div class="show-more-row" id="show-more">
+    <i class="ti ti-dots"></i>
+    <span>20 more event categories</span>
+    <i class="ti ti-chevron-down"></i>
+  </div>
+
+</div>
+
+<script>
+document.getElementById('filter-toggle').addEventListener('click',function(){
+  const d=document.getElementById('filter-drawer');
+  d.classList.toggle('open');
+  this.classList.toggle('open');
+});
+function tog(el){el.classList.toggle('on')}
+function setTab(el){
+  document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+}
+document.getElementById('show-more').addEventListener('click',function(){
+  this.querySelector('span').textContent='loading more…';
+  setTimeout(()=>{this.style.display='none'},800);
+});
+</script>
+</body>
+</html>
