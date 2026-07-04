@@ -2,7 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconHash, IconSpeakerphone, IconCheck } from "@tabler/icons-react";
+import Link from "next/link";
+import { IconHash, IconSpeakerphone, IconChevronRight } from "@tabler/icons-react";
 import { joinGroup } from "@/app/actions/membership";
 import type { CommunityGroup } from "@/lib/queries/membership";
 
@@ -31,30 +32,37 @@ export function GroupList({
     <div className="flex flex-col gap-2">
       {groups.map((group) => {
         const joined = joinedGroupIds.has(group.id);
+        const Icon = group.is_announcement ? IconSpeakerphone : IconHash;
+        const label = (
+          <div className="flex items-center gap-2">
+            <Icon size={16} className="text-text3" />
+            <div>
+              <div className="text-[13px] font-medium text-text">{group.name}</div>
+              {group.description && <div className="text-[11px] text-text3">{group.description}</div>}
+            </div>
+          </div>
+        );
+
+        if (joined) {
+          return (
+            <Link
+              key={group.id}
+              href={`/communities/${communityId}/groups/${group.id}`}
+              className="flex items-center justify-between rounded-card border border-border bg-bg2 px-3.5 py-2.5 hover:border-border2"
+            >
+              {label}
+              <IconChevronRight size={16} className="text-text3" />
+            </Link>
+          );
+        }
+
         return (
           <div
             key={group.id}
             className="flex items-center justify-between rounded-card border border-border bg-bg2 px-3.5 py-2.5"
           >
-            <div className="flex items-center gap-2">
-              {group.is_announcement ? (
-                <IconSpeakerphone size={16} className="text-text3" />
-              ) : (
-                <IconHash size={16} className="text-text3" />
-              )}
-              <div>
-                <div className="text-[13px] font-medium text-text">{group.name}</div>
-                {group.description && (
-                  <div className="text-[11px] text-text3">{group.description}</div>
-                )}
-              </div>
-            </div>
-            {joined ? (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-green">
-                <IconCheck size={13} />
-                joined
-              </span>
-            ) : isMember ? (
+            {label}
+            {isMember && (
               <button
                 onClick={() => handleJoin(group.id)}
                 disabled={pending}
@@ -62,7 +70,7 @@ export function GroupList({
               >
                 join
               </button>
-            ) : null}
+            )}
           </div>
         );
       })}

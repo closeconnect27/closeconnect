@@ -144,7 +144,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 isMember={isMember}
                 joinedGroupIds={joinedGroupIds}
               />
-              <p className="mt-2 text-[11px] text-text3">Realtime chat is coming next.</p>
             </section>
 
             <section>
