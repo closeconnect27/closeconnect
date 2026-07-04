@@ -16,30 +16,24 @@ export default async function Home() {
   return (
     <div className="flex-1">
       {/* HERO */}
-      <section className="flex flex-col items-center gap-4 px-6 pb-14 pt-16 text-center sm:pt-24">
-        <h1 className="font-heading text-[32px] font-extrabold sm:text-[44px]">
+      <section className="flex flex-col items-center gap-6 px-6 pb-16 pt-16 text-center sm:pt-24">
+        <h1 className="font-heading text-[40px] font-extrabold leading-none sm:text-[56px]">
           close<span className="text-green">.connect</span>
         </h1>
-        <p className="max-w-md text-[15px] text-text2">Find your people. Host what you love.</p>
+        <p className="max-w-md text-[16px] text-text2">Find your people. Host what you love.</p>
         <div className="mt-2 flex gap-3">
-          <Link
-            href="/communities"
-            className="rounded-full bg-green px-5 py-2.5 text-[14px] font-bold text-green-dark hover:bg-green-mid"
-          >
+          <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
             Browse communities
           </Link>
-          <Link
-            href="/search"
-            className="rounded-full border border-border2 px-5 py-2.5 text-[14px] font-bold text-text2 hover:text-text"
-          >
+          <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
             Search
           </Link>
         </div>
       </section>
 
       {/* WHAT IT IS */}
-      <section className="border-t border-border px-4 py-14 sm:px-5">
-        <h2 className="mb-8 text-center font-heading text-[22px] font-extrabold">
+      <section className="border-t border-border px-4 py-16 sm:px-6">
+        <h2 className="mb-8 text-center font-heading text-[26px] font-extrabold">
           What Close.Connect actually is
         </h2>
         <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3">
@@ -62,9 +56,9 @@ export default async function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="border-t border-border px-4 py-14 sm:px-5">
-        <h2 className="mb-8 text-center font-heading text-[22px] font-extrabold">How it works</h2>
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 sm:flex-row sm:gap-4">
+      <section className="border-t border-border px-4 py-16 sm:px-6">
+        <h2 className="mb-8 text-center font-heading text-[26px] font-extrabold">How it works</h2>
+        <div className="mx-auto flex max-w-3xl flex-col gap-8 sm:flex-row">
           <Step n={1} title="Browse or search" body="Filter by category, city, or search by name — no account needed to look around." />
           <Step n={2} title="Join or follow a link" body="Native communities: join instantly or request to join. External ones: we hand you off to their WhatsApp or Instagram." />
           <Step n={3} title="Chat, rate, host" body="Once you're in, chat in the group, rate the community, or host your own event or community when you're ready." />
@@ -72,34 +66,28 @@ export default async function Home() {
       </section>
 
       {/* STATS */}
-      <section className="border-t border-border px-4 py-14 text-center sm:px-5">
-        <h2 className="mb-8 font-heading text-[22px] font-extrabold">So far</h2>
-        <div className="mx-auto flex max-w-2xl justify-center gap-10">
+      <section className="border-t border-border px-4 py-16 text-center sm:px-6">
+        <h2 className="mb-8 font-heading text-[26px] font-extrabold">So far</h2>
+        <div className="mx-auto flex max-w-2xl justify-center gap-12">
           <Stat n={stats.communityCount} label={stats.communityCount === 1 ? "community" : "communities"} />
           <Stat n={stats.totalMembers} label={stats.totalMembers === 1 ? "member" : "members"} />
           <Stat n={stats.cityCount} label={stats.cityCount === 1 ? "city" : "cities"} />
         </div>
-        <p className="mt-6 text-[12px] text-text3">
+        <p className="mt-6 text-[13px] text-text3">
           Real numbers from what&apos;s live right now — we&apos;re early, and that&apos;s fine.
         </p>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-border px-6 py-14 text-center">
-        <h2 className="mb-2 font-heading text-[22px] font-extrabold">Ready to look around?</h2>
+      <section className="border-t border-border px-6 py-16 text-center">
+        <h2 className="mb-2 font-heading text-[26px] font-extrabold">Ready to look around?</h2>
         <p className="mb-6 text-[14px] text-text2">No account needed to browse.</p>
         <div className="flex flex-wrap justify-center gap-3">
-          <Link
-            href="/communities"
-            className="flex items-center gap-2 rounded-full bg-green px-5 py-2.5 text-[14px] font-bold text-green-dark hover:bg-green-mid"
-          >
+          <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
             <IconUserPlus size={16} />
             Browse communities
           </Link>
-          <Link
-            href="/search"
-            className="flex items-center gap-2 rounded-full border border-border2 px-5 py-2.5 text-[14px] font-bold text-text2 hover:text-text"
-          >
+          <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
             <IconSearch size={16} />
             Search
           </Link>
@@ -119,9 +107,11 @@ function FeatureCard({
   body: string;
 }) {
   return (
-    <div className="rounded-card border border-border bg-bg2 p-5">
-      <Icon size={22} className="mb-3 text-green" />
-      <h3 className="mb-1.5 text-[15px] font-bold text-text">{title}</h3>
+    <div className="card-elevated rounded-card bg-bg2 p-6">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-green-tint">
+        <Icon size={20} className="text-green" />
+      </div>
+      <h3 className="mb-2 text-[16px] font-bold text-text">{title}</h3>
       <p className="text-[13px] leading-relaxed text-text2">{body}</p>
     </div>
   );
@@ -130,10 +120,10 @@ function FeatureCard({
 function Step({ n, title, body }: { n: number; title: string; body: string }) {
   return (
     <div className="flex-1">
-      <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-green text-[13px] font-bold text-green-dark">
+      <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-green text-[14px] font-bold text-green-dark">
         {n}
       </div>
-      <h3 className="mb-1 text-[14px] font-bold text-text">{title}</h3>
+      <h3 className="mb-2 text-[15px] font-bold text-text">{title}</h3>
       <p className="text-[13px] leading-relaxed text-text2">{body}</p>
     </div>
   );
@@ -141,9 +131,9 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
 
 function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="font-heading text-[28px] font-extrabold text-green">{n}</span>
-      <span className="text-[11px] font-medium text-text3">{label}</span>
+    <div className="flex flex-col gap-2">
+      <span className="font-heading text-[32px] font-extrabold text-green">{n}</span>
+      <span className="text-[12px] font-medium text-text3">{label}</span>
     </div>
   );
 }

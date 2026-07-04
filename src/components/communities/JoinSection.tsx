@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { IconCircleCheck, IconClockHour4 } from "@tabler/icons-react";
 import { DynamicForm } from "@/components/forms/DynamicForm";
 import { joinOpenCommunity, submitJoinRequest } from "@/app/actions/membership";
 import type { FormField } from "@/lib/queries/membership";
@@ -58,21 +59,27 @@ export function JoinSection({
   }
 
   if (isMember) {
-    return <p className="text-[13px] font-medium text-green">You&apos;re a member</p>;
+    return (
+      <p className="flex items-center gap-2 text-[14px] font-bold text-green">
+        <IconCircleCheck size={18} />
+        You&apos;re a member
+      </p>
+    );
   }
 
   if (pendingStatus === "pending") {
-    return <p className="text-[13px] text-text2">Your request to join is awaiting approval.</p>;
+    return (
+      <p className="flex items-center gap-2 text-[14px] text-text2">
+        <IconClockHour4 size={18} className="text-text3" />
+        Your request to join is awaiting approval.
+      </p>
+    );
   }
 
   if (joinMode === "open") {
     return (
       <div>
-        <button
-          onClick={handleJoinOpen}
-          disabled={pending}
-          className="rounded-full bg-green px-5 py-2.5 text-[14px] font-bold text-green-dark disabled:opacity-50"
-        >
+        <button onClick={handleJoinOpen} disabled={pending} className="btn-primary px-6 py-3 text-[14px]">
           {pending ? "Joining…" : "Join"}
         </button>
         {error && <p className="mt-2 text-[13px] text-pink">{error}</p>}
@@ -85,7 +92,7 @@ export function JoinSection({
     return (
       <button
         onClick={() => requireLoginOrRun(() => setShowForm(true))}
-        className="rounded-full border border-green px-5 py-2.5 text-[14px] font-bold text-green"
+        className="btn-secondary px-6 py-3 text-[14px]"
       >
         {pendingStatus === "rejected" ? "Request to join again" : "Request to join"}
       </button>
@@ -93,25 +100,22 @@ export function JoinSection({
   }
 
   return (
-    <div className="rounded-card border border-border bg-bg2 p-4">
+    <div className="card-elevated rounded-card bg-bg2 p-4">
       {formFields.length > 0 && (
         <div className="mb-4">
           <DynamicForm fields={formFields} values={answers} onChange={setAnswers} />
         </div>
       )}
       {error && <p className="mb-2 text-[13px] text-pink">{error}</p>}
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <button
           onClick={handleSubmitRequest}
           disabled={pending}
-          className="rounded-full bg-green px-5 py-2.5 text-[14px] font-bold text-green-dark disabled:opacity-50"
+          className="btn-primary px-6 py-3 text-[14px]"
         >
           {pending ? "Submitting…" : "Submit request"}
         </button>
-        <button
-          onClick={() => setShowForm(false)}
-          className="rounded-full border border-border2 px-5 py-2.5 text-[14px] font-medium text-text2"
-        >
+        <button onClick={() => setShowForm(false)} className="btn-secondary px-6 py-3 text-[14px]">
           Cancel
         </button>
       </div>

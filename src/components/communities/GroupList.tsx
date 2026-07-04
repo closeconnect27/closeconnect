@@ -7,6 +7,9 @@ import { IconHash, IconSpeakerphone, IconChevronRight } from "@tabler/icons-reac
 import { joinGroup } from "@/app/actions/membership";
 import type { CommunityGroup } from "@/lib/queries/membership";
 
+// WhatsApp-style: one continuous list, divided rows, generous padding,
+// single bold/muted hierarchy per row -- not a stack of separate bordered
+// cards with gaps between them.
 export function GroupList({
   communityId,
   groups,
@@ -29,53 +32,58 @@ export function GroupList({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {groups.map((group) => {
-        const joined = joinedGroupIds.has(group.id);
-        const Icon = group.is_announcement ? IconSpeakerphone : IconHash;
-        const label = (
-          <div className="flex items-center gap-2">
-            <Icon size={16} className="text-text3" />
-            <div>
-              <div className="text-[13px] font-medium text-text">{group.name}</div>
-              {group.description && <div className="text-[11px] text-text3">{group.description}</div>}
-            </div>
-          </div>
-        );
-
-        if (joined) {
-          return (
-            <Link
-              key={group.id}
-              href={`/communities/${communityId}/groups/${group.id}`}
-              className="flex items-center justify-between rounded-card border border-border bg-bg2 px-3.5 py-2.5 hover:border-border2"
-            >
-              {label}
-              <IconChevronRight size={16} className="text-text3" />
-            </Link>
+    <div className="card-elevated overflow-hidden rounded-card bg-bg2">
+      <div className="divide-y divide-border">
+        {groups.map((group) => {
+          const joined = joinedGroupIds.has(group.id);
+          const Icon = group.is_announcement ? IconSpeakerphone : IconHash;
+          const content = (
+            <>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-bg3">
+                <Icon size={18} className="text-text3" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-semibold text-text">{group.name}</div>
+                <div className="truncate text-[12px] text-text3">
+                  {group.description || (group.is_announcement ? "Announcements" : "Group chat")}
+                </div>
+              </div>
+            </>
           );
-        }
 
-        return (
-          <div
-            key={group.id}
-            className="flex items-center justify-between rounded-card border border-border bg-bg2 px-3.5 py-2.5"
-          >
-            {label}
-            {isMember && (
-              <button
-                onClick={() => handleJoin(group.id)}
-                disabled={pending}
-                className="rounded-full border border-green px-3 py-1 text-[11px] font-bold text-green disabled:opacity-50"
+          if (joined) {
+            return (
+              <Link
+                key={group.id}
+                href={`/communities/${communityId}/groups/${group.id}`}
+                className="flex items-center gap-3 px-4 py-4 transition hover:bg-bg3"
               >
-                join
-              </button>
-            )}
-          </div>
-        );
-      })}
+                {content}
+                <IconChevronRight size={18} className="shrink-0 text-text3" />
+              </Link>
+            );
+          }
+
+          return (
+            <div key={group.id} className="flex items-center gap-3 px-4 py-4">
+              {content}
+              {isMember && (
+                <button
+                  onClick={() => handleJoin(group.id)}
+                  disabled={pending}
+                  className="btn-secondary shrink-0 px-4 py-2 text-[12px]"
+                >
+                  join
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
       {!isMember && (
-        <p className="text-[12px] text-text3">Join the community to browse and join its groups.</p>
+        <p className="border-t border-border px-4 py-3 text-[12px] text-text3">
+          Join the community to browse and join its groups.
+        </p>
       )}
     </div>
   );

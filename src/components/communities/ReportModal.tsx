@@ -10,6 +10,11 @@ import { createClient } from "@/lib/supabase/client";
 // One deliberate deviation from the reference (which allowed anonymous
 // reports): SPEC.md Section 5's RLS makes `reports` insert authenticated-only,
 // so an anonymous visitor gets sent to sign in instead of silently failing.
+//
+// Pink here is a deliberate exception to "one accent color everywhere":
+// report/destructive contexts are the one place a second color is
+// warranted, precisely so it reads as different-in-kind from the app's
+// normal (green) actions.
 const REASONS = [
   { value: "dead_link", label: "Link no longer works", icon: IconLinkOff },
   { value: "spam", label: "Spam or fake community", icon: IconAlertTriangle },
@@ -52,32 +57,32 @@ export function ReportModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-[420px] rounded-card bg-bg2 p-6">
-        <div className="mb-3 flex items-start justify-between">
+      <div className="w-full max-w-[420px] rounded-card bg-bg2 p-6 shadow-card-hover">
+        <div className="mb-4 flex items-start justify-between">
           <div>
             <div className="font-heading text-[17px] font-bold">Report community</div>
             <div className="text-[13px] text-text2">Help us keep the directory clean</div>
           </div>
-          <button onClick={onClose} className="text-text2">
+          <button onClick={onClose} className="text-text2 transition hover:text-text">
             <IconX size={18} />
           </button>
         </div>
 
         {status === "done" ? (
-          <p className="py-4 text-center text-sm text-text2">
+          <p className="py-4 text-center text-[14px] text-text2">
             Thanks for reporting — we&apos;ll review it shortly.
           </p>
         ) : (
           <>
-            <div className="mb-3.5 flex flex-col gap-2">
+            <div className="mb-4 flex flex-col gap-2">
               {REASONS.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
                   onClick={() => setReason(value)}
-                  className="flex items-center gap-2.5 rounded-card-sm border px-3.5 py-2.5 text-left text-[13px] transition"
+                  className="flex items-center gap-3 rounded-card-sm border px-4 py-3 text-left text-[13px] transition hover:border-pink"
                   style={
                     reason === value
                       ? { borderColor: "var(--pink)", color: "var(--pink)", background: "var(--pink-tint)" }
@@ -90,12 +95,12 @@ export function ReportModal({
               ))}
             </div>
             {status === "error" && (
-              <p className="mb-2 text-xs text-pink">Could not submit report — try again.</p>
+              <p className="mb-2 text-[12px] text-pink">Could not submit report — try again.</p>
             )}
             <button
               onClick={submit}
               disabled={!reason || status === "submitting"}
-              className="w-full rounded-full bg-pink py-3 text-[13px] font-bold text-white disabled:opacity-40"
+              className="w-full rounded-full bg-pink py-3 text-[13px] font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
             >
               {status === "submitting" ? "Submitting…" : isLoggedIn ? "Submit report" : "Sign in to report"}
             </button>

@@ -2,6 +2,9 @@
 
 import type { FormField } from "@/lib/queries/membership";
 
+const inputClass =
+  "rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
+
 /**
  * Renders a set of form_fields as actual inputs and collects answers keyed
  * by field id -- the response-collecting counterpart to FormBuilder (which
@@ -24,7 +27,7 @@ export function DynamicForm({
   return (
     <div className="flex flex-col gap-4">
       {fields.map((field) => (
-        <label key={field.id} className="flex flex-col gap-1.5">
+        <label key={field.id} className="flex flex-col gap-2">
           <span className="text-[13px] font-medium text-text">
             {field.label}
             {field.is_required && <span className="text-pink"> *</span>}
@@ -35,14 +38,14 @@ export function DynamicForm({
               value={values[field.id] ?? ""}
               onChange={(e) => setValue(field.id, e.target.value)}
               rows={3}
-              className="rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className={inputClass}
             />
           ) : field.field_type === "select" ? (
             <select
               required={field.is_required}
               value={values[field.id] ?? ""}
               onChange={(e) => setValue(field.id, e.target.value)}
-              className="rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className={inputClass}
             >
               <option value="" disabled>
                 Choose one
@@ -67,7 +70,7 @@ export function DynamicForm({
               required={field.is_required}
               value={values[field.id] ?? ""}
               onChange={(e) => setValue(field.id, e.target.value)}
-              className="rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className={inputClass}
             />
           )}
         </label>

@@ -14,7 +14,7 @@ export function SearchForm() {
         const q = new FormData(e.currentTarget).get("q")?.toString().trim();
         router.push(q ? `/search?q=${encodeURIComponent(q)}` : "/search");
       }}
-      className="flex items-center gap-2 rounded-full border border-border2 bg-bg3 px-4 py-2.5"
+      className="flex items-center gap-3 rounded-full border border-border2 bg-bg3 px-4 py-3 transition focus-within:border-green"
     >
       <IconSearch size={16} className="text-text3" />
       <input

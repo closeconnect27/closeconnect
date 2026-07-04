@@ -8,6 +8,8 @@ import { FormBuilder } from "@/components/forms/FormBuilder";
 import { createCommunity } from "@/app/actions/communities";
 
 const CITIES = ["Bengaluru", "Mumbai", "Delhi", "Chennai", "Hyderabad", "Pune"];
+const inputClass =
+  "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
 export default function NewCommunityPage() {
   const [name, setName] = useState("");
@@ -55,21 +57,16 @@ export default function NewCommunityPage() {
   }
 
   return (
-    <div className="flex-1 px-4 pb-16 pt-6 sm:px-5">
+    <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-lg">
-        <h1 className="font-heading text-2xl font-extrabold">Create a community</h1>
-        <p className="mb-6 text-sm text-text3">
+        <h1 className="font-heading text-[28px] font-extrabold leading-tight">Create a community</h1>
+        <p className="mb-8 text-[14px] text-text3">
           One umbrella community, sub-groups auto-created — General plus Announcements.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <Field label="Name">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
-            />
+            <input value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
           </Field>
 
           <Field label="Description">
@@ -78,7 +75,7 @@ export default function NewCommunityPage() {
               onChange={(e) => setDescription(e.target.value)}
               required
               rows={4}
-              className="w-full rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className={inputClass}
             />
           </Field>
 
@@ -86,7 +83,7 @@ export default function NewCommunityPage() {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as CategorySlug)}
-              className="w-full rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className={inputClass}
             >
               {CATEGORIES.map((c) => (
                 <option key={c.slug} value={c.slug}>
@@ -103,11 +100,11 @@ export default function NewCommunityPage() {
                   type="button"
                   key={c.slug}
                   onClick={() => toggleExtraCategory(c.slug)}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] font-medium ${
+                  className={
                     extraCategories.includes(c.slug)
-                      ? "border-green bg-green text-green-dark"
-                      : "border-border2 text-text2"
-                  }`}
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                  }
                 >
                   {c.slug}
                 </button>
@@ -116,12 +113,7 @@ export default function NewCommunityPage() {
           </Field>
 
           <Field label="City (optional)">
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              list="cities"
-              className="w-full rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
-            />
+            <input value={city} onChange={(e) => setCity(e.target.value)} list="cities" className={inputClass} />
             <datalist id="cities">
               {CITIES.map((c) => (
                 <option key={c} value={c} />
@@ -136,9 +128,11 @@ export default function NewCommunityPage() {
                   type="button"
                   key={t}
                   onClick={() => setCommunityType(t)}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] font-medium ${
-                    communityType === t ? "border-green bg-green text-green-dark" : "border-border2 text-text2"
-                  }`}
+                  className={
+                    communityType === t
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                  }
                 >
                   {t}
                 </button>
@@ -147,8 +141,8 @@ export default function NewCommunityPage() {
           </Field>
 
           <Field label="Who can join">
-            <div className="flex flex-col gap-2">
-              <label className="flex items-start gap-2 text-[13px]">
+            <div className="flex flex-col gap-3">
+              <label className="flex items-start gap-3 text-[13px]">
                 <input
                   type="radio"
                   checked={joinMode === "open"}
@@ -160,7 +154,7 @@ export default function NewCommunityPage() {
                   <span className="block text-text3">Anyone can join instantly.</span>
                 </span>
               </label>
-              <label className="flex items-start gap-2 text-[13px]">
+              <label className="flex items-start gap-3 text-[13px]">
                 <input
                   type="radio"
                   checked={joinMode === "request"}
@@ -185,11 +179,7 @@ export default function NewCommunityPage() {
 
           {error && <p className="text-[13px] text-pink">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-full bg-green py-3 text-[15px] font-bold text-green-dark disabled:opacity-50"
-          >
+          <button type="submit" disabled={pending} className="btn-primary py-3 text-[15px]">
             {pending ? "Creating…" : "Create community"}
           </button>
         </form>
@@ -205,7 +195,7 @@ export default function NewCommunityPage() {
 // nesting interactive elements inside an anchor.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <span className="text-[12px] font-bold text-text3">{label}</span>
       {children}
     </div>

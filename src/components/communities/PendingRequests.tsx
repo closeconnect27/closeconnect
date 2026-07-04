@@ -2,7 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { IconInbox } from "@tabler/icons-react";
 import { reviewJoinRequest } from "@/app/actions/membership";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { FormField } from "@/lib/queries/membership";
 
 type PendingRequest = {
@@ -33,18 +35,18 @@ export function PendingRequests({
   }
 
   if (requests.length === 0) {
-    return <p className="text-[13px] text-text3">No pending requests.</p>;
+    return <EmptyState icon={IconInbox} title="No pending requests" compact />;
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {requests.map((req) => (
-        <div key={req.id} className="rounded-card border border-border bg-bg2 p-4">
-          <div className="mb-2 text-[13px] font-bold text-text">
+        <div key={req.id} className="card-elevated rounded-card bg-bg2 p-4">
+          <div className="mb-3 text-[14px] font-bold text-text">
             {req.profiles?.display_name ?? "Someone"}
           </div>
           {formFields.length > 0 && (
-            <div className="mb-3 flex flex-col gap-1.5">
+            <div className="mb-4 flex flex-col gap-2">
               {formFields.map((field) => (
                 <div key={field.id} className="text-[12px]">
                   <span className="text-text3">{field.label}: </span>
@@ -53,18 +55,18 @@ export function PendingRequests({
               ))}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={() => handleReview(req.id, "approved")}
               disabled={pending}
-              className="rounded-full bg-green px-4 py-1.5 text-[12px] font-bold text-green-dark disabled:opacity-50"
+              className="btn-primary px-4 py-2 text-[12px]"
             >
               Approve
             </button>
             <button
               onClick={() => handleReview(req.id, "rejected")}
               disabled={pending}
-              className="rounded-full border border-border2 px-4 py-1.5 text-[12px] font-medium text-text2 disabled:opacity-50"
+              className="btn-secondary px-4 py-2 text-[12px]"
             >
               Reject
             </button>

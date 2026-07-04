@@ -7,22 +7,30 @@ export function MemberList({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center gap-1.5 text-[12px] font-bold text-text3">
+      <div className="mb-3 flex items-center gap-2 text-[12px] font-bold text-text3">
         <IconUsers size={14} />
         {members.length} member{members.length === 1 ? "" : "s"}
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {members.slice(0, 20).map((m) => (
-          <span
-            key={m.user_id}
-            className="rounded-full border border-border2 px-2.5 py-1 text-[11px] text-text2"
-          >
-            {m.profiles?.display_name ?? "member"}
-            {m.role !== "member" && <span className="text-green"> · {m.role}</span>}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        {members.slice(0, 20).map((m) => {
+          const name = m.profiles?.display_name ?? "member";
+          return (
+            <span
+              key={m.user_id}
+              className="flex items-center gap-2 rounded-full border border-border2 py-1 pl-1 pr-3 text-[12px] text-text2"
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-tint text-[10px] font-bold text-green">
+                {name.charAt(0).toUpperCase()}
+              </span>
+              {name}
+              {m.role !== "member" && <span className="font-semibold text-green">· {m.role}</span>}
+            </span>
+          );
+        })}
         {members.length > 20 && (
-          <span className="px-2.5 py-1 text-[11px] text-text3">+{members.length - 20} more</span>
+          <span className="flex items-center px-2 text-[12px] text-text3">
+            +{members.length - 20} more
+          </span>
         )}
       </div>
     </div>

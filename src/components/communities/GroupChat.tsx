@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useTransition } from "react";
+import { IconSend2, IconMessageCircle2 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendMessage } from "@/app/actions/chat";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { ChatMessage } from "@/lib/queries/chat";
 
 // Client-side cooldown is UX only -- the real limit is the DB trigger
@@ -99,44 +101,55 @@ export function GroupChat({
   }
 
   return (
-    <div className="flex h-[70vh] flex-col rounded-card border border-border bg-bg2">
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
-        {messages.map((m) => {
-          const isMine = m.user_id === currentUserId;
-          return (
-            <div key={m.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
-              <span className="mb-0.5 text-[10px] text-text3">
-                {m.profiles?.display_name ?? "member"}
-              </span>
-              <span
-                className={`inline-block max-w-[80%] rounded-card-sm px-3 py-2 text-[14px] ${
-                  isMine ? "bg-green text-green-dark" : "bg-bg3 text-text"
-                }`}
-              >
-                {m.content}
-              </span>
-            </div>
-          );
-        })}
+    <div className="card-elevated flex h-[70vh] flex-col overflow-hidden rounded-card bg-bg2">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-bg p-4">
+        {messages.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState icon={IconMessageCircle2} title="No messages yet" description="Say hello!" compact />
+          </div>
+        ) : (
+          messages.map((m) => {
+            const isMine = m.user_id === currentUserId;
+            return (
+              <div key={m.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
+                {!isMine && (
+                  <span className="mb-1 px-1 text-[11px] font-medium text-text3">
+                    {m.profiles?.display_name ?? "member"}
+                  </span>
+                )}
+                <span
+                  className={`inline-block max-w-[80%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                    isMine
+                      ? "rounded-br-sm bg-green text-green-dark"
+                      : "rounded-bl-sm bg-bg2 text-text shadow-card"
+                  }`}
+                >
+                  {m.content}
+                </span>
+              </div>
+            );
+          })
+        )}
         <div ref={bottomRef} />
       </div>
-      <form onSubmit={handleSend} className="flex gap-2 border-t border-border p-3">
+      <form onSubmit={handleSend} className="flex gap-3 border-t border-border bg-bg2 p-4">
         <input
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Message…"
           maxLength={1000}
-          className="flex-1 rounded-full border border-border2 bg-bg3 px-4 py-2 text-[14px]"
+          className="flex-1 rounded-full border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
         />
         <button
           type="submit"
           disabled={pending || cooldown > 0 || !content.trim()}
-          className="rounded-full bg-green px-4 py-2 text-[13px] font-bold text-green-dark disabled:opacity-40"
+          aria-label="Send message"
+          className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 text-[12px]"
         >
-          {cooldown > 0 ? `${cooldown}s` : "Send"}
+          {cooldown > 0 ? cooldown : <IconSend2 size={18} />}
         </button>
       </form>
-      {error && <p className="px-3 pb-2 text-[12px] text-pink">{error}</p>}
+      {error && <p className="border-t border-border px-4 py-2 text-[12px] text-pink">{error}</p>}
     </div>
   );
 }

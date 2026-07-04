@@ -46,17 +46,17 @@ export function FormBuilder({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {fields.map((field, i) => (
-        <div key={i} className="rounded-card border border-border bg-bg2 p-3">
+        <div key={i} className="card-elevated rounded-card bg-bg2 p-4">
           <div className="flex items-start gap-2">
             <input
               value={field.label}
               onChange={(e) => updateField(i, { label: e.target.value })}
               placeholder="Question, e.g. Why do you want to join?"
-              className="flex-1 rounded-card-sm border border-border2 bg-bg3 px-3 py-2 text-[14px]"
+              className="flex-1 rounded-card-sm border border-border2 bg-bg3 px-4 py-2 text-[14px] transition focus:border-green"
             />
-            <div className="flex gap-1">
+            <div className="flex gap-2">
               <IconButton onClick={() => moveField(i, -1)} disabled={i === 0} label="Move up">
                 <IconArrowUp size={14} />
               </IconButton>
@@ -69,13 +69,13 @@ export function FormBuilder({
             </div>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center gap-4">
             <select
               value={field.field_type}
               onChange={(e) =>
                 updateField(i, { field_type: e.target.value as FormFieldDraft["field_type"] })
               }
-              className="rounded-full border border-border2 bg-bg3 px-3 py-1.5 text-[13px]"
+              className="rounded-full border border-border2 bg-bg3 px-4 py-2 text-[13px] transition hover:border-green"
             >
               {FIELD_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -83,7 +83,7 @@ export function FormBuilder({
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-1.5 text-[13px] text-text2">
+            <label className="flex items-center gap-2 text-[13px] text-text2">
               <input
                 type="checkbox"
                 checked={field.is_required}
@@ -105,7 +105,7 @@ export function FormBuilder({
       <button
         type="button"
         onClick={addField}
-        className="flex items-center justify-center gap-1.5 rounded-card-sm border border-dashed border-border2 py-2.5 text-[13px] font-medium text-text2 hover:text-text"
+        className="flex items-center justify-center gap-2 rounded-card-sm border border-dashed border-border2 py-3 text-[13px] font-medium text-text2 transition hover:border-green hover:text-green"
       >
         <IconPlus size={14} />
         Add question
@@ -128,16 +128,20 @@ function OptionsEditor({
     onChange(options.filter((_, idx) => idx !== i));
   }
   return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-border pt-2">
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
       {options.map((opt, i) => (
         <div key={i} className="flex gap-2">
           <input
             value={opt}
             onChange={(e) => updateOption(i, e.target.value)}
             placeholder={`Option ${i + 1}`}
-            className="flex-1 rounded-card-sm border border-border2 bg-bg3 px-2.5 py-1.5 text-[13px]"
+            className="flex-1 rounded-card-sm border border-border2 bg-bg3 px-4 py-2 text-[13px] transition focus:border-green"
           />
-          <button type="button" onClick={() => removeOption(i)} className="text-text3 hover:text-pink">
+          <button
+            type="button"
+            onClick={() => removeOption(i)}
+            className="text-text3 transition hover:text-pink"
+          >
             <IconTrash size={14} />
           </button>
         </div>
@@ -145,7 +149,7 @@ function OptionsEditor({
       <button
         type="button"
         onClick={() => onChange([...options, ""])}
-        className="self-start text-[12px] font-medium text-green"
+        className="self-start text-[12px] font-medium text-green transition hover:text-green-mid"
       >
         + add option
       </button>
@@ -170,7 +174,7 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex h-7 w-7 items-center justify-center rounded-full border border-border2 text-text3 disabled:opacity-30"
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-border2 text-text3 transition hover:border-green hover:text-green disabled:opacity-30"
     >
       {children}
     </button>

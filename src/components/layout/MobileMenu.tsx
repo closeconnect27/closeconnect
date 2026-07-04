@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { IconMenu2, IconX } from "@tabler/icons-react";
+import { IconMenu2, IconX, IconPlus, IconUsers, IconSearch, IconUserCircle } from "@tabler/icons-react";
 
 export function MobileMenu({
   links,
@@ -13,13 +13,17 @@ export function MobileMenu({
   isLoggedIn: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const iconFor: Record<string, typeof IconUsers> = {
+    "/communities": IconUsers,
+    "/search": IconSearch,
+  };
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
         aria-label="Open menu"
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-border2 text-text2"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-border2 text-text2 transition hover:text-text"
       >
         <IconMenu2 size={16} />
       </button>
@@ -33,7 +37,7 @@ export function MobileMenu({
       {open &&
         createPortal(
           <div className="fixed inset-0 z-50 bg-bg">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-4 py-4">
               <span className="font-heading text-lg font-extrabold">
                 close<span className="text-green">.connect</span>
               </span>
@@ -41,22 +45,37 @@ export function MobileMenu({
                 <IconX size={22} />
               </button>
             </div>
-            <nav className="flex flex-col gap-1 p-4">
-              {links.map((link) => (
+            <nav className="flex flex-col p-4">
+              {isLoggedIn && (
                 <Link
-                  key={link.href}
-                  href={link.href}
+                  href="/communities/new"
                   onClick={() => setOpen(false)}
-                  className="rounded-card-sm px-3 py-3 text-base text-text2 hover:bg-bg2 hover:text-text"
+                  className="btn-primary mb-2 w-full py-4 text-[15px]"
                 >
-                  {link.label}
+                  <IconPlus size={18} />
+                  Create a community
                 </Link>
-              ))}
+              )}
+              {links.map((link) => {
+                const Icon = iconFor[link.href];
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-4 rounded-card-sm px-3 py-4 text-[16px] font-medium text-text transition hover:bg-bg2"
+                  >
+                    {Icon && <Icon size={20} className="text-text3" />}
+                    {link.label}
+                  </Link>
+                );
+              })}
               <Link
                 href={isLoggedIn ? "/profile" : "/login"}
                 onClick={() => setOpen(false)}
-                className="rounded-card-sm px-3 py-3 text-base text-text2 hover:bg-bg2 hover:text-text"
+                className="flex items-center gap-4 rounded-card-sm px-3 py-4 text-[16px] font-medium text-text transition hover:bg-bg2"
               >
+                <IconUserCircle size={20} className="text-text3" />
                 {isLoggedIn ? "profile" : "sign in"}
               </Link>
             </nav>

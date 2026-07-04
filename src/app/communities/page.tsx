@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { IconPlus, IconMoodEmpty } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES } from "@/lib/categories";
 import { getCommunities, getCommunitiesByCategory } from "@/lib/queries/communities";
 import { CommunityCard } from "@/components/communities/CommunityCard";
 import { CommunityFilterBar } from "@/components/communities/CommunityFilterBar";
 import { CategoryImage } from "@/components/ui/CategoryImage";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type SearchParams = Promise<{ category?: string; city?: string; kind?: string }>;
 
@@ -12,17 +14,30 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
   const { category, city, kind } = await searchParams;
   const supabase = await createClient();
   const hasFilters = !!(category || city || kind);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
-    <div className="flex-1 pb-10">
-      <div className="px-4 pb-4 pt-6 sm:px-5">
-        <h1 className="font-heading text-2xl font-extrabold">communities</h1>
-        <p className="text-sm text-text3">find your people</p>
+    <div className="flex-1 pb-16">
+      <div className="flex items-start justify-between gap-4 px-4 pb-6 pt-8 sm:px-6">
+        <div>
+          <h1 className="font-heading text-[32px] font-extrabold leading-tight">communities</h1>
+          <p className="text-[14px] text-text3">find your people</p>
+        </div>
+        <Link
+          href={user ? "/communities/new" : "/login?redirect=/communities/new"}
+          className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
+        >
+          <IconPlus size={14} />
+          <span className="hidden sm:inline">Create community</span>
+          <span className="sm:hidden">Create</span>
+        </Link>
       </div>
 
       <CommunityFilterBar />
 
-      <div className="mt-6">
+      <div className="mt-8">
         {hasFilters ? (
           <FilteredGrid
             supabase={supabase}
@@ -50,11 +65,20 @@ async function FilteredGrid({
   const communities = await getCommunities(supabase, filters);
 
   if (!communities.length) {
-    return <p className="px-4 text-sm text-text3 sm:px-5">No communities match these filters yet.</p>;
+    return (
+      <div className="px-4 sm:px-6">
+        <EmptyState
+          icon={IconMoodEmpty}
+          title="No communities match these filters"
+          description="Try a different category or city, or clear your filters to browse everything."
+          action={{ label: "Clear filters", href: "/communities" }}
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 sm:px-5 md:grid-cols-4 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-3 sm:px-6 md:grid-cols-4 lg:grid-cols-6">
       {communities.map((c) => (
         <CommunityCard key={c.id} community={c} />
       ))}
@@ -70,39 +94,52 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
     })),
   );
 
+  const visibleRows = rows.filter((r) => r.communities.length > 0);
+
+  if (visibleRows.length === 0) {
+    return (
+      <div className="px-4 sm:px-6">
+        <EmptyState
+          icon={IconMoodEmpty}
+          title="No communities yet"
+          description="Be the first to start one -- it takes less than a minute."
+          action={{ label: "Create a community", href: "/communities/new" }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-7">
-      {rows
-        .filter((r) => r.communities.length > 0)
-        .map(({ cat, communities }) => (
-          <section key={cat.slug}>
-            <div className="mb-3.5 flex items-center justify-between px-4 sm:px-5">
-              <span className="font-heading flex items-center gap-2 text-[15px] font-bold">
-                <CategoryImage
-                  slug={cat.slug}
-                  seed={0}
-                  alt=""
-                  size={22}
-                  className="rounded-full object-cover"
-                />
-                {cat.label}
-                <span className="font-sans text-[11px] font-normal text-text3">
-                  · {communities.length} communit{communities.length === 1 ? "y" : "ies"}
-                </span>
+    <div className="flex flex-col gap-8">
+      {visibleRows.map(({ cat, communities }) => (
+        <section key={cat.slug}>
+          <div className="mb-4 flex items-center justify-between px-4 sm:px-6">
+            <span className="font-heading flex items-center gap-2 text-[16px] font-bold">
+              <CategoryImage
+                slug={cat.slug}
+                seed={0}
+                alt=""
+                size={24}
+                className="rounded-full object-cover"
+              />
+              {cat.label}
+              <span className="font-sans text-[12px] font-normal text-text3">
+                · {communities.length} communit{communities.length === 1 ? "y" : "ies"}
               </span>
-              <Link href={`/communities?category=${cat.slug}`} className="text-xs font-bold text-green">
-                see all
-              </Link>
-            </div>
-            <div className="scrollbar-none flex gap-3 overflow-x-auto px-4 pb-1 sm:px-5">
-              {communities.map((c) => (
-                <div key={c.id} className="w-[175px] shrink-0">
-                  <CommunityCard community={c} />
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+            </span>
+            <Link href={`/communities?category=${cat.slug}`} className="text-[13px] font-bold text-green">
+              see all
+            </Link>
+          </div>
+          <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
+            {communities.map((c) => (
+              <div key={c.id} className="w-44 shrink-0">
+                <CommunityCard community={c} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

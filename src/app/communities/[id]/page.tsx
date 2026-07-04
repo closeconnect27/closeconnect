@@ -74,10 +74,10 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
       </div>
 
-      <div className="px-4 pt-5 sm:px-5">
-        <div className="mb-2 flex flex-wrap gap-1.5">
+      <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-6">
+        <div className="mb-3 flex flex-wrap gap-2">
           <span
-            className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+            className="rounded-full px-3 py-1 text-[11px] font-bold"
             style={{ background: visual.bg, color: visual.light }}
           >
             {visual.label}
@@ -85,33 +85,33 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           {extraCats.map((ec) => (
             <span
               key={ec.slug}
-              className="rounded-full px-2.5 py-1 text-[10px] font-bold opacity-80"
+              className="rounded-full px-3 py-1 text-[11px] font-bold opacity-80"
               style={{ background: ec.bg, color: ec.light }}
             >
               {ec.label}
             </span>
           ))}
-          <span className="rounded-full border border-border2 px-2.5 py-1 text-[10px] font-bold text-text2">
+          <span className="rounded-full border border-border2 px-3 py-1 text-[11px] font-bold text-text2">
             {isNative ? "native community" : "external"}
           </span>
         </div>
 
-        <h1 className="font-heading text-[22px] font-extrabold">{community.name}</h1>
+        <h1 className="font-heading text-[28px] font-extrabold leading-tight">{community.name}</h1>
 
-        <div className="mt-2 flex flex-wrap items-center gap-4 text-[12px] font-medium text-text2">
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-[13px] font-medium text-text2">
           {community.city && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <IconMapPin size={14} className="text-text3" />
               {community.city}
             </span>
           )}
           {isNative && (
             <>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <IconUsers size={14} className="text-text3" />
                 {community.member_count} members
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <IconStar size={14} className="text-text3" />
                 {community.avg_rating > 0
                   ? `${community.avg_rating.toFixed(1)} (${community.rating_count})`
@@ -126,7 +126,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         </p>
 
         {isNative && (
-          <div className="mt-6 flex flex-col gap-6">
+          <div className="mt-8 flex flex-col gap-8">
             <JoinSection
               communityId={community.id}
               joinMode={community.join_mode}
@@ -137,7 +137,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             />
 
             <section>
-              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">Groups</h2>
+              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Groups</h2>
               <GroupList
                 communityId={community.id}
                 groups={groups}
@@ -147,13 +147,13 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             </section>
 
             <section>
-              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">Members</h2>
+              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Members</h2>
               <MemberList members={members} />
             </section>
 
             {isStaff && (
               <section>
-                <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">
+                <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">
                   Pending requests
                 </h2>
                 <PendingRequests
@@ -173,7 +173,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           isLoggedIn={!!user}
         />
 
-        <Link href="/communities" className="mt-8 block text-center text-xs text-text3">
+        <Link href="/communities" className="mt-8 block text-center text-[13px] text-text3 transition hover:text-text2">
           ← back to communities
         </Link>
       </div>

@@ -69,6 +69,23 @@
   --purple: #7c3aed;
 }
 
+/* Elevation. Real drop shadows read fine on a white/near-white surface but
+   are invisible on near-black -- on dark backgrounds "lift" comes from a
+   lighter border + a faint glow instead of a shadow you'd never see. Both
+   modes get a resting and a hover state so cards visibly lift on interaction
+   rather than sitting flat. */
+:root[data-theme="light"] {
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 10px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.05);
+  --border-card-hover: #c8c2b8;
+}
+:root[data-theme="dark"],
+:root {
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(93, 202, 165, 0.08);
+  --border-card-hover: #3a3a3a;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg2: var(--bg2);
@@ -85,6 +102,9 @@
   --color-pink: var(--pink);
   --color-pink-tint: var(--pink-tint);
   --color-purple: var(--purple);
+  --color-border-card-hover: var(--border-card-hover);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
   --radius-card: 14px;
   --radius-card-sm: 10px;
   --font-heading: var(--font-syne);
@@ -105,4 +125,101 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Global focus-visible ring -- guarantees every interactive element gets a
+   visible keyboard-focus state without adding ring utilities to each one
+   individually and risking missing some. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="link"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* Skeleton loading placeholders -- shape matches the real layout (see
+   loading.tsx files), not a generic spinner. */
+.skeleton {
+  background: var(--bg3);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 6%, transparent), transparent);
+  animation: skeleton-shimmer 1.6s infinite;
+}
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* One confident accent (green) used deliberately for every primary action --
+   not several competing colors. Pink stays reserved for destructive/error
+   states only (see ReportModal, error text). Every interactive state
+   (hover/active/disabled) is explicit so nothing feels static. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  background: var(--green);
+  color: var(--green-dark);
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.btn-primary:hover {
+  background: var(--green-mid);
+}
+.btn-primary:active {
+  transform: scale(0.97);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.btn-secondary:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.btn-secondary:active {
+  transform: scale(0.97);
+}
+.btn-secondary:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Card elevation: resting shadow, lifts + brightens border on hover. */
+.card-elevated {
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.card-elevated:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-card-hover);
+  transform: translateY(-2px);
 }
