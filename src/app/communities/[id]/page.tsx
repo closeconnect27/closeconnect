@@ -3,10 +3,23 @@ import Link from "next/link";
 import { IconStar, IconUsers, IconMapPin } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityById } from "@/lib/queries/communities";
+import {
+  getCommunityMembership,
+  getCommunityGroups,
+  getUserGroupMemberships,
+  getCommunityFormFields,
+  getCommunityMembers,
+  getPendingJoinRequests,
+  getMyJoinRequestStatus,
+} from "@/lib/queries/membership";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
 import { CategoryImage } from "@/components/ui/CategoryImage";
+import { JoinSection } from "@/components/communities/JoinSection";
+import { GroupList } from "@/components/communities/GroupList";
+import { MemberList } from "@/components/communities/MemberList";
+import { PendingRequests } from "@/components/communities/PendingRequests";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +38,27 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
   const visual = getCategoryVisual(community.category);
   const extraCats = (community.extra_categories ?? []).map(getCategoryVisual);
+
+  const isNative = community.kind === "native";
+
+  const membership = isNative && user ? await getCommunityMembership(supabase, id, user.id) : null;
+  const isMember = !!membership;
+  const isStaff = membership?.role === "owner" || membership?.role === "moderator";
+
+  const groups = isNative ? await getCommunityGroups(supabase, id) : [];
+  const joinedGroupIds =
+    isNative && user
+      ? await getUserGroupMemberships(supabase, user.id, groups.map((g) => g.id))
+      : new Set<string>();
+
+  const formFields =
+    isNative && community.join_mode === "request" ? await getCommunityFormFields(supabase, id) : [];
+
+  const pendingStatus =
+    isNative && user && !isMember ? await getMyJoinRequestStatus(supabase, id, user.id) : null;
+
+  const members = isNative ? await getCommunityMembers(supabase, id) : [];
+  const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
 
   return (
     <div className="flex-1 pb-10">
@@ -58,7 +92,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             </span>
           ))}
           <span className="rounded-full border border-border2 px-2.5 py-1 text-[10px] font-bold text-text2">
-            {community.kind === "native" ? "native community" : "external"}
+            {isNative ? "native community" : "external"}
           </span>
         </div>
 
@@ -71,7 +105,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               {community.city}
             </span>
           )}
-          {community.kind === "native" && (
+          {isNative && (
             <>
               <span className="flex items-center gap-1">
                 <IconUsers size={14} className="text-text3" />
@@ -91,11 +125,46 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           {community.description}
         </p>
 
-        {community.kind === "native" && (
-          <p className="mt-6 rounded-card border border-border bg-bg2 px-4 py-3 text-xs text-text3">
-            Joining, sub-groups, and chat for native communities are coming in Phase 5. For now this
-            page just shows what&apos;s public.
-          </p>
+        {isNative && (
+          <div className="mt-6 flex flex-col gap-6">
+            <JoinSection
+              communityId={community.id}
+              joinMode={community.join_mode}
+              isMember={isMember}
+              isLoggedIn={!!user}
+              pendingStatus={pendingStatus}
+              formFields={formFields}
+            />
+
+            <section>
+              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">Groups</h2>
+              <GroupList
+                communityId={community.id}
+                groups={groups}
+                isMember={isMember}
+                joinedGroupIds={joinedGroupIds}
+              />
+              <p className="mt-2 text-[11px] text-text3">Realtime chat is coming next.</p>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">Members</h2>
+              <MemberList members={members} />
+            </section>
+
+            {isStaff && (
+              <section>
+                <h2 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-text3">
+                  Pending requests
+                </h2>
+                <PendingRequests
+                  communityId={community.id}
+                  requests={pendingRequests}
+                  formFields={formFields}
+                />
+              </section>
+            )}
+          </div>
         )}
 
         <CommunityDetailActions
