@@ -4,7 +4,9 @@ import { IconStar, IconUsers, IconMapPin } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityById } from "@/lib/queries/communities";
 import { getCategoryVisual } from "@/lib/categories";
+import { communitySeed } from "@/lib/categoryImages";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
+import { CategoryImage } from "@/components/ui/CategoryImage";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,11 +28,19 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
   return (
     <div className="flex-1 pb-10">
-      <div className="h-40 w-full text-6xl" style={{ background: visual.bg }}>
-        <div className="flex h-full items-center justify-center">{visual.emoji}</div>
+      <div className="relative h-40 w-full sm:h-52" style={{ background: visual.bg }}>
+        <CategoryImage
+          slug={community.category}
+          seed={communitySeed(community.id)}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
       </div>
 
-      <div className="px-5 pt-5">
+      <div className="px-4 pt-5 sm:px-5">
         <div className="mb-2 flex flex-wrap gap-1.5">
           <span
             className="rounded-full px-2.5 py-1 text-[10px] font-bold"
@@ -52,23 +62,23 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           </span>
         </div>
 
-        <h1 className="font-heading text-2xl font-extrabold">{community.name}</h1>
+        <h1 className="font-heading text-[22px] font-extrabold">{community.name}</h1>
 
-        <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-text2">
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-[12px] font-medium text-text2">
           {community.city && (
             <span className="flex items-center gap-1">
-              <IconMapPin size={14} />
+              <IconMapPin size={14} className="text-text3" />
               {community.city}
             </span>
           )}
           {community.kind === "native" && (
             <>
               <span className="flex items-center gap-1">
-                <IconUsers size={14} />
+                <IconUsers size={14} className="text-text3" />
                 {community.member_count} members
               </span>
               <span className="flex items-center gap-1">
-                <IconStar size={14} />
+                <IconStar size={14} className="text-text3" />
                 {community.avg_rating > 0
                   ? `${community.avg_rating.toFixed(1)} (${community.rating_count})`
                   : "no ratings yet"}
@@ -77,7 +87,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           )}
         </div>
 
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-text2">
+        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
           {community.description}
         </p>
 

@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
-/* Design system per SPEC.md Section 3 -- the mockups are dark-themed by
-   product design, not light/dark-adaptive, so these are set directly on
-   :root rather than gated behind prefers-color-scheme. */
+/* Design system per SPEC.md Section 3. Dark values (from communities.html)
+   are the base :root -- default theme is dark regardless of OS preference.
+   Light values are NOT a mechanical inversion: they're ported verbatim from
+   reference/reference_current_index.html's :root, which is a real,
+   already-shipped light theme, not a guess. --green/--pink/--purple shift to
+   darker, more saturated shades in light mode -- same brand hue, but the
+   dark-mode brights (e.g. #5dcaa5 green) fail contrast as text on a light
+   background (~2:1); the reference's shades (e.g. #1a7a5e) hit ~5:1+. Fills
+   where a fixed ink color sits on top of --green/--pink (buttons, badges)
+   are unaffected either way since the ink itself is chosen per-fill, not
+   inherited from page text color. --green-dark keeps its role (the ink that
+   pairs with a --green fill) but flips lightness with the fill it pairs
+   against: near-black in dark mode (dark text needs a bright green fill),
+   near-white in light mode (light text needs the darker green fill) -- see
+   ThemeToggle usage sites for where this matters. */
 :root {
   --bg: #0a0a0a;
   --bg2: #141414;
@@ -15,8 +27,46 @@
   --green: #5dcaa5;
   --green-dark: #0d2218;
   --green-mid: #1d9e75;
+  --green-tint: #0d2218;
   --pink: #d4537e;
+  --pink-tint: #2a0e1a;
   --purple: #7f77dd;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --bg2: #141414;
+  --bg3: #1a1a1a;
+  --border: #222222;
+  --border2: #2a2a2a;
+  --text: #f0f0f0;
+  --text2: #888888;
+  --text3: #444444;
+  --green: #5dcaa5;
+  --green-dark: #0d2218;
+  --green-mid: #1d9e75;
+  --green-tint: #0d2218;
+  --pink: #d4537e;
+  --pink-tint: #2a0e1a;
+  --purple: #7f77dd;
+}
+
+:root[data-theme="light"] {
+  --bg: #fafaf8;
+  --bg2: #ffffff;
+  --bg3: #f4f3f0;
+  --border: #e8e5e0;
+  --border2: #d8d4ce;
+  --text: #1a1814;
+  --text2: #6b6560;
+  --text3: #a09890;
+  --green: #1a7a5e;
+  --green-dark: #edf7f3;
+  --green-mid: #159068;
+  --green-tint: #edf7f3;
+  --pink: #c2185b;
+  --pink-tint: #fce4ec;
+  --purple: #7c3aed;
 }
 
 @theme inline {
@@ -31,7 +81,9 @@
   --color-green: var(--green);
   --color-green-dark: var(--green-dark);
   --color-green-mid: var(--green-mid);
+  --color-green-tint: var(--green-tint);
   --color-pink: var(--pink);
+  --color-pink-tint: var(--pink-tint);
   --color-purple: var(--purple);
   --radius-card: 14px;
   --radius-card-sm: 10px;
@@ -42,6 +94,9 @@
 body {
   background: var(--bg);
   color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .scrollbar-none {

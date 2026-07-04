@@ -59,7 +59,7 @@ export function ReportModal({
         <div className="mb-3 flex items-start justify-between">
           <div>
             <div className="font-heading text-[17px] font-bold">Report community</div>
-            <div className="text-xs text-text3">Help us keep the directory clean</div>
+            <div className="text-[13px] text-text2">Help us keep the directory clean</div>
           </div>
           <button onClick={onClose} className="text-text2">
             <IconX size={18} />
@@ -80,7 +80,7 @@ export function ReportModal({
                   className="flex items-center gap-2.5 rounded-card-sm border px-3.5 py-2.5 text-left text-[13px] transition"
                   style={
                     reason === value
-                      ? { borderColor: "var(--pink)", color: "var(--pink)", background: "rgba(212,83,126,0.1)" }
+                      ? { borderColor: "var(--pink)", color: "var(--pink)", background: "var(--pink-tint)" }
                       : { borderColor: "var(--border)", color: "var(--text2)" }
                   }
                 >

@@ -16,7 +16,7 @@ export function JoinBadge({ link }: { link: string }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+      className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-bold"
       style={
         insta
           ? { background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", borderColor: "transparent", color: "#fff" }
