@@ -4,8 +4,10 @@ import { IconBrandWhatsapp, IconBrandInstagram } from "@tabler/icons-react";
 import { safeJoinHref, isInstagramLink } from "@/lib/validators/links";
 
 // Its own client component because it needs stopPropagation to keep this
-// nested link from also triggering the parent CommunityCard's <Link> to the
-// detail page -- can't pass an event handler from the server-rendered card.
+// nested link from also triggering the parent ClickableCard's navigation --
+// can't pass an event handler from the server-rendered card. A real <a>
+// nested in ClickableCard's div wrapper is valid HTML (unlike nesting it in
+// a <Link>/<a>), which is exactly why CommunityCard uses ClickableCard.
 export function JoinBadge({ link }: { link: string }) {
   const insta = isInstagramLink(link);
   return (

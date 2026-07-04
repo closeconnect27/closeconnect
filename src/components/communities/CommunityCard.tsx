@@ -1,17 +1,17 @@
-import Link from "next/link";
 import { IconUsers, IconStar } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import type { Community } from "@/lib/queries/communities";
 import { JoinBadge } from "@/components/communities/JoinBadge";
+import { ClickableCard } from "@/components/ui/ClickableCard";
 
 export function CommunityCard({ community: c }: { community: Community }) {
   const visual = getCategoryVisual(c.category);
   const extraCats = (c.extra_categories ?? []).map(getCategoryVisual);
 
   return (
-    <Link
+    <ClickableCard
       href={`/communities/${c.id}`}
-      className="block w-[175px] shrink-0 overflow-hidden rounded-card border border-border bg-bg2 transition hover:-translate-y-0.5 hover:border-border2"
+      className="block w-[175px] shrink-0 cursor-pointer overflow-hidden rounded-card border border-border bg-bg2 transition hover:-translate-y-0.5 hover:border-border2"
     >
       <div
         className="relative flex h-[70px] items-center justify-center text-3xl"
@@ -62,7 +62,7 @@ export function CommunityCard({ community: c }: { community: Community }) {
           )}
         </div>
       </div>
-    </Link>
+    </ClickableCard>
   );
 }
 
