@@ -139,22 +139,27 @@ export async function getEventFormFields(supabase: SupabaseClient, eventId: stri
 /** Native communities the user can attach an event to -- owner or moderator
  * only, matching the reference's loadHostableCommunities gate. External
  * (link-out) communities are excluded: events are a native-platform feature,
- * an external community has no real presence here for an event to belong to. */
+ * an external community has no real presence here for an event to belong to.
+ *
+ * communities.owner_id is authoritative for ownership, not
+ * community_members.role (a separate, mutable row that can drift from it) --
+ * see the matching note on getMyCommunities in lib/queries/dashboard.ts.
+ * Querying community_members alone here would silently block an owner from
+ * attaching an event to their own community if that row was ever wrong. */
 export async function getHostableCommunities(supabase: SupabaseClient, userId: string) {
-  const { data: memberships, error: mErr } = await supabase
+  const { data: modMemberships, error: mErr } = await supabase
     .from("community_members")
     .select("community_id")
     .eq("user_id", userId)
-    .in("role", ["owner", "moderator"]);
+    .eq("role", "moderator");
   if (mErr) throw mErr;
 
-  const ids = (memberships ?? []).map((m) => m.community_id as string);
-  if (ids.length === 0) return [];
+  const modIds = (modMemberships ?? []).map((m) => m.community_id as string);
 
   const { data, error } = await supabase
     .from("communities")
-    .select("id, name")
-    .in("id", ids)
+    .select("id, name, owner_id")
+    .or(`owner_id.eq.${userId}${modIds.length ? `,id.in.(${modIds.join(",")})` : ""}`)
     .eq("kind", "native")
     .eq("status", "active");
   if (error) throw error;
@@ -177,18 +182,30 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
 /** Public per-ticket-type registration counts via a security-definer RPC --
  * form_responses rows themselves are PII and stay owner/respondent-only. */
 export async function getTicketAvailability(supabase: SupabaseClient, eventId: string) {
-  const { data, error } = await supabase.rpc("get_ticket_registration_counts", { p_event_id: eventId });
   const counts = new Map<string, number>();
-  if (error) {
-    // Soft-fail rather than 500ing the whole public event page: this is
-    // supplementary "X left" display, not core functionality, and the one
-    // realistic cause is the 0006 migration not having been pushed yet.
-    console.error("get_ticket_registration_counts failed (has 0006 been pushed?):", error.message);
-    return counts;
+
+  // One retry on a genuine network-level failure (fetch throwing/rejecting,
+  // e.g. a transient connection reset to Supabase) before soft-failing --
+  // seen in practice self-resolving on a manual page refresh, which is
+  // exactly what a retry automates instead of surfacing to the user. This is
+  // distinct from an actual Postgres/PostgREST error (bad function, RLS,
+  // etc.), which retrying wouldn't fix and which still soft-fails below.
+  let lastError: string | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await supabase.rpc("get_ticket_registration_counts", { p_event_id: eventId });
+    if (!error) {
+      for (const row of data ?? []) {
+        counts.set(row.ticket_type_id as string, Number(row.registered_count));
+      }
+      return counts;
+    }
+    lastError = error.message;
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 300));
   }
-  for (const row of data ?? []) {
-    counts.set(row.ticket_type_id as string, Number(row.registered_count));
-  }
+
+  // Soft-fail rather than 500ing the whole public event page: this is
+  // supplementary "X left" display, not core functionality.
+  console.error("get_ticket_registration_counts failed after retry:", lastError);
   return counts;
 }
 

@@ -37,7 +37,10 @@ export type CreateEventInput = z.infer<typeof createEventSchema>;
 export const eventRegistrationSchema = z.object({
   ticket_type_id: z.string().uuid(),
   name: z.string().trim().min(1, "Name is required").max(120),
-  email: z.string().trim().email("Enter a valid email"),
+  // Lowercased so it matches the DB's case-insensitive one-registration-per-
+  // event-email unique index (0012) exactly, and so exports/display are
+  // consistent regardless of how a guest capitalized their own email.
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
   answers: formAnswersSchema.default({}),
 });
 

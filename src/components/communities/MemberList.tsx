@@ -2,8 +2,10 @@ import { IconUsers } from "@tabler/icons-react";
 
 export function MemberList({
   members,
+  ownerId,
 }: {
   members: { user_id: string; role: string; profiles: { display_name: string } | null }[];
+  ownerId: string;
 }) {
   return (
     <div>
@@ -14,6 +16,10 @@ export function MemberList({
       <div className="flex flex-wrap gap-2">
         {members.slice(0, 20).map((m) => {
           const name = m.profiles?.display_name ?? "member";
+          // communities.owner_id is authoritative -- always show "owner" for
+          // that user regardless of what their (separate, mutable)
+          // community_members.role row currently says.
+          const displayRole = m.user_id === ownerId ? "owner" : m.role;
           return (
             <span
               key={m.user_id}
@@ -23,7 +29,7 @@ export function MemberList({
                 {name.charAt(0).toUpperCase()}
               </span>
               {name}
-              {m.role !== "member" && <span className="font-semibold text-green">· {m.role}</span>}
+              {displayRole !== "member" && <span className="font-semibold text-green">· {displayRole}</span>}
             </span>
           );
         })}

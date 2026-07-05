@@ -116,7 +116,14 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   });
 
   if (error) {
-    return { error: error.message.includes("wait a moment") ? error.message : "Could not complete registration" };
+    if (error.message.includes("wait a moment")) return { error: error.message };
+    // 23505 = unique_violation -- the one-registration-per-event-email index
+    // (0012). Guest-friendly: no account needed, so email is the only real
+    // identity signal available to catch someone registering twice.
+    if (error.code === "23505") {
+      return { error: "This email has already been used to register for this event." };
+    }
+    return { error: "Could not complete registration" };
   }
   revalidatePath(`/events/${eventId}`);
   return { error: null };

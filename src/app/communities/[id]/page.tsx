@@ -19,6 +19,7 @@ import { CommunityDetailActions } from "@/components/communities/CommunityDetail
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { JoinSection } from "@/components/communities/JoinSection";
 import { GroupList } from "@/components/communities/GroupList";
+import { CreateGroupForm } from "@/components/communities/CreateGroupForm";
 import { MemberList } from "@/components/communities/MemberList";
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
@@ -44,8 +45,15 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   const isNative = community.kind === "native";
 
   const membership = isNative && user ? await getCommunityMembership(supabase, id, user.id) : null;
-  const isMember = !!membership;
-  const isStaff = membership?.role === "owner" || membership?.role === "moderator";
+  const isOwner = !!user && community.owner_id === user.id;
+  // communities.owner_id is authoritative for ownership, not
+  // community_members.role -- that row is separate and mutable, and can
+  // drift from it (e.g. a removed-then-rejoined membership always defaults
+  // to role='member'). Falling back to owner_id here means the actual owner
+  // never silently loses staff access to, or membership status in, their
+  // own community even if that row is ever wrong or missing.
+  const isMember = !!membership || isOwner;
+  const isStaff = isOwner || membership?.role === "owner" || membership?.role === "moderator";
 
   const groups = isNative ? await getCommunityGroups(supabase, id) : [];
   const joinedGroupIds =
@@ -150,11 +158,16 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 isMember={isMember}
                 joinedGroupIds={joinedGroupIds}
               />
+              {isStaff && (
+                <div className="mt-3">
+                  <CreateGroupForm communityId={community.id} />
+                </div>
+              )}
             </section>
 
             <section>
               <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Members</h2>
-              <MemberList members={members} />
+              <MemberList members={members} ownerId={community.owner_id} />
             </section>
 
             {isStaff && (

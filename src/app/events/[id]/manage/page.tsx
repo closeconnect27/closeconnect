@@ -3,7 +3,7 @@ import Link from "next/link";
 import { IconDownload, IconUsers, IconCircleCheck } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getEventById, getEventRegistrations, getEventTicketTypes } from "@/lib/queries/events";
+import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
@@ -22,9 +22,10 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
 
   if (event.host_id !== user.id) redirect(`/events/${id}`);
 
-  const [registrations, ticketTypes] = await Promise.all([
+  const [registrations, ticketTypes, formFields] = await Promise.all([
     getEventRegistrations(supabase, id),
     getEventTicketTypes(supabase, id),
+    getEventFormFields(supabase, id),
   ]);
 
   const checkedInCount = registrations.filter((r) => r.checked_in_at).length;
@@ -67,7 +68,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
           {registrations.length === 0 ? (
             <EmptyState icon={IconUsers} title="No registrants yet" description="Share the event link to get your first sign-up." />
           ) : (
-            <EventRegistrantList eventId={id} registrations={registrations} />
+            <EventRegistrantList eventId={id} registrations={registrations} formFields={formFields} />
           )}
         </div>
       </div>

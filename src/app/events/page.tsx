@@ -80,7 +80,7 @@ async function FilteredGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-3 sm:px-6 md:grid-cols-4 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-2 sm:px-6 md:grid-cols-3 lg:grid-cols-4">
       {events.map((e) => (
         <EventCard key={e.id} event={e} />
       ))}
@@ -151,7 +151,7 @@ function EventRow({
       </div>
       <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
         {events.map((e) => (
-          <div key={e.id} className="w-56 shrink-0">
+          <div key={e.id} className="w-72 shrink-0">
             <EventCard event={e} />
           </div>
         ))}

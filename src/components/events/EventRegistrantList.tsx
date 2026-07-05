@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconSearch, IconCircleCheck, IconCircle } from "@tabler/icons-react";
 import { setCheckIn } from "@/app/actions/events";
 import type { EventRegistration } from "@/lib/queries/events";
+import type { FormField } from "@/lib/queries/membership";
 
 // Search + manual check-in only for v1 -- SPEC.md Section 8 explicitly warns
 // against over-building this ("a mobile web page ... is enough"). A registrant
@@ -14,9 +15,11 @@ import type { EventRegistration } from "@/lib/queries/events";
 export function EventRegistrantList({
   eventId,
   registrations,
+  formFields,
 }: {
   eventId: string;
   registrations: EventRegistration[];
+  formFields: FormField[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -59,26 +62,39 @@ export function EventRegistrantList({
       ) : (
         <div className="flex flex-col divide-y divide-border rounded-card border border-border bg-bg2">
           {filtered.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0">
-                <p className="truncate text-[14px] font-bold text-text">{r.response_data.name ?? "—"}</p>
-                <p className="truncate text-[12px] text-text3">
-                  {r.response_data.email}
-                  {r.event_ticket_types && ` · ${r.event_ticket_types.name}`}
-                </p>
+            <div key={r.id} className="flex flex-col gap-3 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-bold text-text">{r.response_data.name ?? "—"}</p>
+                  <p className="truncate text-[12px] text-text3">
+                    {r.response_data.email}
+                    {r.event_ticket_types && ` · ${r.event_ticket_types.name}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => toggleCheckIn(r)}
+                  disabled={pendingId === r.id}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold transition disabled:opacity-50 ${
+                    r.checked_in_at
+                      ? "border-green bg-green-tint text-green"
+                      : "border-border2 text-text2 hover:border-green hover:text-green"
+                  }`}
+                >
+                  {r.checked_in_at ? <IconCircleCheck size={14} /> : <IconCircle size={14} />}
+                  {r.checked_in_at ? "Checked in" : "Check in"}
+                </button>
               </div>
-              <button
-                onClick={() => toggleCheckIn(r)}
-                disabled={pendingId === r.id}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold transition disabled:opacity-50 ${
-                  r.checked_in_at
-                    ? "border-green bg-green-tint text-green"
-                    : "border-border2 text-text2 hover:border-green hover:text-green"
-                }`}
-              >
-                {r.checked_in_at ? <IconCircleCheck size={14} /> : <IconCircle size={14} />}
-                {r.checked_in_at ? "Checked in" : "Check in"}
-              </button>
+
+              {formFields.length > 0 && (
+                <div className="flex flex-col gap-1 rounded-card-sm bg-bg3 px-3 py-2">
+                  {formFields.map((field) => (
+                    <p key={field.id} className="text-[12px]">
+                      <span className="text-text3">{field.label}: </span>
+                      <span className="text-text2">{r.response_data[field.id] || "—"}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

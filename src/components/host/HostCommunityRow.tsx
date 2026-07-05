@@ -3,14 +3,22 @@ import { IconUsers, IconStar } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { CategoryImage } from "@/components/ui/CategoryImage";
-import type { MyCommunity } from "@/lib/queries/dashboard";
+import type { Community } from "@/lib/queries/communities";
 
 // Compact utility row, not a photo-forward browse card -- a management
 // console is scanned for status (pending count, role), not browsed for
 // discovery, so information density wins over the bigger imagery used on
 // /communities. Matches the WhatsApp-admin-list / Meetup-organizer-console
 // register from the design-pass research rather than the storefront one.
-export function HostCommunityRow({ community: c, pendingCount }: { community: MyCommunity; pendingCount: number }) {
+// Shared between the Host Dashboard (owned/moderated, with pending counts)
+// and the Profile page (owned + joined-as-member, no pending concept).
+export function HostCommunityRow({
+  community: c,
+  pendingCount = 0,
+}: {
+  community: Community & { role: string };
+  pendingCount?: number;
+}) {
   const visual = getCategoryVisual(c.category);
 
   return (
@@ -25,9 +33,9 @@ export function HostCommunityRow({ community: c, pendingCount }: { community: My
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-[14px] font-bold text-text">{c.name}</p>
-          {c.role === "owner" && (
+          {c.role !== "member" && (
             <span className="shrink-0 rounded-full border border-border2 px-2 py-0.5 text-[10px] font-bold text-text3">
-              owner
+              {c.role}
             </span>
           )}
         </div>

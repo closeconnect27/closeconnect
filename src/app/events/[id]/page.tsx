@@ -47,23 +47,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     <div className="flex-1 pb-10">
       <div className="relative h-48 w-full sm:h-64" style={{ background: visual.bg }}>
         {images.length > 0 ? (
-          <div className="grid h-full grid-cols-3 gap-0.5">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="relative">
-                {images[i] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={images[i].image_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <CategoryImage
-                    slug={event.category ?? "other"}
-                    seed={communitySeed(event.id) + i}
-                    alt=""
-                    fill
-                    sizes="33vw"
-                    className="object-cover"
-                  />
-                )}
-              </div>
+          // Grid sized to the ACTUAL image count -- filling empty slots with
+          // random stock category photos (as this used to) put unrelated
+          // stock images side by side with a host's real upload, which reads
+          // as broken rather than as a legitimate fallback. The category
+          // fallback is only for the true zero-images case, below.
+          <div className={`grid h-full gap-0.5 ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+            {images.map((img) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={img.id} src={img.image_url} alt="" className="h-full w-full object-cover" />
             ))}
           </div>
         ) : (

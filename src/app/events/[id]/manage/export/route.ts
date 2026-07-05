@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getEventById, getEventRegistrations, type EventRegistration } from "@/lib/queries/events";
+import { getEventById, getEventRegistrations, getEventFormFields, type EventRegistration } from "@/lib/queries/events";
+import type { FormField } from "@/lib/queries/membership";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,8 +22,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // than a silently-empty CSV.
   if (event.host_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const registrations = await getEventRegistrations(supabase, id);
-  const csv = toCsv(registrations);
+  const [registrations, formFields] = await Promise.all([
+    getEventRegistrations(supabase, id),
+    getEventFormFields(supabase, id),
+  ]);
+  const csv = toCsv(registrations, formFields);
   const filename = event.event_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
 
   return new NextResponse(csv, {
@@ -42,14 +46,22 @@ function csvField(value: string) {
   return `"${sanitized.replace(/"/g, '""')}"`;
 }
 
-function toCsv(registrations: EventRegistration[]) {
-  const header = ["Name", "Email", "Ticket type", "Registered at", "Checked in"];
+function toCsv(registrations: EventRegistration[], formFields: FormField[]) {
+  const header = [
+    "Name",
+    "Email",
+    "Ticket type",
+    "Registered at",
+    "Checked in",
+    ...formFields.map((f) => f.label),
+  ];
   const rows = registrations.map((r) => [
     r.response_data.name ?? "",
     r.response_data.email ?? "",
     r.event_ticket_types?.name ?? "",
     new Date(r.created_at).toISOString(),
     r.checked_in_at ? "yes" : "no",
+    ...formFields.map((f) => r.response_data[f.id] ?? ""),
   ]);
   return [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n");
 }

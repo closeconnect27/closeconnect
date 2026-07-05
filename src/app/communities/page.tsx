@@ -78,7 +78,7 @@ async function FilteredGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-3 sm:px-6 md:grid-cols-4 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-2 sm:px-6 md:grid-cols-3 lg:grid-cols-4">
       {communities.map((c) => (
         <CommunityCard key={c.id} community={c} />
       ))}
@@ -133,7 +133,7 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
           </div>
           <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
             {communities.map((c) => (
-              <div key={c.id} className="w-56 shrink-0">
+              <div key={c.id} className="w-72 shrink-0">
                 <CommunityCard community={c} />
               </div>
             ))}

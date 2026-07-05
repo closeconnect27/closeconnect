@@ -7,25 +7,47 @@ export type MyCommunity = Community & { role: "owner" | "moderator" };
  * dashboard) -- both kinds, unlike getHostableCommunities in
  * lib/queries/events.ts which intentionally narrows to native-only because
  * it's answering a different question ("what can I attach an event to").
- * Here we want everything the host is responsible for managing. */
+ * Here we want everything the host is responsible for managing.
+ *
+ * communities.owner_id, not community_members.role, is the authoritative
+ * signal for ownership -- role is a separate, mutable row that can drift
+ * from it (e.g. if a membership row is ever removed and rejoined through a
+ * normal join flow, which always defaults to role='member'). Querying
+ * community_members alone would silently drop an owner's own community from
+ * their dashboard the moment that happened, rather than just mislabeling it.
+ * Moderator status has no other source of truth, so that part still comes
+ * from community_members. */
 export async function getMyCommunities(supabase: SupabaseClient, userId: string) {
-  const { data: memberships, error: mErr } = await supabase
-    .from("community_members")
-    .select("community_id, role")
-    .eq("user_id", userId)
-    .in("role", ["owner", "moderator"]);
-  if (mErr) throw mErr;
-  if (!memberships || memberships.length === 0) return [];
-
-  const roleByCommunity = new Map(memberships.map((m) => [m.community_id as string, m.role as "owner" | "moderator"]));
-  const { data, error } = await supabase
+  const { data: owned, error: ownedErr } = await supabase
     .from("communities")
     .select("*")
-    .in("id", [...roleByCommunity.keys()])
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+    .eq("owner_id", userId);
+  if (ownedErr) throw ownedErr;
 
-  return (data as Community[]).map((c) => ({ ...c, role: roleByCommunity.get(c.id)! })) as MyCommunity[];
+  const { data: modMemberships, error: modErr } = await supabase
+    .from("community_members")
+    .select("community_id")
+    .eq("user_id", userId)
+    .eq("role", "moderator");
+  if (modErr) throw modErr;
+
+  const ownedIds = new Set((owned ?? []).map((c) => c.id));
+  const moderatedIds = [...new Set((modMemberships ?? []).map((m) => m.community_id as string))].filter(
+    (id) => !ownedIds.has(id),
+  );
+
+  let moderated: Community[] = [];
+  if (moderatedIds.length > 0) {
+    const { data, error } = await supabase.from("communities").select("*").in("id", moderatedIds);
+    if (error) throw error;
+    moderated = data as Community[];
+  }
+
+  const result: MyCommunity[] = [
+    ...(owned as Community[]).map((c) => ({ ...c, role: "owner" as const })),
+    ...moderated.map((c) => ({ ...c, role: "moderator" as const })),
+  ];
+  return result.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export type MyEvent = {

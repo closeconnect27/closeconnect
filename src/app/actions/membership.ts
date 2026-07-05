@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityFormFields } from "@/lib/queries/membership";
 import { formAnswersSchema } from "@/lib/validation/forms";
+import { createGroupSchema, type CreateGroupInput } from "@/lib/validation/community";
 
 export async function joinOpenCommunity(communityId: string) {
   const user = await requireUser();
@@ -62,6 +63,36 @@ export async function submitJoinRequest(communityId: string, answers: Record<str
     if (error.code === "23505") return { error: "You already have a pending request for this community." };
     return { error: error.message };
   }
+  revalidatePath(`/communities/${communityId}`);
+  return { error: null };
+}
+
+export async function createGroup(communityId: string, input: CreateGroupInput) {
+  const user = await requireUser();
+
+  const parsed = createGroupSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+
+  // RLS (community_groups_insert_staff) is the real gate -- a non-staff
+  // caller's insert simply fails rather than erroring silently past it.
+  const { data: group, error } = await supabase
+    .from("community_groups")
+    .insert({ community_id: communityId, name: parsed.data.name, description: parsed.data.description || null })
+    .select()
+    .single();
+
+  if (error || !group) return { error: error?.message ?? "Could not create group" };
+
+  // The staff member who created it is already a community member (that's
+  // what let them get here) -- auto-join them to the group they just made,
+  // matching WhatsApp's behavior, instead of leaving them outside their own
+  // new group.
+  await supabase.from("community_group_members").insert({ group_id: group.id, user_id: user.id });
+
   revalidatePath(`/communities/${communityId}`);
   return { error: null };
 }

@@ -55,7 +55,7 @@ function LoginForm() {
         className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] text-text transition placeholder:text-text3 focus:border-green"
       />
       <button type="submit" disabled={status === "sending"} className="btn-primary py-3 text-[14px]">
-        {status === "sending" ? "Sending…" : "Send magic link"}
+        {status === "sending" ? "Sending…" : "Send sign-in link"}
       </button>
       {error && <p className="text-[13px] text-pink">{error}</p>}
     </form>

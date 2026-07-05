@@ -19,3 +19,10 @@ export const createCommunitySchema = z
   });
 
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
+
+export const createGroupSchema = z.object({
+  name: z.string().trim().min(2, "At least 2 characters").max(60),
+  description: z.string().trim().max(200).optional(),
+});
+
+export type CreateGroupInput = z.infer<typeof createGroupSchema>;

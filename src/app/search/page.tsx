@@ -55,7 +55,7 @@ export default async function SearchPage({
             <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">
               Events · {events.length}
             </h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {events.map((e) => (
                 <EventCard key={e.id} event={e} />
               ))}
@@ -67,7 +67,7 @@ export default async function SearchPage({
             <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">
               Communities · {communities.length}
             </h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {communities.map((c) => (
                 <CommunityCard key={c.id} community={c} />
               ))}
