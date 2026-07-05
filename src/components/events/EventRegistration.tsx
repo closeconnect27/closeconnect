@@ -6,14 +6,15 @@ import { DynamicForm } from "@/components/forms/DynamicForm";
 import { registerForEvent } from "@/app/actions/events";
 import type { FormField } from "@/lib/queries/membership";
 import type { EventTicketType } from "@/lib/queries/events";
-import { isValidPaymentLink } from "@/lib/validators/links";
+import { safePaymentHref } from "@/lib/validators/links";
 
 // Guest-friendly by design (SPEC.md Section 1): no login required, name +
 // email are the only fixed fields (there's no dedicated guest_name/email
 // column -- they ride in response_data alongside the host's own custom
 // questions, same polymorphic shape as everything else in the unified form
-// system). Paid tickets hand off to the ticket's own Razorpay link rather
-// than collecting payment here -- real checkout/webhook handling is Phase 8.
+// system). Paid tickets hand off to the ticket's own payment link rather
+// than collecting payment here -- real checkout/webhook handling is a later
+// phase (SPEC.md Section 8).
 export function EventRegistration({
   eventId,
   ticketTypes,
@@ -65,7 +66,7 @@ export function EventRegistration({
         </p>
         {selectedTicket && selectedTicket.price > 0 && selectedTicket.payment_link && (
           <a
-            href={isValidPaymentLink(selectedTicket.payment_link) ? selectedTicket.payment_link : "#"}
+            href={safePaymentHref(selectedTicket.payment_link)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary mt-4 px-6 py-2.5 text-[13px]"

@@ -10,7 +10,7 @@ const ticketTypeSchema = z.object({
     .string()
     .trim()
     .optional()
-    .refine((v) => !v || isValidPaymentLink(v), "Payment link must be a valid Razorpay link (rzp.io or razorpay.com)"),
+    .refine((v) => !v || isValidPaymentLink(v), "Payment link must be a valid https:// link"),
   quantity_available: z.number().int().min(1).max(100_000).optional(),
 });
 

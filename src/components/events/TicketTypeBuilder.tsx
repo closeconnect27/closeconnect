@@ -87,13 +87,16 @@ export function TicketTypeBuilder({
 
           {t.price > 0 && (
             <label className="mt-3 flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-text3">Razorpay payment link</span>
+              <span className="text-[11px] font-bold text-text3">Payment link</span>
               <input
                 value={t.payment_link}
                 onChange={(e) => updateTicket(i, { payment_link: e.target.value })}
-                placeholder="https://rzp.io/..."
+                placeholder="https://rzp.io/l/your-link"
                 className={inputClass}
               />
+              <span className="text-[11px] text-text3">
+                Paste a Razorpay (or similar) payment link -- attendees pay via card, UPI, or netbanking through it.
+              </span>
             </label>
           )}
         </div>

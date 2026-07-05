@@ -58,15 +58,19 @@ export function isInstagramLink(url: string | null | undefined): boolean {
 }
 
 // Ticket payment links (SPEC.md Section 8): actual checkout/webhook handling
-// is Phase 8 -- for now this is just an external redirect, same shape as the
-// WhatsApp/Instagram link validators above, restricted to Razorpay's own
-// domains so a host can't paste an arbitrary (or malicious) URL into a field
-// that renders as a trusted "Pay" button.
+// is a later phase -- for now this is just an external redirect, same shape
+// as the WhatsApp/Instagram link validators above. reference_current_events.html
+// (the proven production pattern this ports) applies *no* validation at all
+// beyond HTML-escaping the link before rendering it as an <a href> -- its own
+// field hint says "Razorpay (or similar)", i.e. other providers are
+// expected too, not just Razorpay's own domains. Matching that bar plus the
+// https-only floor called for explicitly: well-formed https:// URL, any
+// host. Still parsed through URL() rather than accepted as a raw string, so
+// a javascript: URI or similar can't slip into a rendered href -- that part
+// isn't optional the way the domain restriction was.
 export function isValidPaymentLink(url: string): boolean {
   try {
-    const u = new URL(url);
-    if (u.protocol !== "https:") return false;
-    return u.hostname === "rzp.io" || u.hostname === "razorpay.com" || u.hostname.endsWith(".razorpay.com");
+    return new URL(url).protocol === "https:";
   } catch {
     return false;
   }
