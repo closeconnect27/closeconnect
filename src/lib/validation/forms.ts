@@ -21,3 +21,13 @@ export const formFieldSchema = z
 export type FormFieldDraft = z.infer<typeof formFieldSchema>;
 
 export const formFieldsSchema = z.array(formFieldSchema).max(15);
+
+// Answers to those questions (event registration + community join-requests).
+// Bounded the same way the questions themselves are (max(15) fields above) --
+// without this, a direct call to the submitting action (bypassing the
+// rendered form entirely) could attach an unbounded number of huge-string
+// keys to a single form_responses row (SPEC.md Section 11: never trust the
+// client to have enforced shape/size limits).
+export const formAnswersSchema = z.record(z.string(), z.string().max(2000)).refine((a) => Object.keys(a).length <= 15, {
+  message: "Too many answers",
+});

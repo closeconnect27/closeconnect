@@ -36,9 +36,12 @@ export default async function Home() {
             close<span className="text-green">.connect</span>
           </h1>
           <p className="max-w-md text-[16px] text-text2">Find your people. Host what you love.</p>
-          <div className="mt-2 flex gap-3">
+          <div className="mt-2 flex flex-wrap justify-center gap-3">
             <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
               Browse communities
+            </Link>
+            <Link href="/events" className="btn-secondary px-6 py-3 text-[14px]">
+              Browse events
             </Link>
             <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
               Search
@@ -66,7 +69,7 @@ export default async function Home() {
           <FeatureCard
             icon={IconCalendarEvent}
             title="Events"
-            body="Coming soon: host an event under your own profile, with or without a community attached, and let people register as a guest — no account required to attend."
+            body="Host an event under your own profile, with or without a community attached, free or ticketed, and let people register as a guest — no account required to attend."
           />
         </div>
       </section>
@@ -84,8 +87,9 @@ export default async function Home() {
       {/* STATS */}
       <section className="border-t border-border px-4 py-16 text-center sm:px-6">
         <h2 className="mb-8 font-heading text-[26px] font-extrabold">So far</h2>
-        <div className="mx-auto flex max-w-2xl justify-center gap-12">
+        <div className="mx-auto flex max-w-2xl flex-wrap justify-center gap-x-12 gap-y-6">
           <Stat n={stats.communityCount} label={stats.communityCount === 1 ? "community" : "communities"} />
+          <Stat n={stats.upcomingEventCount} label={stats.upcomingEventCount === 1 ? "upcoming event" : "upcoming events"} />
           <Stat n={stats.totalMembers} label={stats.totalMembers === 1 ? "member" : "members"} />
           <Stat n={stats.cityCount} label={stats.cityCount === 1 ? "city" : "cities"} />
         </div>
@@ -102,6 +106,10 @@ export default async function Home() {
           <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
             <IconUserPlus size={16} />
             Browse communities
+          </Link>
+          <Link href="/events" className="btn-secondary px-6 py-3 text-[14px]">
+            <IconCalendarEvent size={16} />
+            Browse events
           </Link>
           <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
             <IconSearch size={16} />

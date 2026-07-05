@@ -146,6 +146,16 @@ export async function setCheckIn(eventId: string, responseId: string, checkedIn:
 
 export async function addEventImage(eventId: string, imageUrl: string) {
   await requireUser();
+
+  // event_images is publicly rendered on the event page -- without this, a
+  // host (the only caller RLS lets reach the insert) could point it at an
+  // arbitrary external URL instead of a real upload, bypassing the storage
+  // bucket's own type/size limits (SPEC.md Section 11) entirely.
+  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/event-images/${eventId}/`;
+  if (!imageUrl.startsWith(expectedPrefix)) {
+    return { error: "Image must come from this event's own upload" };
+  }
+
   const supabase = await createClient();
 
   const existing = await getEventImages(supabase, eventId);

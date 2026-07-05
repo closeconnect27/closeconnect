@@ -61,6 +61,7 @@ export type EventFilters = {
   hostId?: string;
   dateFrom?: string;
   dateTo?: string;
+  search?: string;
   /** Host-facing views (e.g. "my events") need past events too -- the public
    * browse grid never should, so this defaults to hiding anything before
    * today rather than requiring every call site to remember to filter. */
@@ -84,6 +85,7 @@ export async function getEvents(supabase: SupabaseClient, filters: EventFilters 
   if (filters.hostId) query = query.eq("host_id", filters.hostId);
   if (filters.dateFrom) query = query.gte("event_date", filters.dateFrom);
   if (filters.dateTo) query = query.lte("event_date", filters.dateTo);
+  if (filters.search) query = query.ilike("event_name", `%${filters.search}%`);
   if (!filters.dateFrom && !filters.includePast) query = query.gte("event_date", todayIso());
 
   query = query.order("event_date", { ascending: true }).order("event_time", { ascending: true });

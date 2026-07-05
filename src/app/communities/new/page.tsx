@@ -147,7 +147,7 @@ export default function NewCommunityPage() {
                   type="radio"
                   checked={joinMode === "open"}
                   onChange={() => setJoinMode("open")}
-                  className="mt-0.5"
+                  className="mt-0.5 accent-green"
                 />
                 <span>
                   <span className="font-medium text-text">Open</span>
@@ -159,7 +159,7 @@ export default function NewCommunityPage() {
                   type="radio"
                   checked={joinMode === "request"}
                   onChange={() => setJoinMode("request")}
-                  className="mt-0.5"
+                  className="mt-0.5 accent-green"
                 />
                 <span>
                   <span className="font-medium text-text">Request to join</span>

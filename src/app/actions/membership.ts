@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityFormFields } from "@/lib/queries/membership";
+import { formAnswersSchema } from "@/lib/validation/forms";
 
 export async function joinOpenCommunity(communityId: string) {
   const user = await requireUser();
@@ -24,13 +25,22 @@ export async function joinOpenCommunity(communityId: string) {
 
 export async function submitJoinRequest(communityId: string, answers: Record<string, string>) {
   const user = await requireUser();
+
+  // Never trust the client to have enforced shape/size limits (SPEC.md
+  // Section 11) -- bounds key count and per-value length before anything
+  // else runs.
+  const parsedAnswers = formAnswersSchema.safeParse(answers);
+  if (!parsedAnswers.success) {
+    return { error: parsedAnswers.error.issues[0]?.message ?? "Invalid answers" };
+  }
+
   const supabase = await createClient();
 
   // Never trust the client to have enforced "required" -- re-check server-side
   // against the community's own question definitions.
   const fields = await getCommunityFormFields(supabase, communityId);
   for (const field of fields) {
-    if (field.is_required && !answers[field.id]?.trim()) {
+    if (field.is_required && !parsedAnswers.data[field.id]?.trim()) {
       return { error: `"${field.label}" is required` };
     }
   }
@@ -39,11 +49,19 @@ export async function submitJoinRequest(communityId: string, answers: Record<str
     owner_type: "community",
     owner_id: communityId,
     respondent_id: user.id,
-    response_data: answers,
+    response_data: parsedAnswers.data,
     status: "pending",
   });
 
-  if (error) return { error: error.message };
+  // The rate-limit trigger and the one-pending-per-respondent unique index
+  // (0010_security_hardening.sql) both raise Postgres exceptions with
+  // user-facing text -- safe to surface as-is, same pattern as chat's
+  // rate-limit message.
+  if (error) {
+    if (error.message.includes("too quickly")) return { error: error.message };
+    if (error.code === "23505") return { error: "You already have a pending request for this community." };
+    return { error: error.message };
+  }
   revalidatePath(`/communities/${communityId}`);
   return { error: null };
 }

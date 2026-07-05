@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isCategorySlug } from "@/lib/categories";
-import { formFieldsSchema } from "@/lib/validation/forms";
+import { formFieldsSchema, formAnswersSchema } from "@/lib/validation/forms";
 import { isValidPaymentLink } from "@/lib/validators/links";
 
 const ticketTypeSchema = z.object({
@@ -38,7 +38,7 @@ export const eventRegistrationSchema = z.object({
   ticket_type_id: z.string().uuid(),
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().email("Enter a valid email"),
-  answers: z.record(z.string(), z.string()).default({}),
+  answers: formAnswersSchema.default({}),
 });
 
 export type EventRegistrationInput = z.infer<typeof eventRegistrationSchema>;

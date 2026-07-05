@@ -27,9 +27,18 @@ export async function getPlatformStats(supabase: SupabaseClient) {
 
   const cityCount = new Set((cityRows ?? []).map((r) => r.city)).size;
 
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const { count: upcomingEventCount } = await supabase
+    .from("events")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "active")
+    .gte("event_date", todayIso);
+
   return {
     communityCount: communityCount ?? 0,
     totalMembers,
     cityCount,
+    upcomingEventCount: upcomingEventCount ?? 0,
   };
 }

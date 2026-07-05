@@ -88,6 +88,7 @@ export function FormBuilder({
                 type="checkbox"
                 checked={field.is_required}
                 onChange={(e) => updateField(i, { is_required: e.target.checked })}
+                className="accent-green"
               />
               Required
             </label>
