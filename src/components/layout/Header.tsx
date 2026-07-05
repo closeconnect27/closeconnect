@@ -3,6 +3,7 @@ import { IconPlus } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const NAV_LINKS = [
+  { href: "/events", label: "events" },
   { href: "/communities", label: "communities" },
   { href: "/search", label: "search" },
 ];
@@ -32,10 +33,7 @@ export function Header({ isLoggedIn }: { isLoggedIn: boolean }) {
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {isLoggedIn && (
-            <Link
-              href="/communities/new"
-              className="btn-primary hidden px-4 py-2 text-[13px] sm:inline-flex"
-            >
+            <Link href="/create" className="btn-primary hidden px-4 py-2 text-[13px] sm:inline-flex">
               <IconPlus size={14} />
               Create
             </Link>

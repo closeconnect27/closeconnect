@@ -48,7 +48,8 @@ export function CommunityDetailActions({
 
       {reportOpen && (
         <ReportModal
-          communityId={communityId}
+          targetType="community"
+          targetId={communityId}
           isLoggedIn={isLoggedIn}
           onClose={() => setReportOpen(false)}
         />

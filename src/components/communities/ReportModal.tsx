@@ -23,22 +23,25 @@ const REASONS = [
 ] as const;
 
 export function ReportModal({
-  communityId,
+  targetType,
+  targetId,
   isLoggedIn,
   onClose,
 }: {
-  communityId: string;
+  targetType: "community" | "event";
+  targetId: string;
   isLoggedIn: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [reason, setReason] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
+  const backPath = targetType === "community" ? `/communities/${targetId}` : `/events/${targetId}`;
 
   async function submit() {
     if (!reason) return;
     if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(`/communities/${communityId}`)}`);
+      router.push(`/login?redirect=${encodeURIComponent(backPath)}`);
       return;
     }
     setStatus("submitting");
@@ -47,8 +50,8 @@ export function ReportModal({
       data: { user },
     } = await supabase.auth.getUser();
     const { error } = await supabase.from("reports").insert({
-      target_type: "community",
-      target_id: communityId,
+      target_type: targetType,
+      target_id: targetId,
       reporter_id: user!.id,
       reason,
     });
@@ -63,7 +66,7 @@ export function ReportModal({
       <div className="w-full max-w-[420px] rounded-card bg-bg2 p-6 shadow-card-hover">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <div className="font-heading text-[17px] font-bold">Report community</div>
+            <div className="font-heading text-[17px] font-bold">Report {targetType}</div>
             <div className="text-[13px] text-text2">Help us keep the directory clean</div>
           </div>
           <button onClick={onClose} className="text-text2 transition hover:text-text">

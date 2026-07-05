@@ -56,3 +56,23 @@ export function safeJoinHref(url: string | null | undefined): string {
 export function isInstagramLink(url: string | null | undefined): boolean {
   return !!url && url.includes("instagram.com");
 }
+
+// Ticket payment links (SPEC.md Section 8): actual checkout/webhook handling
+// is Phase 8 -- for now this is just an external redirect, same shape as the
+// WhatsApp/Instagram link validators above, restricted to Razorpay's own
+// domains so a host can't paste an arbitrary (or malicious) URL into a field
+// that renders as a trusted "Pay" button.
+export function isValidPaymentLink(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    return u.hostname === "rzp.io" || u.hostname === "razorpay.com" || u.hostname.endsWith(".razorpay.com");
+  } catch {
+    return false;
+  }
+}
+
+export function safePaymentHref(url: string | null | undefined): string {
+  if (!url || !isValidPaymentLink(url)) return "#";
+  return url;
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  IconHome,
+  IconCalendarEvent,
   IconUsers,
   IconSearch,
   IconCirclePlus,
@@ -21,11 +21,11 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
   const pathname = usePathname();
 
   const items = [
-    { href: "/", label: "Home", icon: IconHome, exact: true },
+    { href: "/events", label: "Events", icon: IconCalendarEvent, exact: false },
     { href: "/communities", label: "Communities", icon: IconUsers, exact: false },
     { href: "/search", label: "Search", icon: IconSearch, exact: false },
     {
-      href: isLoggedIn ? "/communities/new" : `/login?redirect=${encodeURIComponent("/communities/new")}`,
+      href: isLoggedIn ? "/create" : `/login?redirect=${encodeURIComponent("/create")}`,
       label: "Create",
       icon: IconCirclePlus,
       exact: true,
