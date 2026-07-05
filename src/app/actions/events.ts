@@ -140,6 +140,7 @@ export async function setCheckIn(eventId: string, responseId: string, checkedIn:
   if (!data || data.length === 0) return { error: "Not allowed to check in this registrant" };
 
   revalidatePath(`/events/${eventId}/manage`);
+  revalidatePath("/host/dashboard");
   return { error: null };
 }
 

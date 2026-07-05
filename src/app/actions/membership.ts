@@ -81,5 +81,6 @@ export async function reviewJoinRequest(
   if (!data || data.length === 0) return { error: "Not allowed to review this request" };
 
   revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/host/dashboard");
   return { error: null };
 }

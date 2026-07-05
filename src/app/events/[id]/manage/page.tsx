@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes } from "@/lib/queries/events";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StatCard } from "@/components/ui/StatCard";
 
 export default async function ManageEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -69,20 +70,6 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
             <EventRegistrantList eventId={id} registrations={registrations} />
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ icon: Icon, label, value }: { icon: typeof IconUsers; label: string; value: number }) {
-  return (
-    <div className="card-elevated flex flex-1 items-center gap-3 rounded-card bg-bg2 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-tint">
-        <Icon size={18} className="text-green" />
-      </div>
-      <div>
-        <p className="font-heading text-[20px] font-extrabold leading-none">{value}</p>
-        <p className="text-[11px] text-text3">{label}</p>
       </div>
     </div>
   );
