@@ -3,10 +3,8 @@ import { IconLayoutDashboard, IconUsers, IconCalendarEvent } from "@tabler/icons
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
-import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
 import { getMyJoinedCommunities, getMyRegisteredEvents } from "@/lib/queries/profile";
 import { HostCommunityRow } from "@/components/host/HostCommunityRow";
-import { HostEventRow } from "@/components/host/HostEventRow";
 import { RegisteredEventRow } from "@/components/profile/RegisteredEventRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -16,25 +14,26 @@ function todayIso() {
 }
 
 // A distinct page from the Host Dashboard on purpose: this is "what am I
-// part of" (owned + joined, hosting + attending), the dashboard is "what do
-// I need to act on" (pending requests, check-in, CSV export). Same data can
-// appear in both, but the framing and the actions available differ.
+// part of as a member/attendee" (joined communities, registered events),
+// the dashboard is "what do I own or host" (owned communities, hosted
+// events, pending requests, check-in, CSV export). Owned/hosted content
+// deliberately does NOT also appear here -- it used to, and having the same
+// community or event listed in two different places with two different
+// action sets read as a bug, not a feature.
 export default async function ProfilePage() {
   const user = await requireUser();
   const supabase = await createClient();
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   const initial = (profile?.display_name ?? user.email ?? "?").charAt(0).toUpperCase();
 
-  const [ownedCommunities, joinedCommunities, hostedEvents, registeredEvents] = await Promise.all([
-    getMyCommunities(supabase, user.id),
+  const [joinedCommunities, registeredEvents] = await Promise.all([
     getMyJoinedCommunities(supabase, user.id),
-    getMyEvents(supabase, user.id),
     getMyRegisteredEvents(supabase, user.id),
   ]);
 
   const today = todayIso();
-  const upcomingRegistered = registeredEvents.filter((e) => e.event_date >= today);
-  const pastRegistered = registeredEvents.filter((e) => e.event_date < today);
+  const upcomingRegistered = registeredEvents.filter((e) => e.event_date !== null && e.event_date >= today);
+  const pastRegistered = registeredEvents.filter((e) => e.event_date === null || e.event_date < today);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -44,7 +43,7 @@ export default async function ProfilePage() {
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-heading text-[18px] font-extrabold">
+            <h1 className="truncate font-heading text-[14px] font-bold">
               {profile?.display_name ?? "Your profile"}
             </h1>
             <p className="truncate text-[13px] text-text3">{user.email}</p>
@@ -56,20 +55,8 @@ export default async function ProfilePage() {
         </div>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">My communities</h2>
+          <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">My communities</h2>
 
-          <h3 className="mb-2 text-[13px] font-bold text-text2">Own</h3>
-          {ownedCommunities.length === 0 ? (
-            <EmptyState icon={IconUsers} title="You don't own any communities yet" compact />
-          ) : (
-            <div className="mb-6 flex flex-col gap-2">
-              {ownedCommunities.map((c) => (
-                <HostCommunityRow key={c.id} community={c} />
-              ))}
-            </div>
-          )}
-
-          <h3 className="mb-2 text-[13px] font-bold text-text2">Joined</h3>
           {joinedCommunities.length === 0 ? (
             <EmptyState icon={IconUsers} title="You haven't joined any communities yet" compact />
           ) : (
@@ -82,18 +69,7 @@ export default async function ProfilePage() {
         </section>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">My events</h2>
-
-          <h3 className="mb-2 text-[13px] font-bold text-text2">Hosting</h3>
-          {hostedEvents.length === 0 ? (
-            <EmptyState icon={IconCalendarEvent} title="You're not hosting any events yet" compact />
-          ) : (
-            <div className="mb-6 flex flex-col gap-2">
-              {hostedEvents.map((e) => (
-                <HostEventRow key={e.id} event={e} />
-              ))}
-            </div>
-          )}
+          <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">My events</h2>
 
           <h3 className="mb-2 text-[13px] font-bold text-text2">Registered -- upcoming</h3>
           {upcomingRegistered.length === 0 ? (

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type CategorySlug, isCategorySlug } from "@/lib/categories";
+import { type City, isCity } from "@/lib/cities";
 
 // No generated Database types are wired into the Supabase client yet, so
 // `.select("*")` resolves to `any` -- this is the one shared shape every
@@ -11,12 +12,16 @@ export type Community = {
   category: string;
   extra_categories: string[] | null;
   city: string | null;
+  extra_cities: string[] | null;
   community_type: "online" | "offline" | "both";
   kind: "native" | "external";
   external_link: string | null;
   join_mode: "open" | "request";
   cover_image_url: string | null;
-  owner_id: string;
+  logo_url: string | null;
+  // Nullable since 0024: an external community starts unowned (a public,
+  // no-login submission) until a claim is approved.
+  owner_id: string | null;
   claim_status: "unclaimed" | "pending" | "approved" | "rejected";
   avg_rating: number;
   rating_count: number;
@@ -63,11 +68,34 @@ export async function getCommunities(supabase: SupabaseClient, filters: Communit
   if (filters.category && isCategorySlug(filters.category)) {
     query = query.or(`category.eq.${filters.category},extra_categories.cs.{${filters.category}}`);
   }
-  if (filters.city) query = query.eq("city", filters.city);
+  if (filters.city && isCity(filters.city)) {
+    query = query.or(`city.eq.${filters.city},extra_cities.cs.{${filters.city}}`);
+  }
   if (filters.kind) query = query.eq("kind", filters.kind);
   if (filters.search) query = query.ilike("name", `%${filters.search}%`);
 
   query = query.order("member_count", { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as Community[];
+}
+
+/**
+ * The one place multi-city matching lives for communities, mirroring
+ * getCommunitiesByCategory above: a community matches a city if it's the
+ * primary `city` OR listed in `extra_cities`. Reused wherever a city filter
+ * appears (search, browse, sidebar) -- don't reimplement this per call site.
+ */
+export async function getCommunitiesByCity(supabase: SupabaseClient, city: City, opts: { limit?: number } = {}) {
+  let query = supabase
+    .from("communities")
+    .select("*")
+    .eq("status", "active")
+    .or(`city.eq.${city},extra_cities.cs.{${city}}`)
+    .order("member_count", { ascending: false });
+
+  if (opts.limit) query = query.limit(opts.limit);
 
   const { data, error } = await query;
   if (error) throw error;

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "@/lib/email";
 import { getCommunityFormFields } from "@/lib/queries/membership";
 import { formAnswersSchema } from "@/lib/validation/forms";
 import { createGroupSchema, type CreateGroupInput } from "@/lib/validation/community";
@@ -64,7 +66,35 @@ export async function submitJoinRequest(communityId: string, answers: Record<str
     return { error: error.message };
   }
   revalidatePath(`/communities/${communityId}`);
+  notifyOwnerOfPendingRequest(communityId).catch((e) =>
+    console.error("Failed to send join-request notification email:", e),
+  );
   return { error: null };
+}
+
+// Same pattern as notifyAdminsOfPendingClaim (app/actions/communities.ts):
+// heads-up + deep link only, never a one-click approve. The owner still has
+// to open the dashboard and click Approve/Reject there.
+async function notifyOwnerOfPendingRequest(communityId: string) {
+  const admin = createAdminClient();
+  const { data: community } = await admin.from("communities").select("name, owner_id").eq("id", communityId).single();
+  if (!community?.owner_id) return;
+
+  const { data: userResult } = await admin.auth.admin.getUserById(community.owner_id);
+  const email = userResult.user?.email;
+  if (!email) return;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const link = `${siteUrl}/host/dashboard#community-${communityId}`;
+
+  await sendEmail({
+    to: email,
+    subject: `New join request: ${community.name}`,
+    html: `
+      <p>Someone requested to join <strong>${community.name}</strong>.</p>
+      <p><a href="${link}">Review pending requests</a></p>
+    `,
+  });
 }
 
 export async function createGroup(communityId: string, input: CreateGroupInput) {
@@ -131,5 +161,39 @@ export async function reviewJoinRequest(
 
   revalidatePath(`/communities/${communityId}`);
   revalidatePath("/host/dashboard");
+  return { error: null };
+}
+
+export async function removeMember(communityId: string, targetUserId: string) {
+  const user = await requireUser();
+
+  // Removing yourself through this action would orphan the community if
+  // you're the owner (no other staff signal survives it), and doesn't make
+  // sense for a moderator either -- "Remove" here is for removing other
+  // people. Checked before anything else, and explicitly, not left as an
+  // assumption nobody would click it on themselves.
+  if (targetUserId === user.id) {
+    return { error: "You can't remove yourself this way." };
+  }
+
+  const supabase = await createClient();
+
+  // RLS (community_members_delete_self_or_staff, re-verified against a real
+  // non-owner attempt, not assumed from reading the policy alone) is the
+  // real gate -- a non-staff caller's delete simply matches zero rows
+  // rather than erroring. It also already refuses to let staff delete the
+  // owner's own row (role <> 'owner' in the policy), so a moderator can't
+  // remove the owner through this same path.
+  const { data, error } = await supabase
+    .from("community_members")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", targetUserId)
+    .select();
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Not allowed to remove this member" };
+
+  revalidatePath(`/communities/${communityId}`);
   return { error: null };
 }

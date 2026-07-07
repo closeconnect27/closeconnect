@@ -25,7 +25,7 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
     { href: "/communities", label: "Communities", icon: IconUsers, exact: false },
     { href: "/search", label: "Search", icon: IconSearch, exact: false },
     {
-      href: isLoggedIn ? "/create" : `/login?redirect=${encodeURIComponent("/create")}`,
+      href: "/create",
       label: "Create",
       icon: IconCirclePlus,
       exact: true,

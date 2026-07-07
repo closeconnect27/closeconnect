@@ -66,7 +66,7 @@ export function ReportModal({
       <div className="w-full max-w-[420px] rounded-card bg-bg2 p-6 shadow-card-hover">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <div className="font-heading text-[17px] font-bold">Report {targetType}</div>
+            <div className="font-heading text-[14px] font-bold">Report {targetType}</div>
             <div className="text-[13px] text-text2">Help us keep the directory clean</div>
           </div>
           <button onClick={onClose} className="text-text2 transition hover:text-text">

@@ -43,7 +43,7 @@ export function RatingModal({
     >
       <div className="w-full max-w-[420px] rounded-card bg-bg2 p-6 shadow-card-hover">
         <div className="mb-4 flex items-start justify-between">
-          <div className="font-heading text-[17px] font-bold">
+          <div className="font-heading text-[14px] font-bold">
             {initialRating > 0 ? "Update your rating" : "Rate this community"}
           </div>
           <button onClick={onClose} className="text-text2 transition hover:text-text">

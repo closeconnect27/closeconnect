@@ -53,7 +53,7 @@ export async function getMyCommunities(supabase: SupabaseClient, userId: string)
 export type MyEvent = {
   id: string;
   event_name: string;
-  event_date: string;
+  event_date: string | null;
   event_time: string | null;
   venue: string | null;
   city: string | null;

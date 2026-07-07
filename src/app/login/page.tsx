@@ -2,12 +2,40 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { IconMailCheck } from "@tabler/icons-react";
+import { IconMailCheck, IconBrandGoogle } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 
-function LoginForm() {
-  const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/";
+// Google Sign-In is now the primary, required path everywhere an account is
+// needed (SPEC.md Section 9) -- the email magic-link infra stays in place
+// (not ripped out) as a visible fallback rather than dead code, specifically
+// so a Google OAuth misconfiguration doesn't take the whole app's sign-in
+// down with it.
+function GoogleSignInButton({ redirect }: { redirect: string }) {
+  const [pending, setPending] = useState(false);
+
+  async function handleClick() {
+    setPending(true);
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+      },
+    });
+    // No further state update needed on success -- signInWithOAuth navigates
+    // the whole page to Google, so this component unmounts. `pending` only
+    // matters for the (rare) case the call rejects before that happens.
+  }
+
+  return (
+    <button onClick={handleClick} disabled={pending} className="btn-primary w-full py-3 text-[14px]">
+      <IconBrandGoogle size={16} />
+      {pending ? "Redirecting…" : "Continue with Google"}
+    </button>
+  );
+}
+
+function EmailSignInForm({ redirect }: { redirect: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState("");
@@ -45,7 +73,7 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3">
       <input
         type="email"
         required
@@ -54,7 +82,7 @@ function LoginForm() {
         onChange={(e) => setEmail(e.target.value)}
         className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] text-text transition placeholder:text-text3 focus:border-green"
       />
-      <button type="submit" disabled={status === "sending"} className="btn-primary py-3 text-[14px]">
+      <button type="submit" disabled={status === "sending"} className="btn-secondary py-3 text-[14px]">
         {status === "sending" ? "Sending…" : "Send sign-in link"}
       </button>
       {error && <p className="text-[13px] text-pink">{error}</p>}
@@ -62,11 +90,34 @@ function LoginForm() {
   );
 }
 
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/";
+  const [showEmail, setShowEmail] = useState(false);
+
+  return (
+    <div className="flex w-full max-w-sm flex-col gap-3">
+      <GoogleSignInButton redirect={redirect} />
+
+      {showEmail ? (
+        <EmailSignInForm redirect={redirect} />
+      ) : (
+        <button
+          onClick={() => setShowEmail(true)}
+          className="text-[13px] text-text3 transition hover:text-text2"
+        >
+          Or continue with email
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="card-elevated w-full max-w-sm rounded-card bg-bg2 p-8 text-center">
-        <h1 className="mb-6 font-heading text-[24px] font-extrabold">Sign in to Close.Connect</h1>
+        <h1 className="mb-6 font-heading text-[14px] font-bold">Sign in to Closeconnect</h1>
         <Suspense>
           <LoginForm />
         </Suspense>

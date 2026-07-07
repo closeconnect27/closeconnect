@@ -35,7 +35,7 @@ export function EmptyState({
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-bg3">
         <IconComponent size={26} className="text-text3" />
       </div>
-      <h3 className="font-heading text-lg font-bold text-text">{title}</h3>
+      <h3 className="font-heading text-[14px] font-bold text-text">{title}</h3>
       {description && <p className="max-w-xs text-[14px] text-text2">{description}</p>}
       {action && (
         <Link

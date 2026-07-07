@@ -3,9 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
 import { CategoryImage } from "@/components/ui/CategoryImage";
+import { Combobox } from "@/components/ui/Combobox";
 import { EventDateRangeCalendar } from "@/components/events/EventDateRangeCalendar";
-
-const CITIES = ["Bengaluru", "Mumbai", "Delhi", "Chennai", "Hyderabad", "Pune"];
+import { CITY_OPTIONS } from "@/lib/cities";
 
 export function EventFilterBar() {
   const router = useRouter();
@@ -25,38 +25,27 @@ export function EventFilterBar() {
       <div className="scrollbar-none flex gap-2 overflow-x-auto border-b border-border px-4 sm:px-6">
         <button
           onClick={() => setParam("category", "")}
-          className={`whitespace-nowrap border-b-2 px-4 py-2 text-[13px] font-medium transition ${
+          className={`whitespace-nowrap border-b-2 px-4 py-2 font-mono text-[12px] font-semibold transition ${
             activeCategory === "" ? "border-green text-green" : "border-transparent text-text3 hover:text-text2"
           }`}
         >
-          all
+          All
         </button>
         {CATEGORIES.map((c) => (
           <button
             key={c.slug}
             onClick={() => setParam("category", c.slug)}
-            className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-[13px] font-medium transition ${
+            className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 font-mono text-[12px] font-semibold transition ${
               activeCategory === c.slug ? "border-green text-green" : "border-transparent text-text3 hover:text-text2"
             }`}
           >
             <CategoryImage slug={c.slug} seed={0} alt="" size={16} className="rounded-full object-cover" />
-            {c.slug}
+            {c.label}
           </button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2 px-4 sm:px-6">
-        <select
-          value={activeCity}
-          onChange={(e) => setParam("city", e.target.value)}
-          className="rounded-full border border-border2 bg-bg3 px-4 py-2 text-[13px] font-medium text-text2 transition hover:border-green"
-        >
-          <option value="">all cities</option>
-          {CITIES.map((city) => (
-            <option key={city} value={city}>
-              {city}
-            </option>
-          ))}
-        </select>
+        <Combobox value={activeCity} onChange={(v) => setParam("city", v)} options={CITY_OPTIONS} placeholder="All cities" />
         <EventDateRangeCalendar />
       </div>
     </div>

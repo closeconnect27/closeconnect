@@ -20,7 +20,7 @@ export function SearchForm() {
       <input
         name="q"
         defaultValue={searchParams.get("q") ?? ""}
-        placeholder="search communities and events…"
+        placeholder="Search communities and events…"
         className="w-full bg-transparent text-[14px] text-text outline-none placeholder:text-text3"
       />
     </form>

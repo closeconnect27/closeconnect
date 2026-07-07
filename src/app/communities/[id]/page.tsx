@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { IconStar, IconUsers, IconMapPin } from "@tabler/icons-react";
+import { IconStar, IconUsers, IconMapPin, IconPencil } from "@tabler/icons-react";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityById } from "@/lib/queries/communities";
 import {
@@ -16,6 +17,7 @@ import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { getMyRating } from "@/lib/queries/ratings";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { JoinSection } from "@/components/communities/JoinSection";
 import { GroupList } from "@/components/communities/GroupList";
@@ -23,6 +25,8 @@ import { CreateGroupForm } from "@/components/communities/CreateGroupForm";
 import { MemberList } from "@/components/communities/MemberList";
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
+import { ClaimSection } from "@/components/communities/ClaimSection";
+import { Linkify } from "@/components/ui/Linkify";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -69,26 +73,32 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
   const members = isNative ? await getCommunityMembers(supabase, id) : [];
   const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
-  const myRating = isNative && user ? await getMyRating(supabase, id, user.id) : null;
+  const myRating = isNative && user && !isOwner ? await getMyRating(supabase, id, user.id) : null;
 
   return (
     <div className="flex-1 pb-10">
+      <PageViewTracker targetType="community" targetId={community.id} viewerId={user?.id ?? null} />
       <div className="relative h-40 w-full sm:h-52" style={{ background: visual.bg }}>
-        <CategoryImage
-          slug={community.category}
-          seed={communitySeed(community.id)}
-          alt=""
-          fill
-          sizes="100vw"
-          className="object-cover"
-        />
+        {community.cover_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
+          <img src={community.cover_image_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <CategoryImage
+            slug={community.category}
+            seed={communitySeed(community.id)}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
       </div>
 
       <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-6">
         <div className="mb-3 flex flex-wrap gap-2">
           <span
-            className="rounded-full px-3 py-1 text-[11px] font-bold"
+            className="rounded-full px-3 py-1 font-mono text-[11px] font-semibold"
             style={{ background: visual.bg, color: visual.light }}
           >
             {visual.label}
@@ -96,18 +106,38 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           {extraCats.map((ec) => (
             <span
               key={ec.slug}
-              className="rounded-full px-3 py-1 text-[11px] font-bold opacity-80"
+              className="rounded-full px-3 py-1 font-mono text-[11px] font-semibold opacity-80"
               style={{ background: ec.bg, color: ec.light }}
             >
               {ec.label}
             </span>
           ))}
-          <span className="rounded-full border border-border2 px-3 py-1 text-[11px] font-bold text-text2">
-            {isNative ? "native community" : "external"}
+          <span className="rounded-full border border-border2 px-3 py-1 font-mono text-[11px] font-medium text-text2">
+            {isNative ? "Native community" : "External"}
           </span>
         </div>
 
-        <h1 className="font-heading text-[28px] font-extrabold leading-tight">{community.name}</h1>
+        <div className="flex items-center gap-3">
+          {community.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
+            <img
+              src={community.logo_url}
+              alt=""
+              className="h-12 w-12 shrink-0 rounded-full border border-border bg-bg2 object-cover"
+            />
+          )}
+          <h1 className="font-heading text-[18px] font-bold leading-tight">{community.name}</h1>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {isOwner && (
+            <Link href={`/communities/${community.id}/edit`} className="btn-secondary px-4 py-2 text-[13px]">
+              <IconPencil size={14} />
+              Edit
+            </Link>
+          )}
+          {isMember && <CopyLinkButton path={`/communities/${community.id}`} />}
+        </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-4 text-[13px] font-medium text-text2">
           {community.city && (
@@ -126,14 +156,14 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 <IconStar size={14} className="text-text3" />
                 {community.avg_rating > 0
                   ? `${community.avg_rating.toFixed(1)} (${community.rating_count})`
-                  : "no ratings yet"}
+                  : "No ratings yet"}
               </span>
             </>
           )}
         </div>
 
         <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
-          {community.description}
+          <Linkify text={community.description} />
         </p>
 
         {isNative && (
@@ -143,15 +173,16 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 communityId={community.id}
                 joinMode={community.join_mode}
                 isMember={isMember}
+                isOwner={isOwner}
                 isLoggedIn={!!user}
                 pendingStatus={pendingStatus}
                 formFields={formFields}
               />
-              <RatingSection communityId={community.id} isLoggedIn={!!user} myRating={myRating} />
+              <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
             </div>
 
             <section>
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Groups</h2>
+              <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Groups</h2>
               <GroupList
                 communityId={community.id}
                 groups={groups}
@@ -166,13 +197,19 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             </section>
 
             <section>
-              <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Members</h2>
-              <MemberList members={members} ownerId={community.owner_id} />
+              <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Members</h2>
+              <MemberList
+                communityId={community.id}
+                members={members}
+                ownerId={community.owner_id}
+                isStaff={isStaff}
+                currentUserId={user?.id ?? null}
+              />
             </section>
 
             {isStaff && (
               <section>
-                <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">
+                <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">
                   Pending requests
                 </h2>
                 <PendingRequests
@@ -185,6 +222,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           </div>
         )}
 
+        {!isNative && (
+          <div className="mt-8">
+            <ClaimSection communityId={community.id} claimStatus={community.claim_status} isLoggedIn={!!user} />
+          </div>
+        )}
+
         <CommunityDetailActions
           communityId={community.id}
           kind={community.kind}
@@ -193,7 +236,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         />
 
         <Link href="/communities" className="mt-8 block text-center text-[13px] text-text3 transition hover:text-text2">
-          ← back to communities
+          ← Back to communities
         </Link>
       </div>
     </div>

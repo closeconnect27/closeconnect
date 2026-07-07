@@ -33,22 +33,22 @@ export function EventCard({ event: e }: { event: EventListItem }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-black/20" />
 
         <div className="absolute left-3 top-3 flex w-14 flex-col items-center overflow-hidden rounded-lg bg-bg2/95 text-center shadow-card">
-          <span className="w-full bg-pink py-1 text-[11px] font-bold uppercase text-white">{month}</span>
-          <span className="py-1.5 text-[20px] font-extrabold leading-none text-text">{day}</span>
+          <span className="w-full bg-pink py-1 font-mono text-[11px] font-semibold uppercase text-white">{month}</span>
+          <span className="py-1.5 font-mono text-[20px] font-semibold leading-none text-text">{day}</span>
         </div>
 
-        <span className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1.5 text-[12px] font-bold text-white">
+        <span className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1.5 font-mono text-[12px] font-semibold text-white">
           {price}
         </span>
 
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-4">
           <span
-            className="w-fit rounded-full px-2.5 py-1 text-[11px] font-bold"
+            className="w-fit rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold"
             style={{ background: visual.bg, color: visual.light }}
           >
             {visual.label}
           </span>
-          <h3 className="line-clamp-2 font-heading text-[20px] font-extrabold leading-tight text-white">
+          <h3 className="line-clamp-2 font-heading text-[18px] font-bold leading-tight text-white">
             {e.event_name}
           </h3>
         </div>
@@ -71,11 +71,14 @@ export function EventCard({ event: e }: { event: EventListItem }) {
   );
 }
 
-function formatDateChip(isoDate: string) {
+function formatDateChip(isoDate: string | null) {
   // Parsed as a plain calendar date, not a Date-with-timezone -- event_date
   // is a SQL `date` column (no time component), so treating it as UTC
   // midnight and reading local month/day back out could roll it to the
-  // wrong day depending on the viewer's timezone offset.
+  // wrong day depending on the viewer's timezone offset. Null shouldn't
+  // reach this card in practice (getEvents excludes draft events), but the
+  // column itself is nullable, so this stays defensive rather than assuming.
+  if (!isoDate) return { month: "TBD", day: "—" };
   const [, m, d] = isoDate.split("-").map(Number);
   const month = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][m - 1];
   return { month, day: d };

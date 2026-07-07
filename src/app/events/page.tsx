@@ -29,8 +29,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     <div className="flex-1 pb-16">
       <div className="flex items-start justify-between gap-4 px-4 pb-6 pt-8 sm:px-6">
         <div>
-          <h1 className="font-heading text-[32px] font-extrabold leading-tight">events</h1>
-          <p className="text-[14px] text-text3">what&apos;s happening in Bengaluru</p>
+          <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">Events</h1>
+          <p className="text-[14px] text-text3">What&apos;s happening in Bengaluru</p>
         </div>
         <Link
           href={user ? "/events/new" : "/login?redirect=/events/new"}
@@ -116,7 +116,7 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
       {rows.map(({ cat, events }) => (
         <EventRow key={cat.slug} title={cat.label} categorySlug={cat.slug} events={events} />
       ))}
-      {uncategorized.length > 0 && <EventRow title="more events" events={uncategorized} />}
+      {uncategorized.length > 0 && <EventRow title="More events" events={uncategorized} />}
     </div>
   );
 }
@@ -133,12 +133,12 @@ function EventRow({
   return (
     <section>
       <div className="mb-4 flex items-center justify-between px-4 sm:px-6">
-        <span className="font-heading flex items-center gap-2 text-[16px] font-bold">
+        <span className="font-mono flex items-center gap-2 text-[14px] font-semibold">
           {categorySlug && (
             <CategoryImage slug={categorySlug} seed={0} alt="" size={24} className="rounded-full object-cover" />
           )}
           {title}
-          <span className="font-sans text-[12px] font-normal text-text3">
+          <span className="font-mono text-[12px] font-medium text-text3">
             · {events.length} event{events.length === 1 ? "" : "s"}
           </span>
         </span>
@@ -146,7 +146,7 @@ function EventRow({
           href={`/events${categorySlug ? `?category=${categorySlug}` : ""}`}
           className="text-[13px] font-bold text-green"
         >
-          see all
+          See all
         </Link>
       </div>
       <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">

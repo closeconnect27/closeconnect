@@ -6,8 +6,11 @@ import { createCommunitySchema } from "@/lib/validation/community";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { createCommunity } from "@/app/actions/communities";
+import { Combobox } from "@/components/ui/Combobox";
+import { MultiCombobox } from "@/components/ui/MultiCombobox";
+import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { CITY_OPTIONS } from "@/lib/cities";
 
-const CITIES = ["Bengaluru", "Mumbai", "Delhi", "Chennai", "Hyderabad", "Pune"];
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
@@ -17,6 +20,7 @@ export default function NewCommunityPage() {
   const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
+  const [extraCities, setExtraCities] = useState<string[]>([]);
   const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [joinMode, setJoinMode] = useState<"open" | "request">("open");
   const [joinFormFields, setJoinFormFields] = useState<FormFieldDraft[]>([]);
@@ -39,6 +43,7 @@ export default function NewCommunityPage() {
       category,
       extra_categories: extraCategories,
       city: city || undefined,
+      extra_cities: extraCities,
       community_type: communityType,
       join_mode: joinMode,
       join_form_fields: joinMode === "request" ? joinFormFields : [],
@@ -59,7 +64,7 @@ export default function NewCommunityPage() {
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-lg">
-        <h1 className="font-heading text-[28px] font-extrabold leading-tight">Create a community</h1>
+        <h1 className="font-heading text-[18px] font-bold leading-tight">Create a community</h1>
         <p className="mb-8 text-[14px] text-text3">
           One umbrella community, sub-groups auto-created — General plus Announcements.
         </p>
@@ -80,17 +85,7 @@ export default function NewCommunityPage() {
           </Field>
 
           <Field label="Category">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as CategorySlug)}
-              className={inputClass}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            <CategoryPicker value={category} onChange={setCategory} />
           </Field>
 
           <Field label="Also show up under (optional, up to 4)">
@@ -102,8 +97,8 @@ export default function NewCommunityPage() {
                   onClick={() => toggleExtraCategory(c.slug)}
                   className={
                     extraCategories.includes(c.slug)
-                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
-                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
                   }
                 >
                   {c.slug}
@@ -113,12 +108,16 @@ export default function NewCommunityPage() {
           </Field>
 
           <Field label="City (optional)">
-            <input value={city} onChange={(e) => setCity(e.target.value)} list="cities" className={inputClass} />
-            <datalist id="cities">
-              {CITIES.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
+            <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />
+          </Field>
+
+          <Field label="Also show up under (optional, up to 5 more cities)">
+            <MultiCombobox
+              values={extraCities}
+              onChange={setExtraCities}
+              options={CITY_OPTIONS.filter((o) => o.value !== city)}
+              placeholder="Add more cities"
+            />
           </Field>
 
           <Field label="Type">
@@ -130,8 +129,8 @@ export default function NewCommunityPage() {
                   onClick={() => setCommunityType(t)}
                   className={
                     communityType === t
-                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
-                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
                   }
                 >
                   {t}

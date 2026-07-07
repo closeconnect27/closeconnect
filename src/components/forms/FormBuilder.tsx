@@ -2,6 +2,7 @@
 
 import { IconTrash, IconArrowUp, IconArrowDown, IconPlus } from "@tabler/icons-react";
 import { FIELD_TYPES, type FormFieldDraft } from "@/lib/validation/forms";
+import { Combobox } from "@/components/ui/Combobox";
 
 const TYPE_LABELS: Record<(typeof FIELD_TYPES)[number], string> = {
   text: "Short text",
@@ -11,6 +12,7 @@ const TYPE_LABELS: Record<(typeof FIELD_TYPES)[number], string> = {
   number: "Number",
   select: "Multiple choice",
 };
+const FIELD_TYPE_OPTIONS = FIELD_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }));
 
 /**
  * Reusable question-list editor for the unified form-field system (SPEC.md
@@ -70,19 +72,12 @@ export function FormBuilder({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
-            <select
+            <Combobox
               value={field.field_type}
-              onChange={(e) =>
-                updateField(i, { field_type: e.target.value as FormFieldDraft["field_type"] })
-              }
-              className="rounded-full border border-border2 bg-bg3 px-4 py-2 text-[13px] transition hover:border-green"
-            >
-              {FIELD_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => updateField(i, { field_type: v as FormFieldDraft["field_type"] })}
+              options={FIELD_TYPE_OPTIONS}
+              placeholder="Question type"
+            />
             <label className="flex items-center gap-2 text-[13px] text-text2">
               <input
                 type="checkbox"
@@ -152,7 +147,7 @@ function OptionsEditor({
         onClick={() => onChange([...options, ""])}
         className="self-start text-[12px] font-medium text-green transition hover:text-green-mid"
       >
-        + add option
+        + Add option
       </button>
     </div>
   );

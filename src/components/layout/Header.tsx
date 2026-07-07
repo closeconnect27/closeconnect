@@ -3,9 +3,9 @@ import { IconPlus } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const NAV_LINKS = [
-  { href: "/events", label: "events" },
-  { href: "/communities", label: "communities" },
-  { href: "/search", label: "search" },
+  { href: "/events", label: "Events" },
+  { href: "/communities", label: "Communities" },
+  { href: "/search", label: "Search" },
 ];
 
 // Sign-in/profile is a real, always-visible button at every viewport width --
@@ -19,8 +19,8 @@ export function Header({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur-md sm:px-5">
       <div className="mx-auto flex max-w-5xl items-center gap-4 sm:gap-6">
-        <Link href="/" className="shrink-0 font-heading text-lg font-extrabold">
-          close<span className="text-green">.connect</span>
+        <Link href="/" className="shrink-0 font-heading text-[14px] font-bold">
+          Close<span className="text-green">connect</span>
         </Link>
 
         <nav className="hidden items-center gap-6 text-[14px] font-medium text-text2 sm:flex">
@@ -32,12 +32,10 @@ export function Header({ isLoggedIn }: { isLoggedIn: boolean }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          {isLoggedIn && (
-            <Link href="/create" className="btn-primary hidden px-4 py-2 text-[13px] sm:inline-flex">
-              <IconPlus size={14} />
-              Create
-            </Link>
-          )}
+          <Link href="/create" className="btn-primary hidden px-4 py-2 text-[13px] sm:inline-flex">
+            <IconPlus size={14} />
+            Create
+          </Link>
           <Link
             href={isLoggedIn ? "/profile" : "/login"}
             className="btn-secondary px-3.5 py-1.5 text-[13px] sm:px-4 sm:py-2"

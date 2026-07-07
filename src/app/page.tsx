@@ -32,8 +32,8 @@ export default async function Home() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/30 via-bg/85 to-bg" />
 
         <div className="relative flex flex-col items-center gap-6 px-6 pb-16 pt-16 text-center sm:pt-24">
-          <h1 className="font-heading text-[28px] font-extrabold leading-none min-[480px]:text-[40px] sm:text-[56px]">
-            close<span className="text-green">.connect</span>
+          <h1 className="font-heading text-[28px] font-black leading-none min-[480px]:text-[36px] sm:text-[44px] lg:text-[56px]">
+            Close<span className="text-green">connect</span>
           </h1>
           <p className="max-w-md text-[16px] text-text2">Find your people. Host what you love.</p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
@@ -52,14 +52,14 @@ export default async function Home() {
 
       {/* WHAT IT IS */}
       <section className="border-t border-border px-4 py-16 sm:px-6">
-        <h2 className="mb-8 text-center font-heading text-[26px] font-extrabold">
-          What Close.Connect actually is
+        <h2 className="mb-8 text-center font-heading text-[22px] font-black sm:text-[28px] lg:text-[32px]">
+          What Closeconnect actually is
         </h2>
         <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3">
           <FeatureCard
             icon={IconUsers}
             title="Community discovery"
-            body="Browse communities by category and city — some run natively on Close.Connect, others link out to an existing WhatsApp group or Instagram page. One directory, either kind."
+            body="Browse communities by category and city — some run natively on Closeconnect, others link out to an existing WhatsApp group or Instagram page. One directory, either kind."
           />
           <FeatureCard
             icon={IconMessageCircle2}
@@ -69,14 +69,14 @@ export default async function Home() {
           <FeatureCard
             icon={IconCalendarEvent}
             title="Events"
-            body="Host an event under your own profile, with or without a community attached, free or ticketed, and let people register as a guest — no account required to attend."
+            body="Host an event under your own profile, with or without a community attached, free or ticketed — registrants sign in to reserve a spot."
           />
         </div>
       </section>
 
       {/* HOW IT WORKS */}
       <section className="border-t border-border px-4 py-16 sm:px-6">
-        <h2 className="mb-8 text-center font-heading text-[26px] font-extrabold">How it works</h2>
+        <h2 className="mb-8 text-center font-heading text-[22px] font-black sm:text-[28px] lg:text-[32px]">How it works</h2>
         <div className="mx-auto flex max-w-3xl flex-col gap-8 sm:flex-row">
           <Step n={1} title="Browse or search" body="Filter by category, city, or search by name — no account needed to look around." />
           <Step n={2} title="Join or follow a link" body="Native communities: join instantly or request to join. External ones: we hand you off to their WhatsApp or Instagram." />
@@ -86,7 +86,7 @@ export default async function Home() {
 
       {/* STATS */}
       <section className="border-t border-border px-4 py-16 text-center sm:px-6">
-        <h2 className="mb-8 font-heading text-[26px] font-extrabold">So far</h2>
+        <h2 className="mb-8 font-heading text-[22px] font-black sm:text-[28px] lg:text-[32px]">So far</h2>
         <div className="mx-auto flex max-w-2xl flex-wrap justify-center gap-x-12 gap-y-6">
           <Stat n={stats.communityCount} label={stats.communityCount === 1 ? "community" : "communities"} />
           <Stat n={stats.upcomingEventCount} label={stats.upcomingEventCount === 1 ? "upcoming event" : "upcoming events"} />
@@ -100,7 +100,7 @@ export default async function Home() {
 
       {/* CTA */}
       <section className="border-t border-border px-6 py-16 text-center">
-        <h2 className="mb-2 font-heading text-[26px] font-extrabold">Ready to look around?</h2>
+        <h2 className="mb-2 font-heading text-[22px] font-black sm:text-[28px] lg:text-[32px]">Ready to look around?</h2>
         <p className="mb-6 text-[14px] text-text2">No account needed to browse.</p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">
@@ -135,7 +135,7 @@ function FeatureCard({
       <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-green-tint">
         <Icon size={20} className="text-green" />
       </div>
-      <h3 className="mb-2 text-[16px] font-bold text-text">{title}</h3>
+      <h3 className="mb-2 font-heading text-[14px] font-bold text-text">{title}</h3>
       <p className="text-[13px] leading-relaxed text-text2">{body}</p>
     </div>
   );
@@ -147,7 +147,7 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
       <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-green text-[14px] font-bold text-green-dark">
         {n}
       </div>
-      <h3 className="mb-2 text-[15px] font-bold text-text">{title}</h3>
+      <h3 className="mb-2 font-heading text-[14px] font-bold text-text">{title}</h3>
       <p className="text-[13px] leading-relaxed text-text2">{body}</p>
     </div>
   );
@@ -156,8 +156,8 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="font-heading text-[32px] font-extrabold text-green">{n}</span>
-      <span className="text-[12px] font-medium text-text3">{label}</span>
+      <span className="font-heading text-[18px] font-bold text-green">{n}</span>
+      <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-text3">{label}</span>
     </div>
   );
 }

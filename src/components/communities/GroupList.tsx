@@ -73,7 +73,7 @@ export function GroupList({
                   disabled={pending}
                   className="btn-secondary shrink-0 px-4 py-2 text-[12px]"
                 >
-                  join
+                  Join
                 </button>
               )}
             </div>

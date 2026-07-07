@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { IconCalendar, IconClock, IconMapPin, IconStar, IconSettings } from "@tabler/icons-react";
+import { IconCalendar, IconClock, IconMapPin, IconStar, IconSettings, IconPencil } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getEventById,
@@ -15,6 +15,9 @@ import { CategoryImage } from "@/components/ui/CategoryImage";
 import { EventRegistration } from "@/components/events/EventRegistration";
 import { EventImageUploader } from "@/components/events/EventImageUploader";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
+import { Linkify } from "@/components/ui/Linkify";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +35,13 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   } = await supabase.auth.getUser();
 
   const isHost = user?.id === event.host_id;
+
+  // A null event_date only exists right after duplicateEvent(), before the
+  // host has set a real date -- a draft, not a real listing. Invisible to
+  // everyone except the host, same treatment as a 404 for anyone else (no
+  // partial "coming soon" page that would leak the event's existence).
+  if (!event.event_date && !isHost) notFound();
+
   const visual = getCategoryVisual(event.category ?? "other");
 
   const [ticketTypes, images, formFields, availability] = await Promise.all([
@@ -45,19 +55,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="flex-1 pb-10">
-      <div className="relative h-48 w-full sm:h-64" style={{ background: visual.bg }}>
-        {images.length > 0 ? (
-          // Grid sized to the ACTUAL image count -- filling empty slots with
-          // random stock category photos (as this used to) put unrelated
-          // stock images side by side with a host's real upload, which reads
-          // as broken rather than as a legitimate fallback. The category
-          // fallback is only for the true zero-images case, below.
-          <div className={`grid h-full gap-0.5 ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-            {images.map((img) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={img.id} src={img.image_url} alt="" className="h-full w-full object-cover" />
-            ))}
-          </div>
+      <PageViewTracker targetType="event" targetId={event.id} viewerId={user?.id ?? null} />
+      <div className="relative h-48 w-full overflow-hidden sm:h-64" style={{ background: visual.bg }}>
+        {event.cover_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- host-uploaded, not from next/image's configured remote patterns
+          <img src={event.cover_image_url} alt="" className="h-full w-full object-cover" />
         ) : (
           <CategoryImage
             slug={event.category ?? "other"}
@@ -75,7 +77,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
             <span
-              className="rounded-full px-3 py-1 text-[11px] font-bold"
+              className="rounded-full px-3 py-1 font-mono text-[11px] font-semibold"
               style={{ background: visual.bg, color: visual.light }}
             >
               {visual.label}
@@ -83,24 +85,34 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             {event.community && (
               <Link
                 href={`/communities/${event.community.id}`}
-                className="rounded-full border border-border2 px-3 py-1 text-[11px] font-bold text-green"
+                className="rounded-full border border-border2 px-3 py-1 font-mono text-[11px] font-semibold text-green"
               >
                 {event.community.name}
               </Link>
             )}
           </div>
           {isHost && (
-            <Link
-              href={`/events/${event.id}/manage`}
-              className="btn-secondary px-3 py-1.5 text-[12px]"
-            >
-              <IconSettings size={13} />
-              Manage
-            </Link>
+            <div className="flex gap-2">
+              <Link href={`/events/${event.id}/edit`} className="btn-secondary px-3 py-1.5 text-[12px]">
+                <IconPencil size={13} />
+                Edit
+              </Link>
+              <Link
+                href={`/events/${event.id}/manage`}
+                className="btn-secondary px-3 py-1.5 text-[12px]"
+              >
+                <IconSettings size={13} />
+                Manage
+              </Link>
+            </div>
           )}
         </div>
 
-        <h1 className="font-heading text-[28px] font-extrabold leading-tight">{event.event_name}</h1>
+        <h1 className="font-heading text-[18px] font-bold leading-tight">{event.event_name}</h1>
+
+        <div className="mt-3">
+          <CopyLinkButton path={`/events/${event.id}`} label="Copy shareable link" />
+        </div>
 
         <div className="mt-3 flex flex-col gap-2 text-[14px] text-text2">
           <span className="flex items-center gap-2">
@@ -139,18 +151,50 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         )}
 
         {event.description && (
-          <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">{event.description}</p>
+          <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
+            <Linkify text={event.description} />
+          </p>
+        )}
+
+        {images.length > 0 && (
+          <div className="mt-6">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Photos</h2>
+            {/* Real cards, not the old cover-banner grid -- these were
+                getting squeezed into a fixed h-48/h-64 strip alongside the
+                cover image, which made a host's actual photos borderline
+                illegible. This is its own section people scroll to, sized
+                like any other photo card on the site. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {images.map((img) => (
+                // eslint-disable-next-line @next/next/no-img-element -- host-uploaded, not from next/image's configured remote patterns
+                <img
+                  key={img.id}
+                  src={img.image_url}
+                  alt=""
+                  className="h-48 w-full rounded-card object-cover sm:h-40"
+                />
+              ))}
+            </div>
+          </div>
         )}
 
         {isHost && (
           <div className="mt-6">
-            <h2 className="mb-3 text-[12px] font-bold uppercase tracking-wide text-text3">Photos</h2>
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Manage photos</h2>
             <EventImageUploader eventId={event.id} images={images} />
           </div>
         )}
 
         <div className="mt-8">
-          {isHost ? (
+          {!event.event_date ? (
+            <p className="rounded-card-sm border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
+              This event is a draft -- set a date on the{" "}
+              <Link href={`/events/${event.id}/edit`} className="font-bold text-green">
+                edit page
+              </Link>{" "}
+              to publish it.
+            </p>
+          ) : isHost ? (
             <p className="rounded-card-sm border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
               You&apos;re hosting this event -- see{" "}
               <Link href={`/events/${event.id}/manage`} className="font-bold text-green">
@@ -168,7 +212,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               ticketTypes={ticketTypes}
               formFields={formFields}
               availability={availability}
-              defaultEmail={user?.email}
+              isLoggedIn={!!user}
+              email={user?.email}
             />
           )}
         </div>
@@ -176,14 +221,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <EventDetailActions eventId={event.id} isLoggedIn={!!user} />
 
         <Link href="/events" className="mt-4 block text-center text-[13px] text-text3 transition hover:text-text2">
-          ← back to events
+          ← Back to events
         </Link>
       </div>
     </div>
   );
 }
 
-function formatEventDate(isoDate: string) {
+function formatEventDate(isoDate: string | null) {
+  if (!isoDate) return "Date to be announced";
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   return date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });

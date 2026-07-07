@@ -1,14 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Section 1: hosting/joining/registering are three separate login-gated
-// actions kept distinct on purpose. Event browsing, event detail, and guest
-// registration must stay open -- only page-level routes that always require
-// an account are listed here. Join/rate/chat actions live on pages that
-// aren't all built yet; protect those with the same requireUser() pattern
-// (src/lib/supabase/server.ts) inside their own Server Actions, since a
-// proxy matcher change can silently stop covering a route (see Next.js
-// proxy docs) -- don't rely on this list alone for those.
+// Section 1/9: hosting, joining, and registering are all login-gated
+// actions, but event browsing and the event detail page itself must stay
+// open to anonymous visitors (only submitting the registration form
+// requires an account, enforced by requireUser() inside registerForEvent) --
+// so no /events page route belongs in this list. Only page-level routes
+// that always require an account are listed here. Join/rate/chat actions
+// live on pages that aren't all built yet; protect those with the same
+// requireUser() pattern (src/lib/supabase/server.ts) inside their own
+// Server Actions, since a proxy matcher change can silently stop covering a
+// route (see Next.js proxy docs) -- don't rely on this list alone for those.
 const PROTECTED_PREFIXES = ["/profile", "/host", "/communities/new"];
 
 export async function updateSession(request: NextRequest) {

@@ -1,14 +1,26 @@
 import { z } from "zod";
 import { isCategorySlug } from "@/lib/categories";
+import { isCity } from "@/lib/cities";
 import { formFieldsSchema } from "@/lib/validation/forms";
+import { isValidExternalLink } from "@/lib/validators/links";
+
+// Forms convert an empty selection to `undefined` before this ever runs
+// (`city: city || undefined`), so this only ever validates a real,
+// non-empty candidate -- no empty-string escape hatch needed. A direct
+// `refine(isCity)` (not wrapped in another arrow function) is what lets
+// zod's type-predicate narrow this to `City`, not just `string`, so it
+// composes with extra_cities.includes(city) below without a cast.
+const cityField = z.string().trim().refine(isCity, "Choose a valid city").optional();
+const extraCitiesField = z.array(z.string().refine(isCity)).max(5).default([]);
 
 export const createCommunitySchema = z
   .object({
-    name: z.string().trim().min(3, "At least 3 characters").max(80),
-    description: z.string().trim().min(10, "At least 10 characters").max(2000),
+    name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
-    city: z.string().trim().max(80).optional(),
+    city: cityField,
+    extra_cities: extraCitiesField,
     community_type: z.enum(["online", "offline", "both"]),
     join_mode: z.enum(["open", "request"]),
     join_form_fields: formFieldsSchema.default([]),
@@ -16,12 +28,76 @@ export const createCommunitySchema = z
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",
     path: ["extra_categories"],
+  })
+  .refine((c) => !c.city || !c.extra_cities.includes(c.city), {
+    message: "Extra cities can't repeat the primary city",
+    path: ["extra_cities"],
   });
 
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 
+// Deliberately excludes owner_id, claim_status, and join_mode -- not just a
+// smaller form, the Server Action only ever writes these specific columns,
+// so a field missing here can never reach the database no matter what a
+// caller sends. community_type also isn't included: it wasn't named in the
+// edit spec's editable-fields list, unlike everything below.
+export const updateCommunitySchema = z
+  .object({
+    name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
+    category: z.string().refine(isCategorySlug, "Choose a valid category"),
+    extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
+    city: cityField,
+    extra_cities: extraCitiesField,
+  })
+  .refine((c) => !c.extra_categories.includes(c.category), {
+    message: "Extra categories can't repeat the primary category",
+    path: ["extra_categories"],
+  })
+  .refine((c) => !c.city || !c.extra_cities.includes(c.city), {
+    message: "Extra cities can't repeat the primary city",
+    path: ["extra_cities"],
+  });
+
+export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
+
+// Public, no-login submission for an external community listing -- the
+// original site's Add Community modal, which this app never actually had
+// (confirmed by audit, not assumed). No join_mode here: it only means
+// something for a native community with actual membership.
+export const submitExternalCommunitySchema = z
+  .object({
+    name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
+    category: z.string().refine(isCategorySlug, "Choose a valid category"),
+    extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
+    city: cityField,
+    extra_cities: extraCitiesField,
+    community_type: z.enum(["online", "offline", "both"]),
+    external_link: z.string().trim().refine(isValidExternalLink, "Must be a WhatsApp or Instagram link"),
+  })
+  .refine((c) => !c.extra_categories.includes(c.category), {
+    message: "Extra categories can't repeat the primary category",
+    path: ["extra_categories"],
+  })
+  .refine((c) => !c.city || !c.extra_cities.includes(c.city), {
+    message: "Extra cities can't repeat the primary city",
+    path: ["extra_cities"],
+  });
+
+export type SubmitExternalCommunityInput = z.infer<typeof submitExternalCommunitySchema>;
+
+export const claimCommunitySchema = z.object({
+  name: z.string().trim().min(2, "Your name must be at least 2 characters").max(100),
+  phone: z.string().trim().min(6, "Enter a valid phone number").max(20),
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  proof: z.string().trim().max(500).optional(),
+});
+
+export type ClaimCommunityInput = z.infer<typeof claimCommunitySchema>;
+
 export const createGroupSchema = z.object({
-  name: z.string().trim().min(2, "At least 2 characters").max(60),
+  name: z.string().trim().min(2, "Group name must be at least 2 characters").max(60),
   description: z.string().trim().max(200).optional(),
 });
 

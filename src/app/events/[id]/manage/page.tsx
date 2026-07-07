@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
+import { EventManageActions } from "@/components/events/EventManageActions";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 
@@ -33,14 +34,19 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        <Link href={`/events/${id}`} className="text-[13px] text-text3 transition hover:text-text2">
-          ← {event.event_name}
-        </Link>
-        <h1 className="mt-2 font-heading text-[26px] font-extrabold leading-tight">Manage registrants</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link href={`/events/${id}`} className="text-[13px] text-text3 transition hover:text-text2">
+              ← {event.event_name}
+            </Link>
+            <h1 className="mt-2 font-heading text-[18px] font-bold leading-tight">Manage registrants</h1>
+          </div>
+          <EventManageActions eventId={id} status={event.status} />
+        </div>
 
         <div className="mt-6 flex gap-4">
-          <StatCard icon={IconUsers} label="registered" value={registrations.length} />
-          <StatCard icon={IconCircleCheck} label="checked in" value={checkedInCount} />
+          <StatCard icon={IconUsers} label="Registered" value={registrations.length} />
+          <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
         </div>
 
         {ticketTypes.length > 0 && (

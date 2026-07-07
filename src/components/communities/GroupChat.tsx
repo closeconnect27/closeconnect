@@ -18,10 +18,12 @@ export function GroupChat({
   groupId,
   initialMessages,
   currentUserId,
+  canPost,
 }: {
   groupId: string;
   initialMessages: ChatMessage[];
   currentUserId: string;
+  canPost: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");
@@ -132,23 +134,29 @@ export function GroupChat({
         )}
         <div ref={bottomRef} />
       </div>
-      <form onSubmit={handleSend} className="flex gap-3 border-t border-border bg-bg2 p-4">
-        <input
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Message…"
-          maxLength={1000}
-          className="flex-1 rounded-full border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
-        />
-        <button
-          type="submit"
-          disabled={pending || cooldown > 0 || !content.trim()}
-          aria-label="Send message"
-          className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 text-[12px]"
-        >
-          {cooldown > 0 ? cooldown : <IconSend2 size={18} />}
-        </button>
-      </form>
+      {canPost ? (
+        <form onSubmit={handleSend} className="flex gap-3 border-t border-border bg-bg2 p-4">
+          <input
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Message…"
+            maxLength={1000}
+            className="flex-1 rounded-full border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
+          />
+          <button
+            type="submit"
+            disabled={pending || cooldown > 0 || !content.trim()}
+            aria-label="Send message"
+            className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0 text-[12px]"
+          >
+            {cooldown > 0 ? cooldown : <IconSend2 size={18} />}
+          </button>
+        </form>
+      ) : (
+        <p className="border-t border-border bg-bg2 px-4 py-3 text-center text-[12px] text-text3">
+          Only the owner and moderators can post here.
+        </p>
+      )}
       {error && <p className="border-t border-border px-4 py-2 text-[12px] text-pink">{error}</p>}
     </div>
   );

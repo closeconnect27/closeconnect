@@ -34,7 +34,7 @@ export function HostCommunityRow({
         <div className="flex items-center gap-2">
           <p className="truncate text-[14px] font-bold text-text">{c.name}</p>
           {c.role !== "member" && (
-            <span className="shrink-0 rounded-full border border-border2 px-2 py-0.5 text-[10px] font-bold text-text3">
+            <span className="shrink-0 rounded-full border border-border2 px-2 py-0.5 text-[10px] font-bold capitalize text-text3">
               {c.role}
             </span>
           )}
@@ -48,12 +48,12 @@ export function HostCommunityRow({
               </span>
               <span className="flex items-center gap-1">
                 <IconStar size={12} className={c.avg_rating > 0 ? "fill-green text-green" : ""} />
-                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "no ratings"}
+                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings"}
               </span>
-              <span>{c.join_mode === "request" ? "request to join" : "open"}</span>
+              <span>{c.join_mode === "request" ? "Request to join" : "Open"}</span>
             </>
           ) : (
-            <span>external</span>
+            <span>External</span>
           )}
         </div>
       </div>

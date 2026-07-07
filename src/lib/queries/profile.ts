@@ -33,7 +33,10 @@ export type MyRegisteredEvent = {
   ticketTypeId: string | null;
   id: string;
   event_name: string;
-  event_date: string;
+  // A registrant can never actually reach a draft (null-dated) event to
+  // register for it in the first place, but the underlying column is
+  // nullable, so this stays honest about that rather than asserting non-null.
+  event_date: string | null;
   event_time: string | null;
   venue: string | null;
   city: string | null;
@@ -41,7 +44,7 @@ export type MyRegisteredEvent = {
   status: "active" | "cancelled";
 };
 
-/** Events this user has registered for (guest or logged-in). form_responses
+/** Events this user has registered for. form_responses
  * is polymorphic (owner_id points to either communities or events depending
  * on owner_type, so it has no real foreign key PostgREST could embed
  * through) -- fetched in two steps and merged in JS rather than a single

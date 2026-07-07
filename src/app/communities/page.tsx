@@ -22,17 +22,23 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
     <div className="flex-1 pb-16">
       <div className="flex items-start justify-between gap-4 px-4 pb-6 pt-8 sm:px-6">
         <div>
-          <h1 className="font-heading text-[32px] font-extrabold leading-tight">communities</h1>
-          <p className="text-[14px] text-text3">find your people</p>
+          <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">Communities</h1>
+          <p className="text-[14px] text-text3">Find your people</p>
         </div>
-        <Link
-          href={user ? "/communities/new" : "/login?redirect=/communities/new"}
-          className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
-        >
-          <IconPlus size={14} />
-          <span className="hidden sm:inline">Create community</span>
-          <span className="sm:hidden">Create</span>
-        </Link>
+        <div className="flex shrink-0 gap-2">
+          <Link href="/communities/submit" className="btn-secondary px-4 py-2.5 text-[13px]">
+            <span className="hidden sm:inline">List a community</span>
+            <span className="sm:hidden">List</span>
+          </Link>
+          <Link
+            href={user ? "/communities/new" : "/login?redirect=/communities/new"}
+            className="btn-primary px-4 py-2.5 text-[13px]"
+          >
+            <IconPlus size={14} />
+            <span className="hidden sm:inline">Create community</span>
+            <span className="sm:hidden">Create</span>
+          </Link>
+        </div>
       </div>
 
       <CommunityFilterBar />
@@ -114,7 +120,7 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
       {visibleRows.map(({ cat, communities }) => (
         <section key={cat.slug}>
           <div className="mb-4 flex items-center justify-between px-4 sm:px-6">
-            <span className="font-heading flex items-center gap-2 text-[16px] font-bold">
+            <span className="font-mono flex items-center gap-2 text-[14px] font-semibold">
               <CategoryImage
                 slug={cat.slug}
                 seed={0}
@@ -123,12 +129,12 @@ async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof 
                 className="rounded-full object-cover"
               />
               {cat.label}
-              <span className="font-sans text-[12px] font-normal text-text3">
+              <span className="font-mono text-[12px] font-medium text-text3">
                 · {communities.length} communit{communities.length === 1 ? "y" : "ies"}
               </span>
             </span>
             <Link href={`/communities?category=${cat.slug}`} className="text-[13px] font-bold text-green">
-              see all
+              See all
             </Link>
           </div>
           <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">

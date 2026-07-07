@@ -44,11 +44,16 @@ export function EventDateRangeCalendar() {
   const [end, setEnd] = useState<string | null>(searchParams.get("to"));
   // Mirrors of start/end for the document-level mouseup handler below --
   // that listener is registered once and would otherwise close over whatever
-  // start/end were on the render it was attached in.
+  // start/end were on the render it was attached in. Synced via effect, not
+  // assigned during render -- mutating a ref while rendering is impure
+  // (unsafe under concurrent/Strict Mode double-render), even though this
+  // particular assignment happens to be idempotent.
   const startRef = useRef(start);
   const endRef = useRef(end);
-  startRef.current = start;
-  endRef.current = end;
+  useEffect(() => {
+    startRef.current = start;
+    endRef.current = end;
+  }, [start, end]);
 
   function finalizeDrag() {
     if (!draggingRef.current) return;
@@ -157,8 +162,8 @@ export function EventDateRangeCalendar() {
       </button>
 
       {open && (
-        <div className="card-elevated absolute left-0 top-full z-30 mt-2 w-[min(90vw,640px)] rounded-card bg-bg2 p-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="card-elevated absolute left-0 top-full z-30 mt-2 w-[min(90vw,640px)] rounded-card bg-bg2 p-5 shadow-card-hover">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <MonthGrid
               monthDate={viewMonth}
               rangeLo={rangeLo}
@@ -183,7 +188,7 @@ export function EventDateRangeCalendar() {
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
             <button onClick={() => applyPreset("week")} className="btn-secondary px-3 py-1.5 text-[12px]">
               This week
             </button>
@@ -195,7 +200,7 @@ export function EventDateRangeCalendar() {
             </button>
           </div>
 
-          <div className="mt-3 flex justify-end gap-2">
+          <div className="mt-4 flex justify-end gap-2">
             <button onClick={clear} className="btn-secondary px-4 py-2 text-[13px]">
               Clear
             </button>
@@ -246,31 +251,39 @@ function MonthGrid({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-[13px] font-bold">
+      <div className="mb-3 flex items-center justify-between text-[13px] font-bold">
         {showPrev ? (
-          <button onClick={onPrev} aria-label="Previous month" className="text-text2 hover:text-text">
+          <button
+            onClick={onPrev}
+            aria-label="Previous month"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-text2 transition hover:bg-bg3 hover:text-text"
+          >
             <IconChevronLeft size={16} />
           </button>
         ) : (
-          <span className="w-4" />
+          <span className="w-7" />
         )}
         <span>
           {MONTH_NAMES[m]} {y}
         </span>
         {showNext ? (
-          <button onClick={onNext} aria-label="Next month" className="text-text2 hover:text-text">
+          <button
+            onClick={onNext}
+            aria-label="Next month"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-text2 transition hover:bg-bg3 hover:text-text"
+          >
             <IconChevronRight size={16} />
           </button>
         ) : (
-          <span className="w-4" />
+          <span className="w-7" />
         )}
       </div>
-      <div className="mb-1 grid grid-cols-7 text-center text-[11px] text-text3">
+      <div className="mb-2 grid grid-cols-7 text-center font-mono text-[11px] font-medium text-text3">
         {WEEKDAYS.map((d, i) => (
           <span key={i}>{d}</span>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-y-1 text-center text-[13px]" onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      <div className="grid grid-cols-7 text-center text-[13px]" onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         {Array.from({ length: startPad }).map((_, i) => (
           <span key={`pad-${i}`} />
         ))}
@@ -281,27 +294,32 @@ function MonthGrid({
           const isStart = rangeLo === iso;
           const isEnd = rangeHi === iso;
           const inRange = !!(rangeLo && rangeHi && iso > rangeLo && iso < rangeHi);
+          const inBand = inRange || isStart || isEnd;
           return (
-            <button
+            <div
               key={iso}
-              type="button"
-              data-iso={iso}
-              onMouseDown={() => onDown(iso)}
-              onMouseEnter={() => onEnter(iso)}
-              onTouchStart={() => onDown(iso)}
-              className={`mx-auto flex h-8 w-8 select-none items-center justify-center rounded-full text-[13px] transition ${
-                isStart || isEnd
-                  ? "bg-green font-bold text-green-dark"
-                  : inRange
-                    ? "bg-green-tint text-green"
+              className={`flex h-9 items-center justify-center ${inBand ? "bg-green-tint" : ""} ${
+                isStart ? "rounded-l-full" : ""
+              } ${isEnd ? "rounded-r-full" : ""} ${isStart && isEnd ? "rounded-full" : ""}`}
+            >
+              <button
+                type="button"
+                data-iso={iso}
+                onMouseDown={() => onDown(iso)}
+                onMouseEnter={() => onEnter(iso)}
+                onTouchStart={() => onDown(iso)}
+                className={`flex h-8 w-8 select-none items-center justify-center rounded-full text-[13px] font-medium transition ${
+                  isStart || isEnd
+                    ? "bg-green font-bold text-green-dark shadow-sm"
                     : isToday
                       ? "border border-green text-green"
                       : "text-text2 hover:bg-bg3"
-              }`}
-              style={{ touchAction: "none" }}
-            >
-              {day}
-            </button>
+                }`}
+                style={{ touchAction: "none" }}
+              >
+                {day}
+              </button>
+            </div>
           );
         })}
       </div>

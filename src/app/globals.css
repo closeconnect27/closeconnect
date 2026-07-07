@@ -107,8 +107,9 @@
   --shadow-card-hover: var(--shadow-card-hover);
   --radius-card: 14px;
   --radius-card-sm: 10px;
-  --font-heading: var(--font-syne);
+  --font-heading: var(--font-fraunces);
   --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-fira-code);
 }
 
 body {

@@ -11,6 +11,7 @@ export function JoinSection({
   communityId,
   joinMode,
   isMember,
+  isOwner,
   isLoggedIn,
   pendingStatus,
   formFields,
@@ -18,6 +19,7 @@ export function JoinSection({
   communityId: string;
   joinMode: "open" | "request";
   isMember: boolean;
+  isOwner: boolean;
   isLoggedIn: boolean;
   pendingStatus: "pending" | "approved" | "rejected" | null;
   formFields: FormField[];
@@ -62,7 +64,7 @@ export function JoinSection({
     return (
       <p className="flex items-center gap-2 text-[14px] font-bold text-green">
         <IconCircleCheck size={18} />
-        You&apos;re a member
+        {isOwner ? "You're the owner" : "You're a member"}
       </p>
     );
   }

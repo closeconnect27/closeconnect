@@ -15,6 +15,11 @@ const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 // unrated community isn't "new".
 export function CommunityCard({ community: c }: { community: Community }) {
   const visual = getCategoryVisual(c.category);
+  // This is a Server Component (no "use client"): it renders once per
+  // request, not repeatedly on the client, so there's no re-render
+  // inconsistency for Date.now() to introduce here the way there would be
+  // in a client component's render body.
+  // eslint-disable-next-line react-hooks/purity
   const isNew = Date.now() - new Date(c.created_at).getTime() < NEW_THRESHOLD_MS;
 
   return (
@@ -35,23 +40,25 @@ export function CommunityCard({ community: c }: { community: Community }) {
 
         <div className="absolute right-3 top-3 flex gap-1.5">
           {isNew && (
-            <span className="rounded-full bg-green px-2.5 py-1 text-[11px] font-bold text-green-dark">new</span>
+            <span className="rounded-full bg-green px-2.5 py-1 font-mono text-[11px] font-semibold text-green-dark">
+              New
+            </span>
           )}
           {c.kind === "external" && (
-            <span className="rounded-full border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-text2">
-              external
+            <span className="rounded-full border border-white/10 bg-black/70 px-2.5 py-1 font-mono text-[11px] font-medium text-text2">
+              External
             </span>
           )}
         </div>
 
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-4">
           <span
-            className="w-fit rounded-full px-2.5 py-1 text-[11px] font-bold"
+            className="w-fit rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold"
             style={{ background: visual.bg, color: visual.light }}
           >
             {visual.label}
           </span>
-          <h3 className="line-clamp-2 font-heading text-[20px] font-extrabold leading-tight text-white">{c.name}</h3>
+          <h3 className="line-clamp-2 font-heading text-[18px] font-bold leading-tight text-white">{c.name}</h3>
         </div>
       </div>
 
@@ -63,7 +70,7 @@ export function CommunityCard({ community: c }: { community: Community }) {
             <span className="flex items-center gap-3 text-[13px] font-medium text-text2">
               <span className="flex items-center gap-1">
                 <IconStar size={13} className={c.avg_rating > 0 ? "fill-green text-green" : "text-text3"} />
-                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "no ratings yet"}
+                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings yet"}
               </span>
               <span className="flex items-center gap-1">
                 <IconUsers size={13} />

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { isGroupMember, getGroupMessages, getGroupById } from "@/lib/queries/chat";
+import { canReadGroup, canPostToGroup, getGroupMessages, getGroupById } from "@/lib/queries/chat";
 import { GroupChat } from "@/components/communities/GroupChat";
 
 export default async function GroupChatPage({
@@ -22,9 +22,13 @@ export default async function GroupChatPage({
   }
   if (group.community_id !== id) notFound();
 
-  const member = await isGroupMember(supabase, groupId, user.id);
-  if (!member) redirect(`/communities/${id}`);
+  // Announcement groups: readable by any community member, decoupled from
+  // having separately joined this specific sub-group (0020) -- every other
+  // group still requires an explicit join.
+  const canRead = await canReadGroup(supabase, group, user.id);
+  if (!canRead) redirect(`/communities/${id}`);
 
+  const canPost = await canPostToGroup(supabase, group, user.id);
   const messages = await getGroupMessages(supabase, groupId);
 
   return (
@@ -34,10 +38,10 @@ export default async function GroupChatPage({
           href={`/communities/${id}`}
           className="mb-4 inline-block text-[13px] text-text3 transition hover:text-text2"
         >
-          ← back to community
+          ← Back to community
         </Link>
-        <h1 className="mb-4 font-heading text-[22px] font-extrabold">#{group.name}</h1>
-        <GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} />
+        <h1 className="mb-4 font-heading text-[18px] font-bold">#{group.name}</h1>
+        <GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} canPost={canPost} />
       </div>
     </div>
   );

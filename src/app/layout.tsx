@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
-import { Syne, DM_Sans } from "next/font/google";
+import { Fraunces, DM_Sans, Fira_Code } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 import { createClient } from "@/lib/supabase/server";
 
-const syne = Syne({
-  variable: "--font-syne",
-  weight: ["700", "800"],
+// Bold editorial serif for headings -- 900 for major headings/the hero
+// wordmark, 700 for sub-headings. Considered Perandory, but it's
+// personal-use-only licensed (not appropriate for a commercial product) and
+// uppercase-only (which breaks the sentence-case rule everywhere), so
+// Fraunces instead: same bold-serif editorial energy, properly licensed.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  weight: ["700", "900"],
   subsets: ["latin"],
 });
 
@@ -17,8 +21,17 @@ const dmSans = DM_Sans({
   subsets: ["latin"],
 });
 
+// Restrained pairing rule: mono accent font reserved for small accent
+// elements only (tags, stat labels, category pills) -- never body or nav
+// text, same discipline as the previous Syne/DM Sans pairing.
+const firaCode = Fira_Code({
+  variable: "--font-fira-code",
+  weight: ["500", "600"],
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "Close.Connect",
+  title: "Closeconnect",
   description: "Community + events platform",
 };
 
@@ -43,15 +56,11 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${syne.variable} ${dmSans.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${dmSans.variable} ${firaCode.variable} h-full antialiased`}
     >
-      {/* pb-16 clears the fixed BottomNav on mobile so page content never
-          sits underneath it; sm:pb-0 since BottomNav hides itself there. */}
-      <body className="flex min-h-full flex-col pb-16 font-sans sm:pb-0">
+      <body className="flex min-h-full flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        <Header isLoggedIn={isLoggedIn} />
-        {children}
-        <BottomNav isLoggedIn={isLoggedIn} />
+        <SiteChrome isLoggedIn={isLoggedIn}>{children}</SiteChrome>
       </body>
     </html>
   );

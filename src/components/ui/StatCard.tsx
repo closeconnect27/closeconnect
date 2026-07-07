@@ -7,8 +7,8 @@ export function StatCard({ icon: IconComponent, label, value }: { icon: Icon; la
         <IconComponent size={18} className="text-green" />
       </div>
       <div>
-        <p className="font-heading text-[20px] font-extrabold leading-none">{value}</p>
-        <p className="text-[11px] text-text3">{label}</p>
+        <p className="font-heading text-[14px] font-bold leading-none">{value}</p>
+        <p className="font-mono text-[11px] font-medium text-text3">{label}</p>
       </div>
     </div>
   );

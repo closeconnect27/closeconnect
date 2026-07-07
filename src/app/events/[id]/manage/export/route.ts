@@ -37,7 +37,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
 }
 
-// Guests fill in their own name/email -- CSV cells starting with =, +, -, @
+// Registrants fill in their own name -- CSV cells starting with =, +, -, @
 // are treated as formulas by Excel/Sheets on open (a well-known CSV
 // injection vector), so those get a leading quote to defuse them, same
 // principle as the app's other rule about never trusting user input as-is.

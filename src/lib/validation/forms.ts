@@ -10,7 +10,7 @@ export const formFieldSchema = z
   .object({
     label: z.string().trim().min(1, "Question text is required").max(120),
     field_type: z.enum(FIELD_TYPES),
-    options: z.array(z.string().trim().min(1)).max(20).optional(),
+    options: z.array(z.string().trim().min(1, "Option text is required")).max(20).optional(),
     is_required: z.boolean(),
   })
   .refine((f) => f.field_type !== "select" || (f.options?.length ?? 0) >= 2, {

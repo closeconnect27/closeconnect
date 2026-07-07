@@ -19,6 +19,47 @@ export async function isGroupMember(supabase: SupabaseClient, groupId: string, u
   return !!data;
 }
 
+/** Mirrors community_messages_select_group_members's RLS logic (0020):
+ * announcement groups are readable by any community member, decoupled from
+ * having separately joined that specific sub-group -- every other group
+ * still requires an explicit community_group_members row. */
+export async function canReadGroup(
+  supabase: SupabaseClient,
+  group: { id: string; community_id: string; is_announcement: boolean },
+  userId: string,
+) {
+  if (await isGroupMember(supabase, group.id, userId)) return true;
+  if (!group.is_announcement) return false;
+
+  const { data } = await supabase
+    .from("community_members")
+    .select("user_id")
+    .eq("community_id", group.community_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
+/** Mirrors community_messages_insert_group_members's RLS logic (0020):
+ * only staff (owner/moderator) can post to announcement groups; every other
+ * group requires ordinary group membership. */
+export async function canPostToGroup(
+  supabase: SupabaseClient,
+  group: { id: string; community_id: string; is_announcement: boolean },
+  userId: string,
+) {
+  if (group.is_announcement) {
+    const { data } = await supabase
+      .from("community_members")
+      .select("role")
+      .eq("community_id", group.community_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data?.role === "owner" || data?.role === "moderator";
+  }
+  return isGroupMember(supabase, group.id, userId);
+}
+
 export async function getGroupMessages(supabase: SupabaseClient, groupId: string, limit = 50) {
   const { data, error } = await supabase
     .from("community_messages")

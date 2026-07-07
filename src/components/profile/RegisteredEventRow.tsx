@@ -16,10 +16,10 @@ export function RegisteredEventRow({ event: e }: { event: MyRegisteredEvent }) {
         className="flex w-12 shrink-0 flex-col items-center overflow-hidden rounded-card-sm text-center"
         style={{ background: visual.bg }}
       >
-        <span className="w-full py-0.5 text-[9px] font-bold uppercase" style={{ color: visual.light }}>
+        <span className="w-full py-0.5 font-mono text-[9px] font-semibold uppercase" style={{ color: visual.light }}>
           {month}
         </span>
-        <span className="py-1 text-[15px] font-extrabold leading-none" style={{ color: visual.light }}>
+        <span className="py-1 font-mono text-[15px] font-semibold leading-none" style={{ color: visual.light }}>
           {day}
         </span>
       </div>
@@ -29,7 +29,7 @@ export function RegisteredEventRow({ event: e }: { event: MyRegisteredEvent }) {
           <p className="truncate text-[14px] font-bold text-text">{e.event_name}</p>
           {e.status === "cancelled" && (
             <span className="shrink-0 rounded-full bg-pink-tint px-2 py-0.5 text-[10px] font-bold text-pink">
-              cancelled
+              Cancelled
             </span>
           )}
         </div>
@@ -44,14 +44,15 @@ export function RegisteredEventRow({ event: e }: { event: MyRegisteredEvent }) {
       {e.checkedInAt && (
         <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-tint px-2.5 py-1 text-[11px] font-bold text-green">
           <IconCircleCheck size={12} />
-          checked in
+          Checked in
         </span>
       )}
     </Link>
   );
 }
 
-function formatDateChip(isoDate: string) {
+function formatDateChip(isoDate: string | null) {
+  if (!isoDate) return { month: "TBD", day: "—" };
   const [, m, d] = isoDate.split("-").map(Number);
   const month = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][m - 1];
   return { month, day: d };

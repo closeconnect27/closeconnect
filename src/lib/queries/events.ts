@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FormField } from "@/lib/queries/membership";
+import { type City, isCity } from "@/lib/cities";
 
 export type EventTicketType = {
   id: string;
@@ -24,10 +25,14 @@ export type EventListItem = {
   community_id: string | null;
   event_name: string;
   description: string | null;
-  event_date: string;
+  // null means the event is a draft -- currently only reachable right after
+  // duplicateEvent(), before the host has set a real date. Public listing
+  // queries exclude these; the detail page 404s them for non-hosts.
+  event_date: string | null;
   event_time: string | null;
   venue: string | null;
   city: string | null;
+  extra_cities: string[] | null;
   category: string | null;
   cover_image_url: string | null;
   status: "active" | "cancelled";
@@ -77,10 +82,17 @@ function todayIso() {
 }
 
 export async function getEvents(supabase: SupabaseClient, filters: EventFilters = {}) {
-  let query = supabase.from("events").select(EVENT_LIST_SELECT).eq("status", "active");
+  // Draft events (null event_date, only reachable via duplicateEvent before
+  // the host sets a real date) never belong in a public listing -- excluded
+  // unconditionally rather than relying on the date filters below, which
+  // only apply in some call shapes (e.g. includePast: true with no explicit
+  // dateFrom skips them entirely).
+  let query = supabase.from("events").select(EVENT_LIST_SELECT).eq("status", "active").not("event_date", "is", null);
 
   if (filters.category) query = query.eq("category", filters.category);
-  if (filters.city) query = query.eq("city", filters.city);
+  if (filters.city && isCity(filters.city)) {
+    query = query.or(`city.eq.${filters.city},extra_cities.cs.{${filters.city}}`);
+  }
   if (filters.communityId) query = query.eq("community_id", filters.communityId);
   if (filters.hostId) query = query.eq("host_id", filters.hostId);
   if (filters.dateFrom) query = query.gte("event_date", filters.dateFrom);
@@ -89,6 +101,28 @@ export async function getEvents(supabase: SupabaseClient, filters: EventFilters 
   if (!filters.dateFrom && !filters.includePast) query = query.gte("event_date", todayIso());
 
   query = query.order("event_date", { ascending: true }).order("event_time", { ascending: true });
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as unknown as EventListItem[];
+}
+
+/**
+ * The one place multi-city matching lives for events, mirroring
+ * getCommunitiesByCity: an event matches a city if it's the primary `city`
+ * OR listed in `extra_cities`. Reused wherever a city filter appears.
+ */
+export async function getEventsByCity(supabase: SupabaseClient, city: City, opts: { limit?: number } = {}) {
+  let query = supabase
+    .from("events")
+    .select(EVENT_LIST_SELECT)
+    .eq("status", "active")
+    .not("event_date", "is", null)
+    .gte("event_date", todayIso())
+    .or(`city.eq.${city},extra_cities.cs.{${city}}`)
+    .order("event_date", { ascending: true });
+
+  if (opts.limit) query = query.limit(opts.limit);
 
   const { data, error } = await query;
   if (error) throw error;

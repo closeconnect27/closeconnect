@@ -7,8 +7,16 @@ import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
 import { createEvent } from "@/app/actions/events";
+import { Combobox } from "@/components/ui/Combobox";
+import { MultiCombobox } from "@/components/ui/MultiCombobox";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { CITY_OPTIONS } from "@/lib/cities";
 
-const CITIES = ["Bengaluru", "Mumbai", "Delhi", "Chennai", "Hyderabad", "Pune"];
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
@@ -19,6 +27,7 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
   const [eventTime, setEventTime] = useState("");
   const [venue, setVenue] = useState("");
   const [city, setCity] = useState("");
+  const [extraCities, setExtraCities] = useState<string[]>([]);
   const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
   const [communityId, setCommunityId] = useState("");
   const [tickets, setTickets] = useState<TicketTypeDraft[]>([
@@ -39,6 +48,7 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
       event_time: eventTime || undefined,
       venue: venue || undefined,
       city: city || undefined,
+      extra_cities: extraCities,
       category,
       community_id: communityId || undefined,
       ticket_types: tickets.map((t) => ({
@@ -65,9 +75,9 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-lg">
-        <h1 className="font-heading text-[28px] font-extrabold leading-tight">Host an event</h1>
+        <h1 className="font-heading text-[18px] font-bold leading-tight">Host an event</h1>
         <p className="mb-8 text-[14px] text-text3">
-          Guests can register without an account -- add photos once it&apos;s live.
+          Registrants sign in to reserve a spot -- add photos once it&apos;s live.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -86,13 +96,7 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Date">
-              <input
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                required
-                className={inputClass}
-              />
+              <DatePicker value={eventDate || null} onChange={setEventDate} minDate={todayIso()} placeholder="Select a date" />
             </Field>
             <Field label="Time (optional)">
               <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className={inputClass} />
@@ -104,34 +108,30 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
           </Field>
 
           <Field label="City (optional)">
-            <input value={city} onChange={(e) => setCity(e.target.value)} list="cities" className={inputClass} />
-            <datalist id="cities">
-              {CITIES.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
+            <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />
+          </Field>
+
+          <Field label="Also show up under (optional, up to 5 more cities)">
+            <MultiCombobox
+              values={extraCities}
+              onChange={setExtraCities}
+              options={CITY_OPTIONS.filter((o) => o.value !== city)}
+              placeholder="Add more cities"
+            />
           </Field>
 
           <Field label="Category">
-            <select value={category} onChange={(e) => setCategory(e.target.value as CategorySlug)} className={inputClass}>
-              {CATEGORIES.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            <CategoryPicker value={category} onChange={setCategory} />
           </Field>
 
           {hostableCommunities.length > 0 && (
             <Field label="Attach to a community (optional)">
-              <select value={communityId} onChange={(e) => setCommunityId(e.target.value)} className={inputClass}>
-                <option value="">No community -- host it under your own profile</option>
-                {hostableCommunities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                value={communityId}
+                onChange={setCommunityId}
+                options={hostableCommunities.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="No community -- host it under your own profile"
+              />
             </Field>
           )}
 
