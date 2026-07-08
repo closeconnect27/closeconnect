@@ -41,7 +41,7 @@ export function CommunityCard({ community: c }: { community: Community }) {
             <img
               src={c.logo_url}
               alt=""
-              className="h-28 w-28 rounded-full border-4 border-white/20 object-cover shadow-lg"
+              className="h-28 w-28 rounded-full border-4 border-white/20 bg-bg2 object-contain shadow-lg"
             />
           </div>
         ) : (
