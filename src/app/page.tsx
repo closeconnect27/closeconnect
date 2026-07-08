@@ -3,7 +3,6 @@ import {
   IconUsers,
   IconMessageCircle2,
   IconCalendarEvent,
-  IconSearch,
   IconUserPlus,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
@@ -42,9 +41,6 @@ export default async function Home() {
             </Link>
             <Link href="/events" className="btn-secondary px-6 py-3 text-[14px]">
               Browse events
-            </Link>
-            <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
-              Search
             </Link>
           </div>
         </div>
@@ -110,10 +106,6 @@ export default async function Home() {
           <Link href="/events" className="btn-secondary px-6 py-3 text-[14px]">
             <IconCalendarEvent size={16} />
             Browse events
-          </Link>
-          <Link href="/search" className="btn-secondary px-6 py-3 text-[14px]">
-            <IconSearch size={16} />
-            Search
           </Link>
         </div>
       </section>

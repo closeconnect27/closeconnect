@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { IconCalendarOff } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
-import { CATEGORIES } from "@/lib/categories";
-import { getEvents, type EventFilters } from "@/lib/queries/events";
+import { getEvents } from "@/lib/queries/events";
 import { EventCard } from "@/components/events/EventCard";
 import { EventFilterBar } from "@/components/events/EventFilterBar";
-import { CategoryImage } from "@/components/ui/CategoryImage";
+import { CategorySidebarMobile, CategorySidebarDesktop } from "@/components/ui/CategorySidebar";
+import { HeaderSearchSlot } from "@/components/ui/HeaderSearchSlot";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 type SearchParams = Promise<{
@@ -15,147 +15,91 @@ type SearchParams = Promise<{
   host?: string;
   from?: string;
   to?: string;
+  q?: string;
 }>;
 
+// Same restructuring as /communities: one always-shown grid, filtered via
+// the sidebar (category) + top filter bar (city/date range) + inline
+// search, replacing the old default view of horizontal per-category rows
+// (CategoryRows/EventRow, removed). community/host params still work
+// exactly as before (deep links from a community page or "my events"),
+// just no longer gate whether rows-vs-grid renders -- the grid is now the
+// only view, filtered or not.
 export default async function EventsPage({ searchParams }: { searchParams: SearchParams }) {
-  const { category, city, community, host, from, to } = await searchParams;
+  const { category, city, community, host, from, to, q } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const hasFilters = !!(category || city || community || host || from);
+
+  const events = await getEvents(supabase, {
+    category,
+    cities: city ? city.split(",").filter(Boolean) : undefined,
+    communityId: community,
+    hostId: host,
+    dateFrom: from,
+    dateTo: to,
+    search: q,
+  });
+
+  const hasFilters = !!(category || city || community || host || from || q);
 
   return (
     <div className="flex-1 pb-16">
-      <div className="flex items-start justify-between gap-4 px-4 pb-6 pt-8 sm:px-6">
-        <div>
-          <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">Events</h1>
-          <p className="text-[14px] text-text3">What&apos;s happening in Bengaluru</p>
-        </div>
-        <Link
-          href={user ? "/events/new" : "/login?redirect=/events/new"}
-          className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
-        >
-          <span className="hidden sm:inline">Host an event</span>
-          <span className="sm:hidden">Host</span>
-        </Link>
-      </div>
+      <HeaderSearchSlot basePath="/events" placeholder="Search events…" />
 
-      <EventFilterBar />
-
-      <div className="mt-8">
-        {hasFilters ? (
-          <FilteredGrid
-            supabase={supabase}
-            filters={{ category, city, communityId: community, hostId: host, dateFrom: from, dateTo: to }}
-          />
-        ) : (
-          <CategoryRows supabase={supabase} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-async function FilteredGrid({
-  supabase,
-  filters,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  filters: EventFilters;
-}) {
-  const events = await getEvents(supabase, filters);
-
-  if (!events.length) {
-    return (
-      <div className="px-4 sm:px-6">
-        <EmptyState
-          icon={IconCalendarOff}
-          title="No events match these filters"
-          description="Try a different category, city, or date range, or clear your filters to browse everything."
-          action={{ label: "Clear filters", href: "/events" }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-4 px-4 sm:grid-cols-2 sm:px-6 md:grid-cols-3 lg:grid-cols-4">
-      {events.map((e) => (
-        <EventCard key={e.id} event={e} />
-      ))}
-    </div>
-  );
-}
-
-async function CategoryRows({ supabase }: { supabase: Awaited<ReturnType<typeof createClient>> }) {
-  const all = await getEvents(supabase, {});
-
-  if (!all.length) {
-    return (
-      <div className="px-4 sm:px-6">
-        <EmptyState
-          icon={IconCalendarOff}
-          title="No upcoming events yet"
-          description="Be the first to host one."
-          action={{ label: "Host an event", href: "/events/new" }}
-        />
-      </div>
-    );
-  }
-
-  const rows = CATEGORIES.map((cat) => ({
-    cat,
-    events: all.filter((e) => e.category === cat.slug).slice(0, 8),
-  })).filter((r) => r.events.length > 0);
-
-  const uncategorized = all.filter((e) => !CATEGORIES.some((c) => c.slug === e.category)).slice(0, 8);
-
-  return (
-    <div className="flex flex-col gap-8">
-      {rows.map(({ cat, events }) => (
-        <EventRow key={cat.slug} title={cat.label} categorySlug={cat.slug} events={events} />
-      ))}
-      {uncategorized.length > 0 && <EventRow title="More events" events={uncategorized} />}
-    </div>
-  );
-}
-
-function EventRow({
-  title,
-  categorySlug,
-  events,
-}: {
-  title: string;
-  categorySlug?: string;
-  events: Awaited<ReturnType<typeof getEvents>>;
-}) {
-  return (
-    <section>
-      <div className="mb-4 flex items-center justify-between px-4 sm:px-6">
-        <span className="font-mono flex items-center gap-2 text-[14px] font-semibold">
-          {categorySlug && (
-            <CategoryImage slug={categorySlug} seed={0} alt="" size={24} className="rounded-full object-cover" />
-          )}
-          {title}
-          <span className="font-mono text-[12px] font-medium text-text3">
-            · {events.length} event{events.length === 1 ? "" : "s"}
-          </span>
-        </span>
-        <Link
-          href={`/events${categorySlug ? `?category=${categorySlug}` : ""}`}
-          className="text-[13px] font-bold text-green"
-        >
-          See all
-        </Link>
-      </div>
-      <div className="scrollbar-none flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
-        {events.map((e) => (
-          <div key={e.id} className="w-72 shrink-0">
-            <EventCard event={e} />
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-8 sm:px-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">
+              What&apos;s Happening
+              <br />
+              Around You
+            </h1>
+            <p className="mt-2 max-w-md text-[14px] text-text3">
+              Meetups, workshops, and socials hosted by communities near you — filter by what fits your week.
+            </p>
           </div>
-        ))}
+          <Link
+            href={user ? "/events/new" : "/login?redirect=/events/new"}
+            className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
+          >
+            <span className="hidden sm:inline">Host an event</span>
+            <span className="sm:hidden">Host</span>
+          </Link>
+        </div>
       </div>
-    </section>
+
+      <CategorySidebarMobile basePath="/events" />
+
+      <div className="mt-6 flex gap-6 px-4 sm:px-6 md:mt-8">
+        <CategorySidebarDesktop basePath="/events" />
+        <div className="min-w-0 flex-1">
+          <EventFilterBar />
+          <div className="mt-6">
+            {events.length === 0 ? (
+              <EmptyState
+                icon={IconCalendarOff}
+                title={hasFilters ? "No events match these filters" : "No upcoming events yet"}
+                description={
+                  hasFilters
+                    ? "Try a different category, city, or date range, or clear your filters to browse everything."
+                    : "Be the first to host one."
+                }
+                action={
+                  hasFilters ? { label: "Clear filters", href: "/events" } : { label: "Host an event", href: "/events/new" }
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+                {events.map((e) => (
+                  <EventCard key={e.id} event={e} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

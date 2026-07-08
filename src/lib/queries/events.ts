@@ -61,7 +61,9 @@ export type EventRegistration = {
 
 export type EventFilters = {
   category?: string;
-  city?: string;
+  /** Multiple cities match as OR -- an event matching any one of them (as
+   * its primary city or in extra_cities) is included. */
+  cities?: string[];
   communityId?: string;
   hostId?: string;
   dateFrom?: string;
@@ -90,8 +92,9 @@ export async function getEvents(supabase: SupabaseClient, filters: EventFilters 
   let query = supabase.from("events").select(EVENT_LIST_SELECT).eq("status", "active").not("event_date", "is", null);
 
   if (filters.category) query = query.eq("category", filters.category);
-  if (filters.city && isCity(filters.city)) {
-    query = query.or(`city.eq.${filters.city},extra_cities.cs.{${filters.city}}`);
+  const validCities = filters.cities?.filter(isCity) ?? [];
+  if (validCities.length > 0) {
+    query = query.or(validCities.map((c) => `city.eq.${c},extra_cities.cs.{${c}}`).join(","));
   }
   if (filters.communityId) query = query.eq("community_id", filters.communityId);
   if (filters.hostId) query = query.eq("host_id", filters.hostId);

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   IconCalendarEvent,
   IconUsers,
-  IconSearch,
   IconCirclePlus,
   IconUserCircle,
 } from "@tabler/icons-react";
@@ -23,7 +22,6 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
   const items = [
     { href: "/events", label: "Events", icon: IconCalendarEvent, exact: false },
     { href: "/communities", label: "Communities", icon: IconUsers, exact: false },
-    { href: "/search", label: "Search", icon: IconSearch, exact: false },
     {
       href: "/create",
       label: "Create",

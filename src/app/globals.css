@@ -120,14 +120,14 @@ body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.scrollbar-none {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-
+/* @layer components, not plain global rules -- Tailwind v4's utility layer
+   (hidden, sm:inline-flex, etc.) only wins the cascade over these if they
+   share a layer with a defined order. Left unlayered, these plain rules
+   beat EVERY Tailwind utility regardless of breakpoint, since unlayered CSS
+   always outranks layered CSS per the CSS cascade-layer spec -- that's what
+   let `.btn-primary`'s `display: inline-flex` override `hidden` at every
+   viewport, so "Create"/contextual-link buttons never actually hid on
+   mobile despite their `hidden sm:inline-flex` classes. */
 /* Global focus-visible ring -- guarantees every interactive element gets a
    visible keyboard-focus state without adding ring utilities to each one
    individually and risking missing some. */
@@ -141,6 +141,15 @@ textarea:focus-visible,
   outline: 2px solid var(--green);
   outline-offset: 2px;
 }
+
+@layer components {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 
 /* Skeleton loading placeholders -- shape matches the real layout (see
    loading.tsx files), not a generic spinner. */
@@ -223,4 +232,5 @@ textarea:focus-visible,
   box-shadow: var(--shadow-card-hover);
   border-color: var(--border-card-hover);
   transform: translateY(-2px);
+}
 }

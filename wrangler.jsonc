@@ -23,5 +23,10 @@
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
-	}
+	},
+	"workers_dev": true,
+	"routes": [
+		{ "pattern": "closeconnect.in", "custom_domain": true },
+		{ "pattern": "www.closeconnect.in", "custom_domain": true }
+	]
 }

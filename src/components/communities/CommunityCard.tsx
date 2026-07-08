@@ -65,6 +65,11 @@ export function CommunityCard({ community: c }: { community: Community }) {
       <div className="flex flex-col gap-1.5 p-4">
         <p className="line-clamp-1 text-[13px] leading-snug text-text3">{c.description}</p>
 
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <TypeBadge type={c.community_type} />
+          {c.city && <span className="text-[13px] font-medium text-text3">{c.city}</span>}
+        </div>
+
         <div className="mt-1 flex items-center justify-between gap-2">
           {c.kind === "native" ? (
             <span className="flex items-center gap-3 text-[13px] font-medium text-text2">
@@ -78,12 +83,24 @@ export function CommunityCard({ community: c }: { community: Community }) {
               </span>
             </span>
           ) : (
-            <span className="text-[13px] font-medium text-text3">{c.city ?? " "}</span>
+            <span />
           )}
           {c.kind === "external" && c.external_link && <JoinBadge link={c.external_link} />}
         </div>
       </div>
     </ClickableCard>
+  );
+}
+
+const TYPE_LABELS = { online: "Online", offline: "Offline", both: "Both" } as const;
+const TYPE_DOT_COLORS = { online: "#25D366", offline: "#7c3aed", both: "#9ca3af" } as const;
+
+function TypeBadge({ type }: { type: Community["community_type"] }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[13px] font-medium text-text2">
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: TYPE_DOT_COLORS[type] }} />
+      {TYPE_LABELS[type]}
+    </span>
   );
 }
 

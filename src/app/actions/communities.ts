@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import {
   createCommunitySchema,
@@ -252,62 +251,66 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
     return { error: "This community already has a claim in progress or an owner" };
   }
 
-  const { error } = await supabase.from("claims").insert({
-    community_id: communityId,
-    claimant_user_id: user.id,
-    name: data.name,
-    phone: data.phone,
-    email: data.email,
-    proof: data.proof || null,
-  });
+  const { data: claim, error } = await supabase
+    .from("claims")
+    .insert({
+      community_id: communityId,
+      claimant_user_id: user.id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      proof: data.proof || null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    if (error.message.includes("too quickly")) return { error: error.message };
+  if (error || !claim) {
+    if (error?.message.includes("too quickly")) return { error: error.message };
     // 23505 = unique_violation -- claims_one_pending_per_community (0024):
     // someone else's claim was submitted in the moment between this page
     // loading and this submit.
-    if (error.code === "23505") return { error: "A claim for this community is already pending review." };
-    return { error: error.message };
+    if (error?.code === "23505") return { error: "A claim for this community is already pending review." };
+    return { error: error?.message ?? "Could not submit this claim" };
   }
 
   revalidatePath(`/communities/${communityId}`);
-  notifyAdminsOfPendingClaim(community.name).catch((e) =>
+  notifyAdminOfPendingClaim(claim.id, community.name).catch((e) =>
     console.error("Failed to send claim notification email:", e),
   );
   return { error: null };
 }
 
-// Heads-up + deep link only -- the actual approve/reject decision still
-// happens through the authenticated in-app buttons in PendingClaimsSection.
-// Deliberately not a "click here to approve" link: email clients and
-// security scanners pre-fetch links automatically, which would trigger an
-// approval with no real human decision behind it if the link itself did
-// the approving. Fire-and-forget from the caller (never blocks the
-// claimant's own submission on email delivery) -- a failed send here means
-// a missed heads-up, not a broken claim.
-async function notifyAdminsOfPendingClaim(communityName: string) {
-  const admin = createAdminClient();
-  const { data: admins } = await admin.from("profiles").select("id").eq("is_admin", true);
-  if (!admins || admins.length === 0) return;
+// Direct one-click Approve/Reject links in the email, per explicit product
+// decision -- clicking a link mutates the claims table on a GET request.
+// This is a knowing tradeoff, not an oversight: email clients and security
+// scanners that pre-fetch links could trigger a decision with no human
+// behind it. See app/api/claims/[id]/decide/route.ts for the one guard in
+// place (first decision wins; a second click/prefetch is a no-op). The
+// authenticated in-app buttons in PendingClaimsSection still work exactly
+// as before -- this is an additional path, not a replacement. Fire-and-forget
+// from the caller (never blocks the claimant's own submission on email
+// delivery) -- a failed send here means a missed heads-up, not a broken claim.
+async function notifyAdminOfPendingClaim(claimId: string, communityName: string) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) return;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const link = `${siteUrl}/host/dashboard#pending-claims`;
+  const approveLink = `${siteUrl}/api/claims/${claimId}/decide?decision=approved`;
+  const rejectLink = `${siteUrl}/api/claims/${claimId}/decide?decision=rejected`;
+  const dashboardLink = `${siteUrl}/host/dashboard#pending-claims`;
 
-  await Promise.all(
-    admins.map(async (a) => {
-      const { data: userResult } = await admin.auth.admin.getUserById(a.id);
-      const email = userResult.user?.email;
-      if (!email) return;
-      await sendEmail({
-        to: email,
-        subject: `New claim pending review: ${communityName}`,
-        html: `
-          <p>A new claim for <strong>${communityName}</strong> is waiting for review.</p>
-          <p><a href="${link}">Review pending claims</a></p>
-        `,
-      });
-    }),
-  );
+  await sendEmail({
+    to: adminEmail,
+    subject: `New claim pending review: ${communityName}`,
+    html: `
+      <p>A new claim for <strong>${communityName}</strong> is waiting for review.</p>
+      <p>
+        <a href="${approveLink}" style="display:inline-block;padding:10px 22px;background:#1a7a5e;color:#fff;border-radius:999px;text-decoration:none;font-weight:600;margin-right:10px">Approve</a>
+        <a href="${rejectLink}" style="display:inline-block;padding:10px 22px;background:#f3f4f6;color:#111;border-radius:999px;text-decoration:none;font-weight:600">Reject</a>
+      </p>
+      <p style="font-size:13px;color:#888">Or review it in the <a href="${dashboardLink}">dashboard</a>.</p>
+    `,
+  });
 }
 
 export async function reviewCommunityClaim(claimId: string, decision: "approved" | "rejected") {
