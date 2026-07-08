@@ -28,14 +28,32 @@ export function CommunityCard({ community: c }: { community: Community }) {
       className="card-elevated block h-full w-full cursor-pointer overflow-hidden rounded-card bg-bg2"
     >
       <div className="relative h-72" style={{ background: visual.bg }}>
-        <CategoryImage
-          slug={c.category}
-          seed={communitySeed(c.id)}
-          alt=""
-          fill
-          sizes="(max-width: 640px) 80vw, 320px"
-          className="object-cover"
-        />
+        {c.cover_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
+          <img src={c.cover_image_url} alt="" className="h-full w-full object-cover" />
+        ) : c.logo_url ? (
+          // No real cover yet -- a small square logo stretched full-bleed
+          // with object-cover would crop/distort it, so it's shown
+          // contained and centered instead, like a badge on the category
+          // color, rather than the generic Unsplash placeholder.
+          <div className="flex h-full w-full items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns */}
+            <img
+              src={c.logo_url}
+              alt=""
+              className="h-28 w-28 rounded-full border-4 border-white/20 object-cover shadow-lg"
+            />
+          </div>
+        ) : (
+          <CategoryImage
+            slug={c.category}
+            seed={communitySeed(c.id)}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 80vw, 320px"
+            className="object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-black/20" />
 
         <div className="absolute right-3 top-3 flex gap-1.5">

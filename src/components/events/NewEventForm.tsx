@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { createEventSchema } from "@/lib/validation/event";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
-import { createEvent } from "@/app/actions/events";
+import { createEvent, setEventCoverImage, addEventImage } from "@/app/actions/events";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { StagedImagePicker } from "@/components/ui/StagedImagePicker";
+import { StagedGalleryPicker } from "@/components/ui/StagedGalleryPicker";
+import { uploadStagedImage } from "@/lib/uploadStagedImage";
 import { CITY_OPTIONS } from "@/lib/cities";
 
 function todayIso() {
@@ -21,6 +25,7 @@ const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
 export function NewEventForm({ hostableCommunities }: { hostableCommunities: { id: string; name: string }[] }) {
+  const router = useRouter();
   const [eventName, setEventName] = useState("");
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -34,6 +39,8 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
     { name: "General", price: 0, payment_link: "", quantity_available: "" },
   ]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
+  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -68,7 +75,32 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
 
     startTransition(async () => {
       const result = await createEvent(parsed.data);
-      if (result?.error) setError(result.error);
+      if (result?.error || !result?.eventId) {
+        setError(result?.error ?? "Could not create event");
+        return;
+      }
+      const id = result.eventId;
+
+      // Same reasoning as NewCommunityForm: the event exists now, so staged
+      // images can finally upload against a real path. Failures don't block
+      // navigation -- land on the manage page instead of the detail page so
+      // "some images failed" is somewhere actionable, not a vanished banner.
+      const failures: string[] = [];
+      if (coverBlob) {
+        const { url, error: uploadError } = await uploadStagedImage("event-images", `${id}/cover/${crypto.randomUUID()}.jpg`, coverBlob, "image/jpeg");
+        if (url) await setEventCoverImage(id, url);
+        else failures.push(`cover (${uploadError})`);
+      }
+      for (const file of galleryFiles) {
+        const ext = file.name.split(".").pop() ?? "jpg";
+        // No subfolder here -- matches EventImageUploader's existing path
+        // convention exactly (only cover images live under .../cover/).
+        const { url, error: uploadError } = await uploadStagedImage("event-images", `${id}/${crypto.randomUUID()}.${ext}`, file, file.type);
+        if (url) await addEventImage(id, url);
+        else failures.push(`gallery photo (${uploadError})`);
+      }
+
+      router.push(failures.length > 0 ? `/events/${id}/manage` : `/events/${id}`);
     });
   }
 
@@ -76,11 +108,15 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-lg">
         <h1 className="font-heading text-[18px] font-bold leading-tight">Host an event</h1>
-        <p className="mb-8 text-[14px] text-text3">
-          Registrants sign in to reserve a spot -- add photos once it&apos;s live.
-        </p>
+        <p className="mb-8 text-[14px] text-text3">Registrants sign in to reserve a spot.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <StagedImagePicker shape="wide" label="Cover image (optional)" value={coverBlob} onChange={setCoverBlob} />
+
+          <Field label="Gallery (optional)">
+            <StagedGalleryPicker files={galleryFiles} onChange={setGalleryFiles} />
+          </Field>
+
           <Field label="Event name">
             <input value={eventName} onChange={(e) => setEventName(e.target.value)} required className={inputClass} />
           </Field>

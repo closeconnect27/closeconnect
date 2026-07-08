@@ -69,7 +69,12 @@ export async function createCommunity(input: CreateCommunityInput) {
     }
   }
 
-  redirect(`/communities/${community.id}`);
+  // No redirect() here -- the caller (NewCommunityForm) still has staged
+  // logo/cover/gallery images in memory that need this id to upload against
+  // (see uploadStagedImage), and only navigates once that's done. Every
+  // other caller-facing shape in this file returns { error } on failure; a
+  // successful create additionally carries the new id.
+  return { error: null, communityId: community.id };
 }
 
 export async function updateCommunity(communityId: string, input: UpdateCommunityInput) {
