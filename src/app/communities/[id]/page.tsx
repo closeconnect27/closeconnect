@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { IconStar, IconUsers, IconMapPin, IconPencil } from "@tabler/icons-react";
+import { IconStar, IconUsers, IconMapPin, IconPencil, IconChartBar } from "@tabler/icons-react";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityById, getCommunityImages } from "@/lib/queries/communities";
@@ -139,6 +139,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             <Link href={`/communities/${community.id}/edit`} className="btn-secondary px-4 py-2 text-[13px]">
               <IconPencil size={14} />
               Edit
+            </Link>
+          )}
+          {isStaff && (
+            <Link href={`/communities/${community.id}/analytics`} className="btn-secondary px-4 py-2 text-[13px]">
+              <IconChartBar size={14} />
+              Analytics
             </Link>
           )}
           {isMember && <CopyLinkButton path={`/communities/${community.id}`} />}

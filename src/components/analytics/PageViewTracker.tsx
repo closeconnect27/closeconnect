@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { classifyReferrer } from "@/lib/referrerSource";
 
 const SESSION_KEY = "cc_viewer_session";
 
@@ -39,6 +40,7 @@ export function PageViewTracker({
         target_id: targetId,
         viewer_id: viewerId,
         viewer_session: getViewerSession(),
+        referrer_source: classifyReferrer(document.referrer),
       })
       .then(({ error }) => {
         if (error && error.code !== "23505") {
