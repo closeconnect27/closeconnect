@@ -7,6 +7,7 @@ import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormF
 import { getEventInterestCount, getVisibleInterestedUsers } from "@/lib/queries/interests";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
+import { EventFunnel } from "@/components/events/EventFunnel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 
@@ -45,6 +46,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   // elsewhere in this codebase (host/dashboard, profile past/upcoming).
   const eventHasPassed = event.event_date !== null && event.event_date < todayIso();
   const noShowCount = registrations.filter((r) => !r.checked_in_at).length;
+  const paidCount = registrations.filter((r) => r.payment_status === "paid").length;
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -64,6 +66,17 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
           <StatCard icon={IconUsers} label="Registered" value={registrations.length} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
           {eventHasPassed && <StatCard icon={IconUserX} label="No-show" value={noShowCount} />}
+        </div>
+
+        <div className="mt-4">
+          <EventFunnel
+            interestCount={interestCount}
+            registeredCount={registrations.length}
+            paidCount={paidCount}
+            checkedInCount={checkedInCount}
+            noShowCount={noShowCount}
+            eventHasPassed={eventHasPassed}
+          />
         </div>
 
         {visibleInterested.length > 0 && (

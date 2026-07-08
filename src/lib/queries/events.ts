@@ -55,6 +55,7 @@ export type EventRegistration = {
   response_data: Record<string, string>;
   status: "pending" | "approved" | "rejected";
   checked_in_at: string | null;
+  payment_status: "unpaid" | "paid" | "failed";
   created_at: string;
   ticket_type_id: string | null;
   event_ticket_types: { name: string } | null;
@@ -214,7 +215,7 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
   const { data, error } = await supabase
     .from("form_responses")
     .select(
-      "id, respondent_id, response_data, status, checked_in_at, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
+      "id, respondent_id, response_data, status, checked_in_at, payment_status, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
     )
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
