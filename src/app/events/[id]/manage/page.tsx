@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { IconDownload, IconUsers, IconCircleCheck } from "@tabler/icons-react";
+import { IconDownload, IconUsers, IconCircleCheck, IconHeart } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
+import { getEventInterestCount, getVisibleInterestedUsers } from "@/lib/queries/interests";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -23,10 +24,12 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
 
   if (event.host_id !== user.id) redirect(`/events/${id}`);
 
-  const [registrations, ticketTypes, formFields] = await Promise.all([
+  const [registrations, ticketTypes, formFields, interestCount, visibleInterested] = await Promise.all([
     getEventRegistrations(supabase, id),
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
+    getEventInterestCount(supabase, id),
+    getVisibleInterestedUsers(supabase, id),
   ]);
 
   const checkedInCount = registrations.filter((r) => r.checked_in_at).length;
@@ -45,9 +48,25 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
         </div>
 
         <div className="mt-6 flex gap-4">
+          <StatCard icon={IconHeart} label="Interested" value={interestCount} />
           <StatCard icon={IconUsers} label="Registered" value={registrations.length} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
         </div>
+
+        {visibleInterested.length > 0 && (
+          <div className="mt-4">
+            <span className="mb-2 block font-mono text-[11px] font-semibold uppercase tracking-wide text-text3">
+              Interested (shared their name)
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {visibleInterested.map((u) => (
+                <span key={u.userId} className="rounded-full border border-border2 px-3 py-1.5 text-[12px] text-text2">
+                  {u.displayName}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {ticketTypes.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">

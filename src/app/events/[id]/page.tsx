@@ -9,10 +9,12 @@ import {
   getEventFormFields,
   getTicketAvailability,
 } from "@/lib/queries/events";
+import { getMyInterestStatus } from "@/lib/queries/interests";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { EventRegistration } from "@/components/events/EventRegistration";
+import { InterestedButton } from "@/components/events/InterestedButton";
 import { EventImageUploader } from "@/components/events/EventImageUploader";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
@@ -44,11 +46,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, images, formFields, availability] = await Promise.all([
+  const [ticketTypes, images, formFields, availability, myInterest] = await Promise.all([
     getEventTicketTypes(supabase, id),
     getEventImages(supabase, id),
     getEventFormFields(supabase, id),
     getTicketAvailability(supabase, id),
+    user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
   ]);
 
   const dateLabel = formatEventDate(event.event_date);
@@ -207,14 +210,23 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               This event has been cancelled.
             </p>
           ) : (
-            <EventRegistration
-              eventId={event.id}
-              ticketTypes={ticketTypes}
-              formFields={formFields}
-              availability={availability}
-              isLoggedIn={!!user}
-              email={user?.email}
-            />
+            <>
+              <div className="mb-4">
+                <InterestedButton
+                  eventId={event.id}
+                  initiallyInterested={!!myInterest}
+                  isLoggedIn={!!user}
+                />
+              </div>
+              <EventRegistration
+                eventId={event.id}
+                ticketTypes={ticketTypes}
+                formFields={formFields}
+                availability={availability}
+                isLoggedIn={!!user}
+                email={user?.email}
+              />
+            </>
           )}
         </div>
 
