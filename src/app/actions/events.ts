@@ -93,7 +93,10 @@ export async function createEvent(input: CreateEventInput) {
     }
   }
 
-  redirect(`/events/${event.id}`);
+  // No redirect() here -- same reasoning as createCommunity: the caller
+  // (NewEventForm) still has staged cover/gallery images in memory that
+  // need this id to upload against, and only navigates once that's done.
+  return { error: null, eventId: event.id };
 }
 
 export async function registerForEvent(eventId: string, input: EventRegistrationInput) {
@@ -223,8 +226,8 @@ export async function addEventImage(eventId: string, imageUrl: string) {
   const supabase = await createClient();
 
   const existing = await getEventImages(supabase, eventId);
-  if (existing.length >= 3) {
-    return { error: "An event can have at most 3 images" };
+  if (existing.length >= 5) {
+    return { error: "An event can have at most 5 images" };
   }
 
   const { error } = await supabase.from("event_images").insert({

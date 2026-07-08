@@ -3,7 +3,7 @@ import Link from "next/link";
 import { IconStar, IconUsers, IconMapPin, IconPencil } from "@tabler/icons-react";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { createClient } from "@/lib/supabase/server";
-import { getCommunityById } from "@/lib/queries/communities";
+import { getCommunityById, getCommunityImages } from "@/lib/queries/communities";
 import {
   getCommunityMembership,
   getCommunityGroups,
@@ -74,6 +74,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   const members = isNative ? await getCommunityMembers(supabase, id) : [];
   const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
   const myRating = isNative && user && !isOwner ? await getMyRating(supabase, id, user.id) : null;
+  const images = await getCommunityImages(supabase, id);
 
   return (
     <div className="flex-1 pb-10">
@@ -165,6 +166,23 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
           <Linkify text={community.description} />
         </p>
+
+        {images.length > 0 && (
+          <div className="mt-6">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Photos</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {images.map((img) => (
+                // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
+                <img
+                  key={img.id}
+                  src={img.image_url}
+                  alt=""
+                  className="h-48 w-full rounded-card object-cover sm:h-40"
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {isNative && (
           <div className="mt-8 flex flex-col gap-8">

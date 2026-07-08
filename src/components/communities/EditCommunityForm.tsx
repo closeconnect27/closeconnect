@@ -5,11 +5,12 @@ import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateCommunitySchema } from "@/lib/validation/community";
 import { updateCommunity } from "@/app/actions/communities";
 import { CommunityImageUploader } from "@/components/communities/CommunityImageUploader";
+import { CommunityImageGalleryUploader } from "@/components/communities/CommunityImageGalleryUploader";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { CITY_OPTIONS } from "@/lib/cities";
-import type { Community } from "@/lib/queries/communities";
+import type { Community, CommunityImage } from "@/lib/queries/communities";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -21,7 +22,7 @@ const inputClass =
 // community_type (not named in the editable-fields list this was scoped
 // against). Both the Server Action and RLS (0017) enforce this
 // independently of what this form does or doesn't show.
-export function EditCommunityForm({ community }: { community: Community }) {
+export function EditCommunityForm({ community, images }: { community: Community; images: CommunityImage[] }) {
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
   const [category, setCategory] = useState<CategorySlug>(community.category as CategorySlug);
@@ -79,6 +80,11 @@ export function EditCommunityForm({ community }: { community: Community }) {
           shape="wide"
           label="Cover image"
         />
+      </div>
+
+      <div>
+        <span className="mb-2 block text-[12px] font-bold text-text3">Gallery</span>
+        <CommunityImageGalleryUploader communityId={community.id} images={images} />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">

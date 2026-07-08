@@ -113,6 +113,23 @@ export async function getCommunityById(supabase: SupabaseClient, id: string) {
   return data as Community;
 }
 
+export type CommunityImage = {
+  id: string;
+  community_id: string;
+  image_url: string;
+  sort_order: number;
+};
+
+export async function getCommunityImages(supabase: SupabaseClient, communityId: string) {
+  const { data, error } = await supabase
+    .from("community_images")
+    .select("*")
+    .eq("community_id", communityId)
+    .order("sort_order");
+  if (error) throw error;
+  return data as CommunityImage[];
+}
+
 /** Per-category community counts, matching the same primary-or-extra rule above. */
 export async function getCommunityCategoryCounts(supabase: SupabaseClient) {
   const { data, error } = await supabase

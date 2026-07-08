@@ -4,9 +4,15 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconPhotoPlus, IconTrash, IconLoader2 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// Matches the banner's rendered proportions closely enough across
+// breakpoints (h-40/h-48 mobile up to h-52/h-64 desktop, full width) without
+// excessive letterboxing at either end -- covers only, logos stay a plain
+// center-cropped square (see `shape` below).
+const COVER_ASPECT = 3;
 
 /**
  * Single-slot image upload (a logo, a cover) shared by communities and
@@ -38,25 +44,15 @@ export function SingleImageUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
-  async function handleFile(file: File) {
-    setError("");
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Only JPEG, PNG, or WebP images are allowed");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Image must be under 3MB");
-      return;
-    }
-
+  async function uploadBlob(blob: Blob, ext: string, contentType: string) {
     setUploading(true);
     const supabase = createClient();
-    const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${pathPrefix}/${crypto.randomUUID()}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
-      contentType: file.type,
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, blob, {
+      contentType,
       cacheControl: "3600",
     });
     if (uploadError) {
@@ -76,6 +72,38 @@ export function SingleImageUploader({
       router.refresh();
     }
     setUploading(false);
+  }
+
+  function handleFile(file: File) {
+    setError("");
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError("Only JPEG, PNG, or WebP images are allowed");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError("Image must be under 3MB");
+      return;
+    }
+
+    // Covers get a crop/zoom step so the uploader picks what stays visible
+    // instead of always landing on whatever object-cover's default center
+    // crop happens to show -- logos are square avatars, already fine as a
+    // plain center crop, so this only applies to the wide shape.
+    if (shape === "wide") {
+      setCropSrc(URL.createObjectURL(file));
+    } else {
+      uploadBlob(file, file.name.split(".").pop() ?? "jpg", file.type);
+    }
+  }
+
+  function closeCrop() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+  }
+
+  async function handleCropConfirm(blob: Blob) {
+    closeCrop();
+    await uploadBlob(blob, "jpg", "image/jpeg");
   }
 
   async function handleRemove() {
@@ -140,6 +168,10 @@ export function SingleImageUploader({
       />
 
       {error && <p className="text-[12px] text-pink">{error}</p>}
+
+      {cropSrc && (
+        <ImageCropModal imageSrc={cropSrc} aspect={COVER_ASPECT} onCancel={closeCrop} onConfirm={handleCropConfirm} />
+      )}
     </div>
   );
 }

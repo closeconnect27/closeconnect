@@ -38,13 +38,13 @@ export type EventListItem = {
   status: "active" | "cancelled";
   created_at: string;
   host: { display_name: string } | null;
-  community: { id: string; name: string } | null;
+  community: { id: string; name: string; logo_url: string | null } | null;
   event_ticket_types: { price: number }[];
 };
 
 export type EventDetail = Omit<EventListItem, "host" | "community"> & {
   host: { id: string; display_name: string; avatar_url: string | null; host_rating: number } | null;
-  community: { id: string; name: string } | null;
+  community: { id: string; name: string; logo_url: string | null } | null;
 };
 
 export type EventRegistration = {
@@ -76,7 +76,7 @@ export type EventFilters = {
 };
 
 const EVENT_LIST_SELECT =
-  "*, host:profiles(display_name), community:communities(id,name), event_ticket_types(price)";
+  "*, host:profiles(display_name), community:communities(id,name,logo_url), event_ticket_types(price)";
 
 function todayIso() {
   const d = new Date();
@@ -135,7 +135,7 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
 export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("*, host:profiles(id,display_name,avatar_url,host_rating), community:communities(id,name)")
+    .select("*, host:profiles(id,display_name,avatar_url,host_rating), community:communities(id,name,logo_url)")
     .eq("id", id)
     .single();
   if (error) throw error;
