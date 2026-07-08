@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconLayoutDashboard, IconUsers, IconCalendarEvent } from "@tabler/icons-react";
+import { IconLayoutDashboard, IconUsers, IconCalendarEvent, IconUserCircle } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
@@ -48,10 +48,16 @@ export default async function ProfilePage() {
             </h1>
             <p className="truncate text-[13px] text-text3">{user.email}</p>
           </div>
-          <Link href="/host/dashboard" className="btn-secondary shrink-0 px-4 py-2 text-[13px]">
-            <IconLayoutDashboard size={14} />
-            <span className="hidden sm:inline">Host dashboard</span>
-          </Link>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <Link href={`/profile/${user.id}`} className="btn-secondary px-4 py-2 text-[13px]">
+              <IconUserCircle size={14} />
+              <span className="hidden sm:inline">View public profile</span>
+            </Link>
+            <Link href="/host/dashboard" className="btn-secondary px-4 py-2 text-[13px]">
+              <IconLayoutDashboard size={14} />
+              <span className="hidden sm:inline">Host dashboard</span>
+            </Link>
+          </div>
         </div>
 
         <section className="mt-8">
@@ -94,7 +100,11 @@ export default async function ProfilePage() {
           )}
         </section>
 
-        <form action={signOut} className="mt-8">
+        <Link href="/profile/edit" className="btn-secondary mt-8 block w-full py-2.5 text-center text-[13px]">
+          Edit profile
+        </Link>
+
+        <form action={signOut} className="mt-3">
           <button type="submit" className="btn-secondary w-full py-2.5 text-[13px]">
             Sign out
           </button>

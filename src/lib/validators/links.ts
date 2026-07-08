@@ -80,3 +80,48 @@ export function safePaymentHref(url: string | null | undefined): string {
   if (!url || !isValidPaymentLink(url)) return "#";
   return url;
 }
+
+// Member profile social links (Branch 1) -- same write-time validate /
+// render-time sanitize pair as the links above, domain-restricted to each
+// platform's real profile URLs rather than accepting any https:// link
+// under a "LinkedIn" label.
+export function isValidLinkedInUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /^(www\.)?linkedin\.com$/.test(u.hostname) && u.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+export function isValidGithubUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /^(www\.)?github\.com$/.test(u.hostname) && u.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+export function isValidInstagramUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /^(www\.)?instagram\.com$/.test(u.hostname) && u.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+const SOCIAL_URL_VALIDATORS = {
+  linkedin: isValidLinkedInUrl,
+  github: isValidGithubUrl,
+  instagram: isValidInstagramUrl,
+} as const;
+
+export function safeSocialHref(
+  platform: keyof typeof SOCIAL_URL_VALIDATORS,
+  url: string | null | undefined,
+): string {
+  if (!url || !SOCIAL_URL_VALIDATORS[platform](url)) return "#";
+  return url;
+}

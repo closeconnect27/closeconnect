@@ -2,7 +2,8 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconInbox } from "@tabler/icons-react";
+import Link from "next/link";
+import { IconInbox, IconUserCircle } from "@tabler/icons-react";
 import { reviewJoinRequest } from "@/app/actions/membership";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { FormField } from "@/lib/queries/membership";
@@ -42,8 +43,20 @@ export function PendingRequests({
     <div className="flex flex-col gap-4">
       {requests.map((req) => (
         <div key={req.id} className="card-elevated rounded-card bg-bg2 p-4">
-          <div className="mb-3 text-[14px] font-bold text-text">
-            {req.profiles?.display_name ?? "Someone"}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-[14px] font-bold text-text">{req.profiles?.display_name ?? "Someone"}</span>
+            {/* profile_details_select_staff_reviewing (0033) lets staff see
+                this applicant's full profile while the request is pending,
+                regardless of their profile_visibility setting -- the
+                "judge quality before approving" case. */}
+            <Link
+              href={`/profile/${req.respondent_id}`}
+              target="_blank"
+              className="flex items-center gap-1 text-[12px] font-medium text-text3 transition hover:text-green"
+            >
+              <IconUserCircle size={14} />
+              View full profile
+            </Link>
           </div>
           {formFields.length > 0 && (
             <div className="mb-4 flex flex-col gap-2">
