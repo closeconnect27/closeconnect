@@ -38,6 +38,7 @@ export function EventRegistration({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
@@ -54,7 +55,10 @@ export function EventRegistration({
     startTransition(async () => {
       const result = await registerForEvent(eventId, { ticket_type_id: ticketTypeId, name, answers });
       if (result?.error) setError(result.error);
-      else setDone(true);
+      else {
+        setPaymentLinkUrl(result.paymentLinkUrl ?? null);
+        setDone(true);
+      }
     });
   }
 
@@ -79,12 +83,14 @@ export function EventRegistration({
         <p className="text-[15px] font-bold text-text">You&apos;re registered!</p>
         <p className="mt-1 text-[13px] text-text2">
           {selectedTicket && selectedTicket.price > 0
-            ? "Finish payment via the ticket link to confirm your spot."
+            ? paymentLinkUrl
+              ? "Finish payment via the link below to confirm your spot."
+              : "Payment setup ran into an issue -- contact the organizer to complete payment."
             : "A confirmation has been sent to your email."}
         </p>
-        {selectedTicket && selectedTicket.price > 0 && selectedTicket.payment_link && (
+        {selectedTicket && selectedTicket.price > 0 && paymentLinkUrl && (
           <a
-            href={safePaymentHref(selectedTicket.payment_link)}
+            href={safePaymentHref(paymentLinkUrl)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary mt-4 px-6 py-2.5 text-[13px]"

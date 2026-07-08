@@ -14,10 +14,12 @@ const inputClass =
 
 /**
  * Editor for an event's ticket types (SPEC.md Section 8: free + paid +
- * early-bird tiers, each with its own Razorpay link and optional quantity
- * cap). Mirrors FormBuilder's list-editor shape but for a different field
- * set -- kept separate rather than generalizing FormBuilder further since
- * ticket types aren't part of the unified form-field system.
+ * early-bird tiers, optional quantity cap). Paid tickets no longer collect
+ * a host-pasted payment link -- registerForEvent generates a fresh
+ * per-registration Razorpay Payment Link automatically (Branch 4 part 2).
+ * Mirrors FormBuilder's list-editor shape but for a different field set --
+ * kept separate rather than generalizing FormBuilder further since ticket
+ * types aren't part of the unified form-field system.
  */
 export function TicketTypeBuilder({
   tickets,
@@ -86,18 +88,9 @@ export function TicketTypeBuilder({
           </div>
 
           {t.price > 0 && (
-            <label className="mt-3 flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-text3">Payment link</span>
-              <input
-                value={t.payment_link}
-                onChange={(e) => updateTicket(i, { payment_link: e.target.value })}
-                placeholder="https://rzp.io/l/your-link"
-                className={inputClass}
-              />
-              <span className="text-[11px] text-text3">
-                Paste a Razorpay (or similar) payment link -- attendees pay via card, UPI, or netbanking through it.
-              </span>
-            </label>
+            <p className="mt-3 text-[11px] text-text3">
+              A Razorpay payment link is generated automatically for each registrant -- no link to paste here.
+            </p>
           )}
         </div>
       ))}

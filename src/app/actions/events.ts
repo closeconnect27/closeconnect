@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { createPaymentLink } from "@/lib/razorpay";
 import {
   createEventSchema,
   updateEventSchema,
@@ -122,30 +123,66 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     }
   }
 
-  const { error } = await supabase.from("form_responses").insert({
-    owner_type: "event",
-    owner_id: eventId,
-    ticket_type_id: parsed.data.ticket_type_id,
-    respondent_id: user.id,
-    // Email comes from the verified session, never client input -- a
-    // registrant can't spoof someone else's email or dodge the
-    // one-registration-per-account constraint by varying it.
-    response_data: { name: parsed.data.name, email: user.email, ...parsed.data.answers },
-    status: "approved",
-  });
+  // Needed both for the price (free tickets skip payment entirely --
+  // payment_status starts 'paid', not the column default 'unpaid', so a
+  // free RSVP doesn't sit in the funnel dashboard looking like an unpaid
+  // one forever) and for the payment link's own description/amount.
+  const ticketTypes = await getEventTicketTypes(supabase, eventId);
+  const ticketType = ticketTypes.find((t) => t.id === parsed.data.ticket_type_id);
+  if (!ticketType) return { error: "That ticket type no longer exists" };
+  const isPaid = ticketType.price > 0;
 
-  if (error) {
-    if (error.message.includes("wait a moment")) return { error: error.message };
+  const { data: registration, error } = await supabase
+    .from("form_responses")
+    .insert({
+      owner_type: "event",
+      owner_id: eventId,
+      ticket_type_id: parsed.data.ticket_type_id,
+      respondent_id: user.id,
+      // Email comes from the verified session, never client input -- a
+      // registrant can't spoof someone else's email or dodge the
+      // one-registration-per-account constraint by varying it.
+      response_data: { name: parsed.data.name, email: user.email, ...parsed.data.answers },
+      status: "approved",
+      payment_status: isPaid ? "unpaid" : "paid",
+    })
+    .select("id")
+    .single();
+
+  if (error || !registration) {
+    if (error?.message.includes("wait a moment")) return { error: error.message };
     // Raised by enforce_ticket_capacity() (0030) -- already user-facing text.
-    if (error.message.includes("sold out")) return { error: error.message };
+    if (error?.message.includes("sold out")) return { error: error.message };
     // 23505 = unique_violation -- the one-registration-per-event-respondent
     // index (0015, migrated off the old email-based one now that every
     // registrant has a real account).
-    if (error.code === "23505") {
+    if (error?.code === "23505") {
       return { error: "You've already registered for this event." };
     }
-    return { error: "Could not complete registration" };
+    return { error: error?.message ?? "Could not complete registration" };
   }
+
+  // A per-registration Razorpay Payment Link, not the ticket type's own
+  // static link -- reference_id = this registration's id is what the
+  // webhook (app/api/webhooks/razorpay) matches back to later. The
+  // registration itself is already confirmed at this point regardless of
+  // payment outcome (matching the pre-existing "approved on submit, pay
+  // after" flow) -- a failed link creation here doesn't undo it, it just
+  // means no payment link to show; the registrant/host can be pointed at
+  // support rather than losing the registration entirely.
+  let paymentLinkUrl: string | null = null;
+  if (isPaid) {
+    const linkResult = await createPaymentLink({
+      registrationId: registration.id,
+      amountRupees: ticketType.price,
+      description: `${ticketType.name} ticket`,
+      customerName: parsed.data.name,
+      customerEmail: user.email ?? "",
+    });
+    if ("url" in linkResult) paymentLinkUrl = linkResult.url;
+    else console.error("Payment link creation failed for registration", registration.id, linkResult.error);
+  }
+
   revalidatePath(`/events/${eventId}`);
   // The UI's "A confirmation has been sent to your email" line pre-dates
   // this -- it was display text with no actual send behind it (found while
@@ -157,7 +194,7 @@ export async function registerForEvent(eventId: string, input: EventRegistration
       console.error("Failed to send registration confirmation email:", e),
     );
   }
-  return { error: null };
+  return { error: null, paymentLinkUrl };
 }
 
 function formatEventDateForEmail(isoDate: string | null) {
