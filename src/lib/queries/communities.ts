@@ -28,6 +28,7 @@ export type Community = {
   member_count: number;
   status: "active" | "hidden" | "reported";
   created_at: string;
+  is_verified: boolean;
 };
 
 export type CommunityFilters = {

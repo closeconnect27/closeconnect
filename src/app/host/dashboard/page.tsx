@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
 import { getPendingJoinRequests, getCommunityFormFields } from "@/lib/queries/membership";
 import { getPendingClaims } from "@/lib/queries/claims";
+import { getPendingVerificationRequests } from "@/lib/queries/verification";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HostCommunityRow } from "@/components/host/HostCommunityRow";
 import { HostEventRow } from "@/components/host/HostEventRow";
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { PendingClaimsSection } from "@/components/communities/PendingClaimsSection";
+import { PendingVerificationRequestsSection } from "@/components/verification/PendingVerificationRequestsSection";
 
 function todayIso() {
   const d = new Date();
@@ -24,10 +26,11 @@ export default async function HostDashboardPage() {
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
   const isAdmin = !!profile?.is_admin;
 
-  const [communities, events, pendingClaims] = await Promise.all([
+  const [communities, events, pendingClaims, pendingVerifications] = await Promise.all([
     getMyCommunities(supabase, user.id),
     getMyEvents(supabase, user.id),
     isAdmin ? getPendingClaims(supabase) : Promise.resolve([]),
+    isAdmin ? getPendingVerificationRequests(supabase) : Promise.resolve([]),
   ]);
 
   const requestModeCommunities = communities.filter((c) => c.kind === "native" && c.join_mode === "request");
@@ -71,6 +74,7 @@ export default async function HostDashboardPage() {
         </div>
 
         {isAdmin && <PendingClaimsSection claims={pendingClaims} />}
+        {isAdmin && <PendingVerificationRequestsSection requests={pendingVerifications} />}
 
         {needsAttention.length > 0 && (
           <section className="mt-8">

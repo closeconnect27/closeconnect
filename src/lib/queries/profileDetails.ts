@@ -32,19 +32,24 @@ export type PublicProfileBasic = {
   host_rating: number;
   bio: string | null;
   profile_visibility: "public" | "members_only" | "private";
+  is_verified: boolean;
+  verified_phone: boolean;
+  verified_email: boolean;
 };
 
-/** display_name/avatar_url/host_rating/bio/profile_visibility are all on
- * `profiles`, not profile_details -- profiles_select_public is
+/** display_name/avatar_url/host_rating/bio/profile_visibility/is_verified
+ * are all on `profiles`, not profile_details -- profiles_select_public is
  * unrestricted (0001_init.sql), so this always resolves for any real
  * profile id. bio lives here specifically so it's visible regardless of
  * profile_visibility (0035); profile_visibility itself has to be readable
  * by everyone too, or a viewer could never be shown a "Request to follow"
- * button on a private profile in the first place. */
+ * button on a private profile in the first place. Verification status
+ * (0037) is likewise meant to be publicly visible -- a badge no one but
+ * the owner could see wouldn't do anything. */
 export async function getPublicProfileBasic(supabase: SupabaseClient, profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_url, host_rating, bio, profile_visibility")
+    .select("id, display_name, avatar_url, host_rating, bio, profile_visibility, is_verified, verified_phone, verified_email")
     .eq("id", profileId)
     .maybeSingle();
   if (error) throw error;

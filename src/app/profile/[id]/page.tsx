@@ -13,6 +13,7 @@ import {
   IconPencil,
   IconStar,
   IconMapPin,
+  IconUsersGroup,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -22,9 +23,12 @@ import {
   getEventsAttendedPublic,
   getFollowRequestStatus,
 } from "@/lib/queries/profileDetails";
+import { getOrganizerStats } from "@/lib/queries/verification";
 import { getCategoryVisual } from "@/lib/categories";
 import { safeSocialHref } from "@/lib/validators/links";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StatCard } from "@/components/ui/StatCard";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
 
 // bio/profile_visibility come from `basic` (profiles, always public, 0035)
@@ -45,7 +49,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const basic = await getPublicProfileBasic(supabase, id);
   if (!basic) notFound();
 
-  const details = await getProfileDetails(supabase, id);
+  const [details, stats] = await Promise.all([
+    getProfileDetails(supabase, id),
+    getOrganizerStats(supabase, id),
+  ]);
   const isOwner = viewer?.id === id;
 
   const initial = basic.display_name.charAt(0).toUpperCase();
@@ -63,7 +70,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-heading text-[16px] font-bold">{basic.display_name}</h1>
+            <h1 className="flex items-center gap-1.5 truncate font-heading text-[16px] font-bold">
+              {basic.display_name}
+              {basic.is_verified && <VerifiedBadge />}
+            </h1>
             {basic.host_rating > 0 && (
               <span className="flex items-center gap-1 text-[13px] text-text3">
                 <IconStar size={13} className="fill-green text-green" />
@@ -82,6 +92,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         {/* Always visible regardless of profile_visibility (0035) -- bio
             lives on `profiles`, not the gated profile_details. */}
         {basic.bio && <p className="mt-6 whitespace-pre-wrap text-[14px] leading-relaxed text-text2">{basic.bio}</p>}
+
+        {/* Organizer stats: computed live (getOrganizerStats), not stored --
+            shown whenever there's anything to show, same as bio, regardless
+            of profile_visibility (these are aggregate counts, not the
+            gated detail fields). Hidden entirely for a non-organizer so an
+            ordinary member's profile doesn't show a row of zeros. */}
+        {(stats.communitiesCreated > 0 || stats.eventsHosted > 0) && (
+          <div className="mt-4 flex gap-3">
+            <StatCard icon={IconUsers} label="Communities created" value={stats.communitiesCreated} />
+            <StatCard icon={IconCalendarEvent} label="Events hosted" value={stats.eventsHosted} />
+            <StatCard icon={IconUsersGroup} label="Members managed" value={stats.totalMembersManaged} />
+          </div>
+        )}
 
         {!details && !isOwner ? (
           <RestrictedProfileNotice

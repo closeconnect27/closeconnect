@@ -5,14 +5,21 @@ import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
 import { updateProfile } from "@/app/actions/profile";
 import { updateProfileSchema } from "@/lib/validation/profile";
+import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import type { ProfileDetails, PublicProfileBasic } from "@/lib/queries/profileDetails";
+import type { VerificationRequestStatus } from "@/lib/queries/verification";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
 const VISIBILITY_OPTIONS = [
   { value: "public" as const, label: "Public", hint: "Anyone can view your full profile." },
-  { value: "members_only" as const, label: "Members only", hint: "Only people signed in can view it." },
+  {
+    value: "members_only" as const,
+    label: "Members only",
+    hint: "Only people who share a community with you can view it.",
+  },
   {
     value: "private" as const,
     label: "Private",
@@ -25,7 +32,15 @@ const VISIBILITY_OPTIONS = [
 // form since a viewer editing their own profile doesn't need to think
 // about that split; updateProfile writes each field back to the table it
 // actually lives on.
-export function EditProfileForm({ basic, details }: { basic: PublicProfileBasic; details: ProfileDetails }) {
+export function EditProfileForm({
+  basic,
+  details,
+  verificationStatus,
+}: {
+  basic: PublicProfileBasic;
+  details: ProfileDetails;
+  verificationStatus: VerificationRequestStatus;
+}) {
   const router = useRouter();
   const [bio, setBio] = useState(basic.bio ?? "");
   const [occupation, setOccupation] = useState(details.occupation ?? "");
@@ -80,7 +95,28 @@ export function EditProfileForm({ basic, details }: { basic: PublicProfileBasic;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-3 rounded-card border border-border2 p-4">
+        <div>
+          <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
+            Organizer verification
+            {basic.is_verified && <VerifiedBadge />}
+          </span>
+          <p className="mt-1 text-[12px] text-text3">
+            {basic.is_verified
+              ? "You're a verified organizer."
+              : "A verified badge shows you've been reviewed by an admin."}
+          </p>
+        </div>
+        <RequestVerificationButton
+          targetType="organizer"
+          targetId={basic.id}
+          isVerified={basic.is_verified}
+          initialStatus={verificationStatus}
+        />
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <Field label="Bio">
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={1000} className={inputClass} />
       </Field>
@@ -182,7 +218,8 @@ export function EditProfileForm({ basic, details }: { basic: PublicProfileBasic;
       <button type="submit" disabled={pending} className="btn-primary py-3 text-[15px]">
         {pending ? "Saving…" : "Save profile"}
       </button>
-    </form>
+      </form>
+    </div>
   );
 }
 

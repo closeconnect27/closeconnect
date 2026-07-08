@@ -6,11 +6,14 @@ import { updateCommunitySchema } from "@/lib/validation/community";
 import { updateCommunity } from "@/app/actions/communities";
 import { CommunityImageUploader } from "@/components/communities/CommunityImageUploader";
 import { CommunityImageGalleryUploader } from "@/components/communities/CommunityImageGalleryUploader";
+import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { CITY_OPTIONS } from "@/lib/cities";
 import type { Community, CommunityImage } from "@/lib/queries/communities";
+import type { VerificationRequestStatus } from "@/lib/queries/verification";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -22,7 +25,15 @@ const inputClass =
 // community_type (not named in the editable-fields list this was scoped
 // against). Both the Server Action and RLS (0017) enforce this
 // independently of what this form does or doesn't show.
-export function EditCommunityForm({ community, images }: { community: Community; images: CommunityImage[] }) {
+export function EditCommunityForm({
+  community,
+  images,
+  verificationStatus,
+}: {
+  community: Community;
+  images: CommunityImage[];
+  verificationStatus: VerificationRequestStatus;
+}) {
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description);
   const [category, setCategory] = useState<CategorySlug>(community.category as CategorySlug);
@@ -65,6 +76,26 @@ export function EditCommunityForm({ community, images }: { community: Community;
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-3 rounded-card border border-border2 p-4">
+        <div>
+          <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
+            Verification
+            {community.is_verified && <VerifiedBadge />}
+          </span>
+          <p className="mt-1 text-[12px] text-text3">
+            {community.is_verified
+              ? "This community is verified."
+              : "A verified badge shows this community has been reviewed by an admin."}
+          </p>
+        </div>
+        <RequestVerificationButton
+          targetType="community"
+          targetId={community.id}
+          isVerified={community.is_verified}
+          initialStatus={verificationStatus}
+        />
+      </div>
+
       <div className="flex flex-wrap gap-6">
         <CommunityImageUploader
           communityId={community.id}

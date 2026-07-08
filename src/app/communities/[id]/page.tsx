@@ -27,6 +27,7 @@ import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
 import { ClaimSection } from "@/components/communities/ClaimSection";
 import { Linkify } from "@/components/ui/Linkify";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -127,7 +128,10 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               className="h-12 w-12 shrink-0 rounded-full border border-border bg-bg2 object-cover"
             />
           )}
-          <h1 className="font-heading text-[18px] font-bold leading-tight">{community.name}</h1>
+          <h1 className="flex items-center gap-1.5 font-heading text-[18px] font-bold leading-tight">
+            {community.name}
+            {community.is_verified && <VerifiedBadge />}
+          </h1>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">

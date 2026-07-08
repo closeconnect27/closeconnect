@@ -5,6 +5,7 @@ import type { Community } from "@/lib/queries/communities";
 import { JoinBadge } from "@/components/communities/JoinBadge";
 import { ClickableCard } from "@/components/ui/ClickableCard";
 import { CategoryImage } from "@/components/ui/CategoryImage";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -76,7 +77,10 @@ export function CommunityCard({ community: c }: { community: Community }) {
           >
             {visual.label}
           </span>
-          <h3 className="line-clamp-2 font-heading text-[18px] font-bold leading-tight text-white">{c.name}</h3>
+          <h3 className="flex items-center gap-1.5 line-clamp-2 font-heading text-[18px] font-bold leading-tight text-white">
+            {c.name}
+            {c.is_verified && <VerifiedBadge />}
+          </h3>
         </div>
       </div>
 
