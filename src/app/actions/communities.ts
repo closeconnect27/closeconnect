@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { getCommunityImages } from "@/lib/queries/communities";
 import {
   createCommunitySchema,
   updateCommunitySchema,
@@ -182,6 +183,52 @@ export async function removeCommunityImage(communityId: string, kind: CommunityI
     .eq("id", communityId);
   if (error) return { error: error.message };
 
+  revalidatePath(`/communities/${communityId}`);
+  return { error: null };
+}
+
+// Mirrors addEventImage/removeEventImage exactly (0003_event_images.sql's
+// pattern) -- a gallery separate from the single logo/cover, same shape,
+// same defense-in-depth. RLS (community_images_insert_staff/delete_staff,
+// 0032) is the real gate; a non-staff caller's insert/delete simply matches
+// zero rows or fails RLS rather than this action needing its own duplicate
+// ownership check.
+export async function addCommunityImage(communityId: string, imageUrl: string) {
+  await requireUser();
+
+  // community_images is publicly rendered -- without this, staff (the only
+  // caller RLS lets reach the insert) could point it at an arbitrary
+  // external URL instead of a real upload, bypassing the storage bucket's
+  // own type/size limits entirely.
+  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/community-images/${communityId}/`;
+  if (!imageUrl.startsWith(expectedPrefix)) {
+    return { error: "Image must come from this community's own upload" };
+  }
+
+  const supabase = await createClient();
+
+  const existing = await getCommunityImages(supabase, communityId);
+  if (existing.length >= 5) {
+    return { error: "A community can have at most 5 images" };
+  }
+
+  const { error } = await supabase.from("community_images").insert({
+    community_id: communityId,
+    image_url: imageUrl,
+    sort_order: existing.length,
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/communities/${communityId}`);
+  return { error: null };
+}
+
+export async function removeCommunityImageFromGallery(communityId: string, imageId: string, storagePath: string) {
+  await requireUser();
+  const supabase = await createClient();
+
+  await supabase.storage.from("community-images").remove([storagePath]);
+  const { error } = await supabase.from("community_images").delete().eq("id", imageId);
+  if (error) return { error: error.message };
   revalidatePath(`/communities/${communityId}`);
   return { error: null };
 }

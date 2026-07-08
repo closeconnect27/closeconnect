@@ -223,8 +223,8 @@ export async function addEventImage(eventId: string, imageUrl: string) {
   const supabase = await createClient();
 
   const existing = await getEventImages(supabase, eventId);
-  if (existing.length >= 3) {
-    return { error: "An event can have at most 3 images" };
+  if (existing.length >= 5) {
+    return { error: "An event can have at most 5 images" };
   }
 
   const { error } = await supabase.from("event_images").insert({

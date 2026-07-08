@@ -55,9 +55,18 @@ export function EventCard({ event: e }: { event: EventListItem }) {
       </div>
 
       <div className="flex flex-col gap-1 p-4">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-text2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-text2">
           {e.host && <span>by {e.host.display_name}</span>}
-          {e.community && <span className="text-green">· {e.community.name}</span>}
+          {e.community && (
+            <span className="flex items-center gap-1.5 text-green">
+              ·
+              {e.community.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
+                <img src={e.community.logo_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+              ) : null}
+              {e.community.name}
+            </span>
+          )}
         </div>
 
         {(e.venue || e.city) && (

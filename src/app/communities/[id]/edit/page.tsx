@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getCommunityById } from "@/lib/queries/communities";
+import { getCommunityById, getCommunityImages } from "@/lib/queries/communities";
 import { EditCommunityForm } from "@/components/communities/EditCommunityForm";
 
 export default async function EditCommunityPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +25,8 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
     redirect(`/communities/${id}`);
   }
 
+  const images = await getCommunityImages(supabase, id);
+
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-lg">
@@ -35,7 +37,7 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
           ← Back to community
         </Link>
         <h1 className="mb-6 font-heading text-[18px] font-bold leading-tight">Edit community</h1>
-        <EditCommunityForm community={community} />
+        <EditCommunityForm community={community} images={images} />
       </div>
     </div>
   );
