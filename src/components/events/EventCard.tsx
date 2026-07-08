@@ -62,7 +62,7 @@ export function EventCard({ event: e }: { event: EventListItem }) {
               ·
               {e.community.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-                <img src={e.community.logo_url} alt="" className="h-4 w-4 rounded-full object-contain" />
+                <img src={e.community.logo_url} alt="" className="h-4 w-4 rounded-full object-scale-down" />
               ) : null}
               {e.community.name}
             </span>

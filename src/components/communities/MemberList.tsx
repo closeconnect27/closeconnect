@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { IconUsers, IconSearch, IconUserMinus } from "@tabler/icons-react";
 import { removeMember } from "@/app/actions/membership";
 
@@ -88,13 +89,13 @@ export function MemberList({
 
             return (
               <div key={m.user_id} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-green">
+                <Link href={`/profile/${m.user_id}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-tint text-[11px] font-bold text-green">
                   {name.charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-text">
+                </Link>
+                <Link href={`/profile/${m.user_id}`} className="min-w-0 flex-1 truncate text-[13px] text-text hover:text-green hover:underline">
                   {name}
                   {displayRole !== "Member" && <span className="ml-2 font-semibold text-green">· {displayRole}</span>}
-                </span>
+                </Link>
 
                 {canRemove &&
                   (removingId === m.user_id ? (

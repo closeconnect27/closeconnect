@@ -24,7 +24,7 @@ import {
   getFollowRequestStatus,
 } from "@/lib/queries/profileDetails";
 import { getOrganizerStats } from "@/lib/queries/verification";
-import { getCategoryVisual } from "@/lib/categories";
+import { getCategoryVisual, getCategory } from "@/lib/categories";
 import { safeSocialHref } from "@/lib/validators/links";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
@@ -249,6 +249,20 @@ async function ProfileDetailSections({
         </div>
       )}
 
+      {details.interests && details.interests.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {details.interests.map((slug) => {
+            const cat = getCategory(slug);
+            return (
+              <span key={slug} className="flex items-center gap-1.5 rounded-full border border-border2 px-3 py-1.5 text-[12px] font-medium text-text2">
+                {cat && <span>{cat.emoji}</span>}
+                {cat?.label ?? slug}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       <section className="mt-8">
         <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Communities</h2>
         {communities.length === 0 ? (
@@ -265,7 +279,7 @@ async function ProfileDetailSections({
                 >
                   {c.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-                    <img src={c.logo_url} alt="" className="h-6 w-6 rounded-full object-contain" />
+                    <img src={c.logo_url} alt="" className="h-6 w-6 rounded-full object-scale-down" />
                   ) : (
                     <span
                       className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"

@@ -37,12 +37,16 @@ export function CommunityCard({ community: c }: { community: Community }) {
           // with object-cover would crop/distort it, so it's shown
           // contained and centered instead, like a badge on the category
           // color, rather than the generic Unsplash placeholder.
+          // object-scale-down (not object-contain) -- contain still
+          // upscales a logo smaller than this 112px box to fill it, which
+          // reads as blurry/"enlarged" next to the actual uploaded file;
+          // scale-down never grows the image past its own native size.
           <div className="flex h-full w-full items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns */}
             <img
               src={c.logo_url}
               alt=""
-              className="h-28 w-28 rounded-full border-4 border-white/20 bg-bg2 object-contain shadow-lg"
+              className="h-28 w-28 rounded-full border-4 border-white/20 bg-bg2 object-scale-down shadow-lg"
             />
           </div>
         ) : (

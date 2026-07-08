@@ -7,8 +7,12 @@ import { updateProfile } from "@/app/actions/profile";
 import { updateProfileSchema } from "@/lib/validation/profile";
 import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { MultiCombobox } from "@/components/ui/MultiCombobox";
+import { CATEGORIES } from "@/lib/categories";
 import type { ProfileDetails, PublicProfileBasic } from "@/lib/queries/profileDetails";
 import type { VerificationRequestStatus } from "@/lib/queries/verification";
+
+const INTEREST_OPTIONS = CATEGORIES.map((c) => ({ value: c.slug, label: `${c.emoji} ${c.label}` }));
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -51,6 +55,7 @@ export function EditProfileForm({
   const [instagramUrl, setInstagramUrl] = useState(details.instagram_url ?? "");
   const [skills, setSkills] = useState<string[]>(details.skills);
   const [skillDraft, setSkillDraft] = useState("");
+  const [interests, setInterests] = useState<string[]>(details.interests ?? []);
   const [visibility, setVisibility] = useState(basic.profile_visibility);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -78,6 +83,7 @@ export function EditProfileForm({
       github_url: githubUrl || undefined,
       instagram_url: instagramUrl || undefined,
       skills,
+      interests,
       profile_visibility: visibility,
     };
 
@@ -167,6 +173,10 @@ export function EditProfileForm({
             className={`mt-2 ${inputClass}`}
           />
         )}
+      </Field>
+
+      <Field label="Interests (up to 10)">
+        <MultiCombobox values={interests} onChange={setInterests} options={INTEREST_OPTIONS} placeholder="Choose interests" />
       </Field>
 
       <Field label="LinkedIn (optional)">

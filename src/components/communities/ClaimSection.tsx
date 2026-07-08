@@ -13,10 +13,12 @@ export function ClaimSection({
   communityId,
   claimStatus,
   isLoggedIn,
+  email,
 }: {
   communityId: string;
   claimStatus: "unclaimed" | "pending" | "approved" | "rejected";
   isLoggedIn: boolean;
+  email?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -46,7 +48,7 @@ export function ClaimSection({
         <IconBadge size={14} />
         Claim this community
       </button>
-      {open && <ClaimCommunityModal communityId={communityId} onClose={() => setOpen(false)} />}
+      {open && <ClaimCommunityModal communityId={communityId} email={email} onClose={() => setOpen(false)} />}
     </>
   );
 }

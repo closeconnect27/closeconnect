@@ -121,11 +121,14 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
         <div className="flex items-center gap-3">
           {community.logo_url && (
+            // object-scale-down, not object-cover -- cover crops/zooms into
+            // a non-square logo instead of showing it as uploaded, same fix
+            // already applied to the browse-grid card (CommunityCard).
             // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
             <img
               src={community.logo_url}
               alt=""
-              className="h-12 w-12 shrink-0 rounded-full border border-border bg-bg2 object-cover"
+              className="h-12 w-12 shrink-0 rounded-full border border-border bg-bg2 object-scale-down"
             />
           )}
           <h1 className="flex items-center gap-1.5 font-heading text-[18px] font-bold leading-tight">
@@ -252,7 +255,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
         {!isNative && (
           <div className="mt-8">
-            <ClaimSection communityId={community.id} claimStatus={community.claim_status} isLoggedIn={!!user} />
+            <ClaimSection communityId={community.id} claimStatus={community.claim_status} isLoggedIn={!!user} email={user?.email} />
           </div>
         )}
 

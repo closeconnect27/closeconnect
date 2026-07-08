@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sendEmail } from "@/lib/email";
 import { requestVerificationSchema, type RequestVerificationInput } from "@/lib/validation/verification";
 
 export async function requestCommunityVerification(communityId: string, input: RequestVerificationInput) {
@@ -32,6 +33,11 @@ export async function requestCommunityVerification(communityId: string, input: R
 
   revalidatePath(`/communities/${communityId}`);
   revalidatePath(`/communities/${communityId}/edit`);
+
+  const { data: community } = await supabase.from("communities").select("name").eq("id", communityId).maybeSingle();
+  notifyAdminOfVerificationRequest("community", community?.name ?? "a community").catch((e) =>
+    console.error("Failed to send verification request notification email:", e),
+  );
   return { error: null };
 }
 
@@ -59,7 +65,34 @@ export async function requestOrganizerVerification(input: RequestVerificationInp
 
   revalidatePath("/profile");
   revalidatePath(`/profile/${user.id}`);
+
+  const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+  notifyAdminOfVerificationRequest("organizer", profile?.display_name ?? "A user").catch((e) =>
+    console.error("Failed to send verification request notification email:", e),
+  );
   return { error: null };
+}
+
+// Fire-and-forget, same shape as notifyAdminOfPendingClaim (communities.ts)
+// -- never blocks the requester's own submission on email delivery, and no
+// one-click approve/reject links (unlike claims): verification review has
+// no equivalent throwaway "reject with no downside" action, and always
+// happens from the dashboard already.
+async function notifyAdminOfVerificationRequest(targetType: "community" | "organizer", label: string) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) return;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const dashboardLink = `${siteUrl}/host/dashboard#pending-verifications`;
+
+  await sendEmail({
+    to: adminEmail,
+    subject: `New ${targetType} verification request: ${label}`,
+    html: `
+      <p>A new ${targetType} verification request${targetType === "community" ? ` for <strong>${label}</strong>` : ` from <strong>${label}</strong>`} is waiting for review.</p>
+      <p><a href="${dashboardLink}">Review in dashboard</a></p>
+    `,
+  });
 }
 
 export async function reviewVerificationRequest(

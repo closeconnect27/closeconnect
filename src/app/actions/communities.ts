@@ -49,6 +49,12 @@ export async function createCommunity(input: CreateCommunityInput) {
     .single();
 
   if (error || !community) {
+    // 23505 = unique_violation -- communities_unique_name_per_category_native
+    // (0043): another native community already has this name in this
+    // category.
+    if (error?.code === "23505") {
+      return { error: "A community with this name already exists in this category." };
+    }
     return { error: error?.message ?? "Could not create community" };
   }
 
@@ -123,7 +129,12 @@ export async function updateCommunity(communityId: string, input: UpdateCommunit
     })
     .eq("id", communityId);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "A community with this name already exists in this category." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath(`/communities/${communityId}`);
   redirect(`/communities/${communityId}`);
@@ -303,6 +314,18 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
     return { error: "This community already has a claim in progress or an owner" };
   }
 
+  // Email comes from the signed-in session, never a client-supplied value
+  // -- same fix as event registration's email field. A free-text email
+  // input here was never checked against anything, so anyone could type a
+  // random address and still have the claim granted to their real
+  // claimant_user_id regardless -- the field looked like verification but
+  // wasn't. If a user's account somehow has no email (e.g. phone-only
+  // auth), this fails closed with a clear message rather than sending
+  // admins an empty contact field.
+  if (!user.email) {
+    return { error: "Your account needs an email on file to submit a claim." };
+  }
+
   const { data: claim, error } = await supabase
     .from("claims")
     .insert({
@@ -310,7 +333,7 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
       claimant_user_id: user.id,
       name: data.name,
       phone: data.phone,
-      email: data.email,
+      email: user.email,
       proof: data.proof || null,
     })
     .select("id")

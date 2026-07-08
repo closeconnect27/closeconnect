@@ -41,6 +41,7 @@ export async function updateProfile(input: UpdateProfileInput) {
       github_url: data.github_url || null,
       instagram_url: data.instagram_url || null,
       skills: data.skills,
+      interests: data.interests,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);

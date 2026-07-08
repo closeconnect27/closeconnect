@@ -6,11 +6,18 @@ import { IconX } from "@tabler/icons-react";
 import { claimCommunitySchema } from "@/lib/validation/community";
 import { submitCommunityClaim } from "@/app/actions/communities";
 
-export function ClaimCommunityModal({ communityId, onClose }: { communityId: string; onClose: () => void }) {
+export function ClaimCommunityModal({
+  communityId,
+  email,
+  onClose,
+}: {
+  communityId: string;
+  email?: string;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [proof, setProof] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [error, setError] = useState("");
@@ -20,7 +27,7 @@ export function ClaimCommunityModal({ communityId, onClose }: { communityId: str
     e.preventDefault();
     setError("");
 
-    const parsed = claimCommunitySchema.safeParse({ name, phone, email, proof: proof || undefined });
+    const parsed = claimCommunitySchema.safeParse({ name, phone, proof: proof || undefined });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
@@ -75,14 +82,10 @@ export function ClaimCommunityModal({ communityId, onClose }: { communityId: str
               required
               className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
             />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-              className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
-            />
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-text3">We&apos;ll contact you at</span>
+              <p className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] text-text2">{email}</p>
+            </div>
             <textarea
               value={proof}
               onChange={(e) => setProof(e.target.value)}

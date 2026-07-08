@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidLinkedInUrl, isValidGithubUrl, isValidInstagramUrl } from "@/lib/validators/links";
+import { isCategorySlug } from "@/lib/categories";
 
 // Forms convert an empty input to `undefined` before this runs (matching
 // the cityField/extra_cities pattern in validation/community.ts), so a
@@ -20,6 +21,7 @@ export const updateProfileSchema = z.object({
   github_url: githubField,
   instagram_url: instagramField,
   skills: z.array(z.string().trim().min(1).max(40)).max(15).default([]),
+  interests: z.array(z.string().refine(isCategorySlug)).max(10).default([]),
   profile_visibility: z.enum(["public", "members_only", "private"]),
 });
 

@@ -143,7 +143,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </div>
 
         {event.host && (
-          <div className="mt-4 flex items-center gap-3 rounded-card-sm border border-border bg-bg2 px-4 py-3">
+          <Link
+            href={`/profile/${event.host.id}`}
+            className="mt-4 flex items-center gap-3 rounded-card-sm border border-border bg-bg2 px-4 py-3 transition hover:border-green"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-tint text-[13px] font-bold text-green">
               {event.host.display_name.charAt(0).toUpperCase()}
             </div>
@@ -156,7 +159,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 </p>
               )}
             </div>
-          </div>
+          </Link>
         )}
 
         {event.description && (

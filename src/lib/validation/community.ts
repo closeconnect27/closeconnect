@@ -87,10 +87,14 @@ export const submitExternalCommunitySchema = z
 
 export type SubmitExternalCommunityInput = z.infer<typeof submitExternalCommunitySchema>;
 
+// No email field -- it used to be a free-text input nobody validated
+// against anything (any string passed the schema and the claim was still
+// granted to the real signed-in claimant_user_id regardless), which meant
+// it looked like a check that did nothing. The real contact email is the
+// claimant's own session email, taken server-side in submitCommunityClaim.
 export const claimCommunitySchema = z.object({
   name: z.string().trim().min(2, "Your name must be at least 2 characters").max(100),
   phone: z.string().trim().min(6, "Enter a valid phone number").max(20),
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
   proof: z.string().trim().max(500).optional(),
 });
 
