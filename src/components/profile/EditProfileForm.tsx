@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
 import { updateProfile } from "@/app/actions/profile";
 import { updateProfileSchema } from "@/lib/validation/profile";
-import type { ProfileDetails } from "@/lib/queries/profileDetails";
+import type { ProfileDetails, PublicProfileBasic } from "@/lib/queries/profileDetails";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -13,12 +13,21 @@ const inputClass =
 const VISIBILITY_OPTIONS = [
   { value: "public" as const, label: "Public", hint: "Anyone can view your full profile." },
   { value: "members_only" as const, label: "Members only", hint: "Only people signed in can view it." },
-  { value: "private" as const, label: "Private", hint: "Only you can view it." },
+  {
+    value: "private" as const,
+    label: "Private",
+    hint: "People must send a follow request, which you approve, before they can view it.",
+  },
 ];
 
-export function EditProfileForm({ details }: { details: ProfileDetails }) {
+// bio/profile_visibility come from `basic` (profiles, always public) --
+// the rest from `details` (profile_details, gated). Both land in the same
+// form since a viewer editing their own profile doesn't need to think
+// about that split; updateProfile writes each field back to the table it
+// actually lives on.
+export function EditProfileForm({ basic, details }: { basic: PublicProfileBasic; details: ProfileDetails }) {
   const router = useRouter();
-  const [bio, setBio] = useState(details.bio ?? "");
+  const [bio, setBio] = useState(basic.bio ?? "");
   const [occupation, setOccupation] = useState(details.occupation ?? "");
   const [company, setCompany] = useState(details.company ?? "");
   const [college, setCollege] = useState(details.college ?? "");
@@ -27,7 +36,7 @@ export function EditProfileForm({ details }: { details: ProfileDetails }) {
   const [instagramUrl, setInstagramUrl] = useState(details.instagram_url ?? "");
   const [skills, setSkills] = useState<string[]>(details.skills);
   const [skillDraft, setSkillDraft] = useState("");
-  const [visibility, setVisibility] = useState(details.profile_visibility);
+  const [visibility, setVisibility] = useState(basic.profile_visibility);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 

@@ -20,19 +20,20 @@ import {
   getPublicProfileBasic,
   getCommunitiesJoinedPublic,
   getEventsAttendedPublic,
+  getFollowRequestStatus,
 } from "@/lib/queries/profileDetails";
 import { getCategoryVisual } from "@/lib/categories";
 import { safeSocialHref } from "@/lib/validators/links";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
 
-// The base `profiles` row (display_name/avatar_url/host_rating) always
-// resolves -- profiles_select_public is unrestricted. profile_details
-// coming back null is the one signal that matters here: either this id
-// doesn't exist as a profile at all, or profile_visibility says this
-// viewer can't see it. Both render the same "private" state deliberately
-// (SPEC.md Section 11 pattern: don't leak which case it is via a different
-// message -- a 404-shaped id and a real private profile should look
-// identical to an unauthorized viewer).
+// bio/profile_visibility come from `basic` (profiles, always public, 0035)
+// -- always resolves for any real profile id and shows regardless of
+// visibility. `details` (profile_details) coming back null is the signal
+// that the *rest* of the profile isn't visible to this viewer; which
+// message to show for that depends on basic.profile_visibility, which is
+// itself always readable (a viewer needs to know a profile is private in
+// order to see a "Request to follow" button, same as Instagram's lock icon).
 export default async function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -78,18 +79,75 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           )}
         </div>
 
-        {!details ? (
-          <div className="mt-8">
-            <EmptyState icon={IconLock} title="This profile is private" compact />
-          </div>
-        ) : (
-          <ProfileDetailSections
-            details={details}
-            profileId={id}
+        {/* Always visible regardless of profile_visibility (0035) -- bio
+            lives on `profiles`, not the gated profile_details. */}
+        {basic.bio && <p className="mt-6 whitespace-pre-wrap text-[14px] leading-relaxed text-text2">{basic.bio}</p>}
+
+        {!details && !isOwner ? (
+          <RestrictedProfileNotice
+            visibility={basic.profile_visibility}
+            hasViewer={!!viewer}
+            targetId={id}
             supabase={supabase}
-            isMembersOnlyGate={details.profile_visibility === "members_only" && !viewer}
+            viewerId={viewer?.id ?? null}
           />
-        )}
+        ) : details ? (
+          <ProfileDetailSections details={details} profileId={id} supabase={supabase} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+async function RestrictedProfileNotice({
+  visibility,
+  hasViewer,
+  targetId,
+  viewerId,
+  supabase,
+}: {
+  visibility: "public" | "members_only" | "private";
+  hasViewer: boolean;
+  targetId: string;
+  viewerId: string | null;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  if (visibility === "members_only" && !hasViewer) {
+    return (
+      <div className="mt-8">
+        <EmptyState icon={IconLock} title="Sign in to view this profile" compact />
+      </div>
+    );
+  }
+
+  if (visibility === "members_only") {
+    return (
+      <div className="mt-8">
+        <EmptyState
+          icon={IconUsers}
+          title="Only shared community members can view this profile"
+          compact
+        />
+      </div>
+    );
+  }
+
+  // private
+  if (!hasViewer) {
+    return (
+      <div className="mt-8">
+        <EmptyState icon={IconLock} title="Sign in to request to view this profile" compact />
+      </div>
+    );
+  }
+
+  const requestStatus = await getFollowRequestStatus(supabase, targetId, viewerId);
+
+  return (
+    <div className="mt-8">
+      <EmptyState icon={IconLock} title="This profile is private" compact />
+      <div className="mt-4 flex justify-center">
+        <RequestToFollowButton targetId={targetId} initialStatus={requestStatus} />
       </div>
     </div>
   );
@@ -99,25 +157,11 @@ async function ProfileDetailSections({
   details,
   profileId,
   supabase,
-  isMembersOnlyGate,
 }: {
   details: NonNullable<Awaited<ReturnType<typeof getProfileDetails>>>;
   profileId: string;
   supabase: Awaited<ReturnType<typeof createClient>>;
-  isMembersOnlyGate: boolean;
 }) {
-  // This shouldn't actually be reachable -- if visibility is members_only
-  // and there's no viewer, RLS would have already returned null for
-  // `details` upstream. Kept as a defensive second check rather than
-  // trusting that the caller always evaluates it in the same order.
-  if (isMembersOnlyGate) {
-    return (
-      <div className="mt-8">
-        <EmptyState icon={IconLock} title="Sign in to view this profile" compact />
-      </div>
-    );
-  }
-
   const [communities, events] = await Promise.all([
     getCommunitiesJoinedPublic(supabase, profileId),
     getEventsAttendedPublic(supabase, profileId),
@@ -131,8 +175,6 @@ async function ProfileDetailSections({
 
   return (
     <>
-      {details.bio && <p className="mt-6 whitespace-pre-wrap text-[14px] leading-relaxed text-text2">{details.bio}</p>}
-
       {(details.occupation || details.company || details.college) && (
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-text3">
           {details.occupation && (

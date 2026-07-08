@@ -17,15 +17,23 @@ export async function updateProfile(input: UpdateProfileInput) {
 
   const supabase = await createClient();
 
-  // RLS (profile_details_update_own, 0033) backs this up independently, but
-  // .eq("id", user.id) means this can only ever target the caller's own
-  // row regardless -- no separate ownership check needed the way
+  // Split across two tables (0035): bio/profile_visibility live on
+  // `profiles` (always public -- see getPublicProfileBasic), the rest on
+  // profile_details (gated by visibility). RLS backs both up independently
+  // (profiles_update_own, profile_details_update_own), but .eq("id",
+  // user.id) means this can only ever target the caller's own rows
+  // regardless -- no separate ownership check needed the way
   // updateCommunity/updateEvent need one (those take a foreign id as an
   // argument; this doesn't).
-  const { error } = await supabase
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ bio: data.bio || null, profile_visibility: data.profile_visibility })
+    .eq("id", user.id);
+  if (profileError) return { error: profileError.message };
+
+  const { error: detailsError } = await supabase
     .from("profile_details")
     .update({
-      bio: data.bio || null,
       occupation: data.occupation || null,
       company: data.company || null,
       college: data.college || null,
@@ -33,15 +41,60 @@ export async function updateProfile(input: UpdateProfileInput) {
       github_url: data.github_url || null,
       instagram_url: data.instagram_url || null,
       skills: data.skills,
-      profile_visibility: data.profile_visibility,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
-
-  if (error) return { error: error.message };
+  if (detailsError) return { error: detailsError.message };
 
   revalidatePath("/profile");
   revalidatePath("/profile/edit");
   revalidatePath(`/profile/${user.id}`);
+  return { error: null };
+}
+
+export async function requestToFollowProfile(targetId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("profile_follow_requests").insert({
+    requester_id: user.id,
+    target_id: targetId,
+  });
+
+  if (error) {
+    // 23505 = unique_violation -- profile_follow_requests_one_pending
+    // (0035): a request is already pending, submitted in the moment
+    // between this page loading and this click.
+    if (error.code === "23505") return { error: "You've already requested to follow this profile." };
+    // 23514 = check_violation -- the requester_id != target_id check
+    // (0035), reachable if the UI's own guard against requesting your own
+    // profile were ever bypassed.
+    if (error.code === "23514") return { error: "You can't follow your own profile." };
+    return { error: error.message };
+  }
+
+  revalidatePath(`/profile/${targetId}`);
+  return { error: null };
+}
+
+export async function reviewFollowRequest(requestId: string, decision: "accepted" | "rejected") {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS (pfr_update_target, 0035) is the real gate -- a non-target caller's
+  // update simply matches zero rows rather than erroring.
+  const { data, error } = await supabase
+    .from("profile_follow_requests")
+    .update({ status: decision, reviewed_at: new Date().toISOString() })
+    .eq("id", requestId)
+    .eq("target_id", user.id)
+    .select("requester_id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/profile");
+  revalidatePath(`/profile/${user.id}`);
+  if (data) revalidatePath(`/profile/${data.requester_id}`);
   return { error: null };
 }

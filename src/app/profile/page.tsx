@@ -4,8 +4,10 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
 import { getMyJoinedCommunities, getMyRegisteredEvents } from "@/lib/queries/profile";
+import { getIncomingFollowRequests } from "@/lib/queries/profileDetails";
 import { HostCommunityRow } from "@/components/host/HostCommunityRow";
 import { RegisteredEventRow } from "@/components/profile/RegisteredEventRow";
+import { IncomingFollowRequests } from "@/components/profile/IncomingFollowRequests";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 function todayIso() {
@@ -26,9 +28,10 @@ export default async function ProfilePage() {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   const initial = (profile?.display_name ?? user.email ?? "?").charAt(0).toUpperCase();
 
-  const [joinedCommunities, registeredEvents] = await Promise.all([
+  const [joinedCommunities, registeredEvents, incomingFollowRequests] = await Promise.all([
     getMyJoinedCommunities(supabase, user.id),
     getMyRegisteredEvents(supabase, user.id),
+    getIncomingFollowRequests(supabase, user.id),
   ]);
 
   const today = todayIso();
@@ -99,6 +102,8 @@ export default async function ProfilePage() {
             </>
           )}
         </section>
+
+        <IncomingFollowRequests requests={incomingFollowRequests} />
 
         <Link href="/profile/edit" className="btn-secondary mt-8 block w-full py-2.5 text-center text-[13px]">
           Edit profile
