@@ -8,8 +8,10 @@ import {
   getEventImages,
   getEventFormFields,
   getTicketAvailability,
+  getMyEventCheckIn,
 } from "@/lib/queries/events";
 import { getMyInterestStatus } from "@/lib/queries/interests";
+import { getMyEventFeedback, getEventFeedbackList } from "@/lib/queries/eventFeedback";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { CategoryImage } from "@/components/ui/CategoryImage";
@@ -17,6 +19,7 @@ import { EventRegistration } from "@/components/events/EventRegistration";
 import { InterestedButton } from "@/components/events/InterestedButton";
 import { EventImageUploader } from "@/components/events/EventImageUploader";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
+import { EventFeedbackSection } from "@/components/events/EventFeedbackSection";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { Linkify } from "@/components/ui/Linkify";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
@@ -46,12 +49,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, images, formFields, availability, myInterest] = await Promise.all([
+  const [ticketTypes, images, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList] = await Promise.all([
     getEventTicketTypes(supabase, id),
     getEventImages(supabase, id),
     getEventFormFields(supabase, id),
     getTicketAvailability(supabase, id),
     user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
+    user ? getMyEventCheckIn(supabase, id, user.id) : Promise.resolve(false),
+    user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
+    getEventFeedbackList(supabase, id),
   ]);
 
   const dateLabel = formatEventDate(event.event_date);
@@ -229,6 +235,46 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </>
           )}
         </div>
+
+        {event.event_date && (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Feedback</h2>
+              {event.feedback_count > 0 && (
+                <span className="flex items-center gap-1 text-[13px] text-text2">
+                  <IconStar size={14} className="fill-green text-green" />
+                  {event.avg_feedback_rating.toFixed(1)} ({event.feedback_count})
+                </span>
+              )}
+            </div>
+
+            {!isHost && (
+              <EventFeedbackSection
+                eventId={event.id}
+                isLoggedIn={!!user}
+                hasCheckedIn={hasCheckedIn}
+                myFeedback={myFeedback}
+              />
+            )}
+
+            {feedbackList.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3">
+                {feedbackList.map((f) => (
+                  <div key={f.user_id} className="rounded-card-sm border border-border2 bg-bg2 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-bold text-text">{f.display_name}</span>
+                      <span className="flex items-center gap-1 text-[12px] text-text3">
+                        <IconStar size={12} className="fill-green text-green" />
+                        {f.rating}/5
+                      </span>
+                    </div>
+                    {f.comment && <p className="mt-1 text-[13px] text-text2">{f.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <EventDetailActions eventId={event.id} isLoggedIn={!!user} />
 

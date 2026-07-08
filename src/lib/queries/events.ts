@@ -36,6 +36,8 @@ export type EventListItem = {
   category: string | null;
   cover_image_url: string | null;
   status: "active" | "cancelled";
+  avg_feedback_rating: number;
+  feedback_count: number;
   created_at: string;
   host: { display_name: string } | null;
   community: { id: string; name: string; logo_url: string | null } | null;
@@ -75,8 +77,13 @@ export type EventFilters = {
   includePast?: boolean;
 };
 
+// host:profiles(...) must pin the FK explicitly (!events_host_id_fkey) --
+// event_interests and event_feedback each add their own many-to-many bridge
+// between events and profiles (via user_id), so PostgREST can no longer
+// infer which relationship "host:profiles(...)" means and 404s the query
+// entirely (PGRST201, ambiguous embed) without this hint.
 const EVENT_LIST_SELECT =
-  "*, host:profiles(display_name), community:communities(id,name,logo_url), event_ticket_types(price)";
+  "*, host:profiles!events_host_id_fkey(display_name), community:communities(id,name,logo_url), event_ticket_types(price)";
 
 function todayIso() {
   const d = new Date();
@@ -135,7 +142,7 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
 export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("*, host:profiles(id,display_name,avatar_url,host_rating), community:communities(id,name,logo_url)")
+    .select("*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating), community:communities(id,name,logo_url)")
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -244,6 +251,19 @@ export async function getTicketAvailability(supabase: SupabaseClient, eventId: s
   // supplementary "X left" display, not core functionality.
   console.error("get_ticket_registration_counts failed after retry:", lastError);
   return counts;
+}
+
+/** Whether the signed-in user has an approved registration for this event
+ * with checked_in_at set -- the gate for leaving event feedback. */
+export async function getMyEventCheckIn(supabase: SupabaseClient, eventId: string, userId: string) {
+  const { data } = await supabase
+    .from("form_responses")
+    .select("checked_in_at")
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .eq("respondent_id", userId)
+    .maybeSingle();
+  return !!data?.checked_in_at;
 }
 
 export async function getEventRegistrationById(supabase: SupabaseClient, eventId: string, responseId: string) {

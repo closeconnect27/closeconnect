@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { IconDownload, IconUsers, IconCircleCheck, IconHeart } from "@tabler/icons-react";
+import { IconDownload, IconUsers, IconCircleCheck, IconHeart, IconUserX } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
@@ -9,6 +9,11 @@ import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default async function ManageEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +38,13 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   ]);
 
   const checkedInCount = registrations.filter((r) => r.checked_in_at).length;
+  // A "no-show" is only a meaningful, final number once the event has
+  // actually happened -- before then, someone who hasn't checked in yet
+  // just hasn't arrived, not skipped it. No new column: derived purely from
+  // event_date vs. today, same local-date comparison pattern used
+  // elsewhere in this codebase (host/dashboard, profile past/upcoming).
+  const eventHasPassed = event.event_date !== null && event.event_date < todayIso();
+  const noShowCount = registrations.filter((r) => !r.checked_in_at).length;
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -51,6 +63,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
           <StatCard icon={IconHeart} label="Interested" value={interestCount} />
           <StatCard icon={IconUsers} label="Registered" value={registrations.length} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
+          {eventHasPassed && <StatCard icon={IconUserX} label="No-show" value={noShowCount} />}
         </div>
 
         {visibleInterested.length > 0 && (
