@@ -56,6 +56,7 @@ export async function createCommunity(input: CreateCommunityInput) {
       community_type: data.community_type,
       kind: "native",
       join_mode: data.join_mode,
+      member_limit: data.member_limit ?? null,
       owner_id: user.id,
       unsplash_image_url: photo.imageUrl,
       unsplash_photo_id: photo.photoId,
@@ -145,6 +146,7 @@ export async function updateCommunity(communityId: string, input: UpdateCommunit
       extra_categories: data.extra_categories,
       city: data.city || null,
       extra_cities: data.extra_cities,
+      member_limit: data.member_limit ?? null,
     })
     .eq("id", communityId);
 
@@ -179,6 +181,31 @@ export async function toggleMembersListVisibility(communityId: string, visible: 
   const { error } = await supabase
     .from("communities")
     .update({ members_list_visible: visible })
+    .eq("id", communityId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/communities/${communityId}`);
+  return { error: null };
+}
+
+/** Owner-only toggle for whether the member COUNT (not the roster --
+ * that's toggleMembersListVisibility above) shows on the card and detail
+ * page header. Same pattern as its sibling. */
+export async function toggleMemberCountVisibility(communityId: string, visible: boolean) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("communities")
+    .select("owner_id")
+    .eq("id", communityId)
+    .single();
+  if (fetchError || !existing) return { error: "Community not found" };
+  if (existing.owner_id !== user.id) return { error: "Only the owner can change this" };
+
+  const { error } = await supabase
+    .from("communities")
+    .update({ member_count_visible: visible })
     .eq("id", communityId);
   if (error) return { error: error.message };
 

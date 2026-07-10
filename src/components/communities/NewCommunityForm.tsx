@@ -33,6 +33,7 @@ export function NewCommunityForm() {
   const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [joinMode, setJoinMode] = useState<"open" | "request">("open");
   const [joinFormFields, setJoinFormFields] = useState<FormFieldDraft[]>([]);
+  const [memberLimit, setMemberLimit] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -58,6 +59,7 @@ export function NewCommunityForm() {
       community_type: communityType,
       join_mode: joinMode,
       join_form_fields: joinMode === "request" ? joinFormFields : [],
+      member_limit: memberLimit ? Number(memberLimit) : undefined,
     };
 
     const parsed = createCommunitySchema.safeParse(input);
@@ -189,6 +191,18 @@ export function NewCommunityForm() {
               <FormBuilder fields={joinFormFields} onChange={setJoinFormFields} />
             </Field>
           )}
+
+          <Field label="Limit members (optional)">
+            <input
+              type="number"
+              min={1}
+              value={memberLimit}
+              onChange={(e) => setMemberLimit(e.target.value)}
+              placeholder="No limit"
+              className={inputClass}
+            />
+            <p className="text-[11px] text-text3">Once this many people have joined, new joins are blocked until someone leaves.</p>
+          </Field>
 
           {error && <p className="text-[13px] text-pink">{error}</p>}
 

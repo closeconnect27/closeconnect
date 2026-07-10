@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import { trackServerEvent } from "@/lib/mixpanel/server";
-import { getCommunityFormFields } from "@/lib/queries/membership";
+import { getCommunityFormFields, getCommunityMembers } from "@/lib/queries/membership";
 import { formAnswersSchema } from "@/lib/validation/forms";
 import { createGroupSchema, type CreateGroupInput } from "@/lib/validation/community";
 
@@ -200,6 +200,16 @@ export async function setMemberRole(communityId: string, targetUserId: string, r
 
   revalidatePath(`/communities/${communityId}`);
   return { error: null };
+}
+
+/** No requireUser() -- community_members_select_public (0001) is already
+ * unconditional, same data MemberList's initial server-rendered page
+ * already exposes; this is just the next page of the exact same read, not
+ * a new privilege. */
+export async function loadMoreCommunityMembers(communityId: string, offset: number) {
+  const supabase = await createClient();
+  const members = await getCommunityMembers(supabase, communityId, offset);
+  return { members };
 }
 
 export async function removeMember(communityId: string, targetUserId: string) {

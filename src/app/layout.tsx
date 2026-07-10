@@ -31,8 +31,17 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "Closeconnect",
-  description: "Community + events platform",
+  metadataBase: new URL("https://closeconnect.in"),
+  title: {
+    default: "Close.Connect -- Find your people. Host what you love.",
+    template: "%s | Close.Connect",
+  },
+  description: "Discover communities and events near you in India. Join a group, host a meetup, or sell tickets to your next event.",
+  openGraph: {
+    siteName: "Close.Connect",
+    locale: "en_IN",
+    type: "website",
+  },
 };
 
 // Runs before hydration to avoid a flash of the wrong theme: stored choice

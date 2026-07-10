@@ -44,7 +44,14 @@ export type EventListItem = {
 };
 
 export type EventDetail = Omit<EventListItem, "host" | "community"> & {
-  host: { id: string; display_name: string; avatar_url: string | null; host_rating: number } | null;
+  host: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+    host_rating: number;
+    host_rating_count: number;
+    is_founding_host: boolean;
+  } | null;
   community: { id: string; name: string } | null;
 };
 
@@ -54,6 +61,11 @@ export type EventRegistration = {
   response_data: Record<string, string>;
   status: "pending" | "approved" | "rejected";
   checked_in_at: string | null;
+  /** How many of `quantity` people have actually arrived -- 0.._quantity_,
+   * not a binary flag (0055). checked_in_at above still just means
+   * "checked in at all". */
+  checked_in_count: number;
+  quantity: number;
   payment_status: "unpaid" | "paid" | "failed";
   created_at: string;
   ticket_type_id: string | null;
@@ -142,7 +154,9 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
 export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating), community:communities(id,name)")
+    .select(
+      "*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating,host_rating_count,is_founding_host), community:communities(id,name)",
+    )
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -204,7 +218,7 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
   const { data, error } = await supabase
     .from("form_responses")
     .select(
-      "id, respondent_id, response_data, status, checked_in_at, payment_status, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
+      "id, respondent_id, response_data, status, checked_in_at, checked_in_count, quantity, payment_status, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
     )
     .eq("owner_type", "event")
     .eq("owner_id", eventId)

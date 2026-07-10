@@ -43,6 +43,7 @@ export function EditCommunityForm({
   const [extraCategories, setExtraCategories] = useState<string[]>(community.extra_categories ?? []);
   const [city, setCity] = useState(community.city ?? "");
   const [extraCities, setExtraCities] = useState<string[]>(community.extra_cities ?? []);
+  const [memberLimit, setMemberLimit] = useState(community.member_limit != null ? String(community.member_limit) : "");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -64,6 +65,7 @@ export function EditCommunityForm({
       extra_categories: extraCategories,
       city: city || undefined,
       extra_cities: extraCities,
+      member_limit: memberLimit ? Number(memberLimit) : undefined,
     };
 
     const parsed = updateCommunitySchema.safeParse(input);
@@ -148,6 +150,18 @@ export function EditCommunityForm({
             options={CITY_OPTIONS.filter((o) => o.value !== city)}
             placeholder="Add more cities"
           />
+        </Field>
+
+        <Field label="Limit members (optional)">
+          <input
+            type="number"
+            min={1}
+            value={memberLimit}
+            onChange={(e) => setMemberLimit(e.target.value)}
+            placeholder="No limit"
+            className={inputClass}
+          />
+          <p className="text-[11px] text-text3">Once this many people have joined, new joins are blocked until someone leaves.</p>
         </Field>
 
         {error && <p className="text-[13px] text-pink">{error}</p>}

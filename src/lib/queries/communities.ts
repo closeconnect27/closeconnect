@@ -40,6 +40,16 @@ export type Community = {
   // member list -- the owner/moderators always show regardless (enforced
   // in MemberList, not RLS -- see 0052).
   members_list_visible: boolean;
+  // Separate from members_list_visible above -- this hides just the
+  // headline number (CommunityCard, the detail page header), not the
+  // roster itself. A community can hide the count while keeping the list
+  // visible, or vice versa.
+  member_count_visible: boolean;
+  is_founding: boolean;
+  // null = unlimited (0057). Once member_count reaches this, no new join
+  // can succeed through any path -- enforced at the DB level, not just by
+  // hiding the Join button.
+  member_limit: number | null;
 };
 
 export type CommunityFilters = {

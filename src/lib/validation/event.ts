@@ -104,6 +104,22 @@ export const eventRegistrationSchema = z.object({
   // guest-friendly decision is reversed), so the registrant's email comes
   // from their authenticated session server-side, never from client input.
   answers: formAnswersSchema.default({}),
+  // Buying more than one ticket in a single registration (e.g. for a
+  // group of friends) -- capped at 10, matching the DB check constraint
+  // (0055). Defaults to 1 so every existing call site that doesn't pass
+  // this keeps behaving exactly as before.
+  quantity: z.number().int().min(1).max(10).default(1),
 });
 
 export type EventRegistrationInput = z.infer<typeof eventRegistrationSchema>;
+
+// Shared by the "message registrants right now" and "schedule a reminder
+// for later" flows -- both just insert an event_reminders row (0022), only
+// send_at differs (now vs. a future timestamp). The already-deployed cron
+// job (every 5 minutes) and Edge Function handle the rest either way.
+export const eventReminderSchema = z.object({
+  message: z.string().trim().min(1, "Write something to send").max(500),
+  send_at: z.string().datetime().optional(),
+});
+
+export type EventReminderInput = z.infer<typeof eventReminderSchema>;

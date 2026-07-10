@@ -29,6 +29,9 @@ import { safeSocialHref } from "@/lib/validators/links";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { FoundingBadge } from "@/components/ui/FoundingBadge";
+import { FoundingToggle } from "@/components/ui/FoundingToggle";
+import { setHostFounding } from "@/app/actions/admin";
 import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
 import { RichTextView } from "@/components/ui/RichTextView";
 
@@ -55,6 +58,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     getOrganizerStats(supabase, id),
   ]);
   const isOwner = viewer?.id === id;
+  const { data: viewerProfile } = viewer
+    ? await supabase.from("profiles").select("is_admin").eq("id", viewer.id).single()
+    : { data: null };
+  const isAdmin = !!viewerProfile?.is_admin;
 
   const initial = basic.display_name.charAt(0).toUpperCase();
 
@@ -74,13 +81,18 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <h1 className="flex items-center gap-1.5 truncate font-heading text-[16px] font-bold">
               {basic.display_name}
               {basic.is_verified && <VerifiedBadge />}
+              {basic.is_founding_host && <FoundingBadge />}
             </h1>
-            {basic.host_rating > 0 && (
-              <span className="flex items-center gap-1 text-[13px] text-text3">
-                <IconStar size={13} className="fill-green text-green" />
-                {basic.host_rating.toFixed(1)} host rating
-              </span>
-            )}
+            <span className="flex items-center gap-1 text-[13px] text-text3">
+              {basic.host_rating_count > 0 ? (
+                <>
+                  <IconStar size={13} className="fill-green text-green" />
+                  {basic.host_rating.toFixed(1)} host rating
+                </>
+              ) : (
+                "New host"
+              )}
+            </span>
           </div>
           {isOwner && (
             <Link href="/profile/edit" className="btn-secondary shrink-0 px-4 py-2 text-[13px]">
@@ -89,6 +101,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             </Link>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="mt-3">
+            <FoundingToggle founding={basic.is_founding_host} onToggle={setHostFounding.bind(null, basic.id)} />
+          </div>
+        )}
 
         {/* Always visible regardless of profile_visibility (0035) -- bio
             lives on `profiles`, not the gated profile_details. */}

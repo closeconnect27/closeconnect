@@ -5,9 +5,11 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
 import { getEventInterestCount, getVisibleInterestedUsers } from "@/lib/queries/interests";
+import { getEventReminders } from "@/lib/queries/reminders";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
 import { EventFunnel } from "@/components/events/EventFunnel";
+import { MessageAttendeesSection } from "@/components/events/MessageAttendeesSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 
@@ -30,23 +32,27 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
 
   if (event.host_id !== user.id) redirect(`/events/${id}`);
 
-  const [registrations, ticketTypes, formFields, interestCount, visibleInterested] = await Promise.all([
+  const [registrations, ticketTypes, formFields, interestCount, visibleInterested, reminders] = await Promise.all([
     getEventRegistrations(supabase, id),
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
     getEventInterestCount(supabase, id),
     getVisibleInterestedUsers(supabase, id),
+    getEventReminders(supabase, id),
   ]);
 
-  const checkedInCount = registrations.filter((r) => r.checked_in_at).length;
+  // Counted in TICKETS (sum of quantity), not registration rows -- a group
+  // booking of 4 is 4 people, not 1, for every stat below (0055).
+  const totalTickets = registrations.reduce((sum, r) => sum + r.quantity, 0);
+  const checkedInCount = registrations.reduce((sum, r) => sum + r.checked_in_count, 0);
   // A "no-show" is only a meaningful, final number once the event has
   // actually happened -- before then, someone who hasn't checked in yet
   // just hasn't arrived, not skipped it. No new column: derived purely from
   // event_date vs. today, same local-date comparison pattern used
   // elsewhere in this codebase (host/dashboard, profile past/upcoming).
   const eventHasPassed = event.event_date !== null && event.event_date < todayIso();
-  const noShowCount = registrations.filter((r) => !r.checked_in_at).length;
-  const paidCount = registrations.filter((r) => r.payment_status === "paid").length;
+  const noShowCount = totalTickets - checkedInCount;
+  const paidCount = registrations.filter((r) => r.payment_status === "paid").reduce((sum, r) => sum + r.quantity, 0);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -63,7 +69,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
 
         <div className="mt-6 flex gap-4">
           <StatCard icon={IconHeart} label="Interested" value={interestCount} />
-          <StatCard icon={IconUsers} label="Registered" value={registrations.length} />
+          <StatCard icon={IconUsers} label="Registered" value={totalTickets} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
           {eventHasPassed && <StatCard icon={IconUserX} label="No-show" value={noShowCount} />}
         </div>
@@ -71,7 +77,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
         <div className="mt-4">
           <EventFunnel
             interestCount={interestCount}
-            registeredCount={registrations.length}
+            registeredCount={totalTickets}
             paidCount={paidCount}
             checkedInCount={checkedInCount}
             noShowCount={noShowCount}
@@ -101,7 +107,7 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
         {ticketTypes.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {ticketTypes.map((t) => {
-              const count = registrations.filter((r) => r.ticket_type_id === t.id).length;
+              const count = registrations.filter((r) => r.ticket_type_id === t.id).reduce((sum, r) => sum + r.quantity, 0);
               return (
                 <span key={t.id} className="rounded-full border border-border2 px-3 py-1 text-[12px] text-text2">
                   {t.name}: {count}
@@ -111,6 +117,8 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
             })}
           </div>
         )}
+
+        <MessageAttendeesSection eventId={id} reminders={reminders} />
 
         <div className="mt-6 flex justify-end">
           <a href={`/events/${id}/manage/export`} className="btn-secondary px-4 py-2 text-[13px]">

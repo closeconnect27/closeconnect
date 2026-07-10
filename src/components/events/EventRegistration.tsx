@@ -35,6 +35,7 @@ export function EventRegistration({
   const router = useRouter();
   const [ticketTypeId, setTicketTypeId] = useState(ticketTypes[0]?.id ?? "");
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -44,6 +45,11 @@ export function EventRegistration({
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
   const isSoldOut = (t: EventTicketType) =>
     t.quantity_available != null && (availability.get(t.id) ?? 0) >= t.quantity_available;
+  const remainingForSelected =
+    selectedTicket?.quantity_available != null
+      ? selectedTicket.quantity_available - (availability.get(selectedTicket.id) ?? 0)
+      : null;
+  const maxQuantity = Math.min(10, remainingForSelected ?? 10);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +59,7 @@ export function EventRegistration({
       return;
     }
     startTransition(async () => {
-      const result = await registerForEvent(eventId, { ticket_type_id: ticketTypeId, name, answers });
+      const result = await registerForEvent(eventId, { ticket_type_id: ticketTypeId, name, answers, quantity });
       if (result?.error) setError(result.error);
       else {
         setPaymentLinkUrl(result.paymentLinkUrl ?? null);
@@ -95,7 +101,8 @@ export function EventRegistration({
             rel="noopener noreferrer"
             className="btn-primary mt-4 px-6 py-2.5 text-[13px]"
           >
-            Pay ₹{selectedTicket.price} for {selectedTicket.name}
+            Pay ₹{selectedTicket.price * quantity} for {quantity > 1 ? `${quantity}x ` : ""}
+            {selectedTicket.name}
           </a>
         )}
       </div>
@@ -116,7 +123,10 @@ export function EventRegistration({
                 type="button"
                 key={t.id}
                 disabled={soldOut}
-                onClick={() => setTicketTypeId(t.id)}
+                onClick={() => {
+                  setTicketTypeId(t.id);
+                  setQuantity(1);
+                }}
                 className={`flex items-center justify-between rounded-card-sm border px-4 py-3 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${
                   ticketTypeId === t.id ? "border-green bg-green-tint" : "border-border2 hover:border-green"
                 }`}
@@ -149,6 +159,36 @@ export function EventRegistration({
           required
           className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
         />
+      </label>
+
+      <label className="flex flex-col gap-2">
+        <span className="text-[13px] font-medium text-text">
+          Number of tickets{remainingForSelected != null && ` (${remainingForSelected} left)`}
+        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            disabled={quantity <= 1}
+            aria-label="Fewer tickets"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border2 text-text2 transition hover:border-green hover:text-green disabled:opacity-40"
+          >
+            −
+          </button>
+          <span className="w-8 text-center text-[15px] font-bold text-text">{quantity}</span>
+          <button
+            type="button"
+            onClick={() => setQuantity((q) => Math.min(maxQuantity, q + 1))}
+            disabled={quantity >= maxQuantity}
+            aria-label="More tickets"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border2 text-text2 transition hover:border-green hover:text-green disabled:opacity-40"
+          >
+            +
+          </button>
+          {selectedTicket && selectedTicket.price > 0 && quantity > 1 && (
+            <span className="text-[13px] text-text3">₹{selectedTicket.price * quantity} total</span>
+          )}
+        </div>
       </label>
       <div className="flex flex-col gap-2">
         <span className="text-[13px] font-medium text-text">Email</span>

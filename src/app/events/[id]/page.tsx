@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { IconCalendar, IconClock, IconMapPin, IconStar, IconSettings, IconPencil } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +22,27 @@ import { EventFeedbackSection } from "@/components/events/EventFeedbackSection";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
+import { FoundingBadge } from "@/components/ui/FoundingBadge";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: event } = await supabase
+    .from("events")
+    .select("event_name, description, event_date, venue, city")
+    .eq("id", id)
+    .single();
+  if (!event) return {};
+
+  const place = [event.venue, event.city].filter(Boolean).join(", ");
+  const dateLabel = formatEventDate(event.event_date);
+  const description = event.description ? event.description.slice(0, 120) : `${dateLabel}${place ? ` · ${place}` : ""}`;
+  return {
+    title: event.event_name,
+    description,
+    openGraph: { title: event.event_name, description },
+  };
+}
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -144,13 +166,20 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               {event.host.display_name.charAt(0).toUpperCase()}
             </div>
             <div className="text-[13px]">
-              <p className="font-bold text-text">Hosted by {event.host.display_name}</p>
-              {event.host.host_rating > 0 && (
-                <p className="flex items-center gap-1 text-text3">
-                  <IconStar size={12} className="fill-green text-green" />
-                  {event.host.host_rating.toFixed(1)} host rating
-                </p>
-              )}
+              <p className="flex items-center gap-1.5 font-bold text-text">
+                Hosted by {event.host.display_name}
+                {event.host.is_founding_host && <FoundingBadge />}
+              </p>
+              <p className="flex items-center gap-1 text-text3">
+                {event.host.host_rating_count > 0 ? (
+                  <>
+                    <IconStar size={12} className="fill-green text-green" />
+                    {event.host.host_rating.toFixed(1)} host rating
+                  </>
+                ) : (
+                  "New host"
+                )}
+              </p>
             </div>
           </Link>
         )}

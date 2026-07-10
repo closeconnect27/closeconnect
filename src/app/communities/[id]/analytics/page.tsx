@@ -10,6 +10,7 @@ import {
   getViewsByDay,
   getJoinRequestMetrics,
   computeAcceptanceRate,
+  computeConversionRate,
   getNewMembersByMonth,
   getTrafficSourceBreakdown,
   getMostActiveMembers,
@@ -64,6 +65,12 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
 
   const acceptanceRate = computeAcceptanceRate(joinMetrics.totals);
   const totalTraffic = Object.values(traffic).reduce((a, b) => a + b, 0);
+  // views -> a join request being *submitted* (approved+pending+rejected),
+  // not views -> current member_count -- member_count can shrink (someone
+  // leaves) independently of how many people the page ever converted,
+  // which would make the rate silently wrong over time.
+  const totalJoinAttempts = joinMetrics.totals.pending + joinMetrics.totals.approved + joinMetrics.totals.rejected;
+  const conversionRate = computeConversionRate(viewCount, totalJoinAttempts);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -76,11 +83,16 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard icon={IconChartBar} label="Total views" value={viewCount} />
           <StatCard icon={IconUsers} label="Members" value={community.member_count} />
-          <StatCard icon={IconInbox} label="Join requests" value={joinMetrics.totals.pending + joinMetrics.totals.approved + joinMetrics.totals.rejected} />
+          <StatCard icon={IconInbox} label="Join requests" value={totalJoinAttempts} />
           <StatCard
             icon={IconChartBar}
             label="Acceptance rate"
             value={acceptanceRate === null ? 0 : Math.round(acceptanceRate * 100)}
+          />
+          <StatCard
+            icon={IconChartBar}
+            label="Views -> join rate"
+            value={conversionRate === null ? 0 : Math.round(conversionRate * 100)}
           />
         </div>
 

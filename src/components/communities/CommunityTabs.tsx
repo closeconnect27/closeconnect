@@ -6,6 +6,7 @@ const TABS = [
   { key: "about", label: "About" },
   { key: "groups", label: "Groups" },
   { key: "members", label: "Members" },
+  { key: "events", label: "Events" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -19,17 +20,19 @@ export function CommunityTabs({
   groups,
   about,
   members,
+  events,
 }: {
   groups: React.ReactNode;
   about: React.ReactNode;
   members: React.ReactNode;
+  events: React.ReactNode;
 }) {
   const [active, setActive] = useState<TabKey>("about");
-  const content = { groups, about, members }[active];
+  const content = { groups, about, members, events }[active];
 
   return (
     <div>
-      <div role="tablist" className="mb-4 flex gap-1 rounded-full border border-border2 bg-bg3 p-1">
+      <div role="tablist" className="mb-4 flex gap-1 overflow-x-auto rounded-full border border-border2 bg-bg3 p-1">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -39,8 +42,8 @@ export function CommunityTabs({
             onClick={() => setActive(t.key)}
             className={
               active === t.key
-                ? "flex-1 rounded-full bg-green px-4 py-2 text-[13px] font-bold text-green-dark transition"
-                : "flex-1 rounded-full px-4 py-2 text-[13px] font-medium text-text2 transition hover:text-text"
+                ? "flex-1 shrink-0 rounded-full bg-green px-4 py-2 text-[13px] font-bold text-green-dark transition"
+                : "flex-1 shrink-0 rounded-full px-4 py-2 text-[13px] font-medium text-text2 transition hover:text-text"
             }
           >
             {t.label}

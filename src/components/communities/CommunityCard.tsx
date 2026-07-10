@@ -84,10 +84,12 @@ export function CommunityCard({ community: c }: { community: Community }) {
                 <IconStar size={13} className={c.avg_rating > 0 ? "fill-green text-green" : "text-text3"} />
                 {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings yet"}
               </span>
-              <span className="flex items-center gap-1">
-                <IconUsers size={13} />
-                {formatCount(c.member_count)}
-              </span>
+              {c.member_count_visible && (
+                <span className="flex items-center gap-1">
+                  <IconUsers size={13} />
+                  {formatCount(c.member_count)}
+                </span>
+              )}
             </span>
           ) : (
             <span />

@@ -4,20 +4,23 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconUsers, IconSearch, IconUserMinus, IconShieldPlus, IconShieldMinus, IconLock } from "@tabler/icons-react";
-import { removeMember, setMemberRole } from "@/app/actions/membership";
+import { removeMember, setMemberRole, loadMoreCommunityMembers } from "@/app/actions/membership";
 
 type Member = { user_id: string; role: string; profiles: { display_name: string } | null };
 
-// Client-side filtering over the full list, not the API -- no new schema,
-// and per the brief, fine as long as membership sizes stay in the low
-// hundreds at most (a few hundred rows of name + a substring match is
-// trivial client-side work). Flagged separately: nothing in the app caps
-// community_members size today, so a community *could* organically grow
-// past that -- worth a real check-in if usage ever gets there, not
-// something to silently build server-side pagination for pre-emptively.
+// Server-paginated (getCommunityMembers, 50/page, staff-first) -- `members`
+// is only the first page; `totalCount` is the real roster size.
+// "Load more" fetches subsequent pages on demand rather than shipping the
+// whole roster on first render, which is what "nothing caps
+// community_members size today" (the previous version of this comment)
+// was flagging as the actual risk once a community grows past a few
+// hundred. Client-side search still only searches what's been loaded so
+// far -- a real limitation, not silently wrong, called out in the empty
+// state below when more pages remain.
 export function MemberList({
   communityId,
   members,
+  totalCount,
   ownerId,
   isStaff,
   isOwner,
@@ -26,6 +29,7 @@ export function MemberList({
 }: {
   communityId: string;
   members: Member[];
+  totalCount: number;
   ownerId: string | null;
   isStaff: boolean;
   isOwner: boolean;
@@ -33,6 +37,8 @@ export function MemberList({
   currentUserId: string | null;
 }) {
   const router = useRouter();
+  const [loadedMembers, setLoadedMembers] = useState(members);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -41,18 +47,34 @@ export function MemberList({
 
   // Owner/admins always show, WhatsApp-style, regardless of the toggle --
   // only an ordinary member's view of the *rest* of the roster is hidden.
-  const staffFirst = [...members].sort((a, b) => {
+  // The server query already orders staff-first; this re-derives the same
+  // rank client-side only to decide who survives the visibility filter,
+  // not to re-sort (owner_id is authoritative and cheap to check here too).
+  const staffFirst = [...loadedMembers].sort((a, b) => {
     const rank = (m: Member) => (m.user_id === ownerId ? 0 : m.role === "moderator" ? 1 : 2);
     return rank(a) - rank(b);
   });
   const visibleMembers = membersListVisible || isStaff ? staffFirst : staffFirst.filter((m) => m.user_id === ownerId || m.role === "moderator");
-  const hiddenCount = members.length - visibleMembers.length;
+  // Against the real total, not just this page -- staff sort first server-side
+  // too, so they're already all present in loadedMembers well before this
+  // matters for any realistically-sized admin team.
+  const hiddenCount = totalCount - visibleMembers.length;
+  const canLoadMore = (membersListVisible || isStaff) && loadedMembers.length < totalCount;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return visibleMembers;
     return visibleMembers.filter((m) => (m.profiles?.display_name ?? "member").toLowerCase().includes(q));
   }, [visibleMembers, query]);
+
+  function handleLoadMore() {
+    setLoadingMore(true);
+    startTransition(async () => {
+      const { members: nextPage } = await loadMoreCommunityMembers(communityId, loadedMembers.length);
+      setLoadedMembers((prev) => [...prev, ...nextPage]);
+      setLoadingMore(false);
+    });
+  }
 
   function handleRemove(userId: string) {
     setError("");
@@ -82,7 +104,7 @@ export function MemberList({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[12px] font-bold text-text3">
           <IconUsers size={14} />
-          {members.length} member{members.length === 1 ? "" : "s"}
+          {totalCount} member{totalCount === 1 ? "" : "s"}
         </div>
         {visibleMembers.length > 5 && (
           <div className="relative w-full max-w-[200px]">
@@ -105,6 +127,10 @@ export function MemberList({
       )}
 
       {error && <p className="mb-2 text-[12px] text-pink">{error}</p>}
+
+      {query && canLoadMore && (
+        <p className="mb-2 text-[11px] text-text3">Searching the {loadedMembers.length} loaded so far -- load more to search further.</p>
+      )}
 
       {filtered.length === 0 ? (
         <p className="py-4 text-center text-[13px] text-text3">No members match “{query}”.</p>
@@ -187,6 +213,16 @@ export function MemberList({
             );
           })}
         </div>
+      )}
+
+      {canLoadMore && !query && (
+        <button
+          onClick={handleLoadMore}
+          disabled={loadingMore}
+          className="mt-3 w-full rounded-card-sm border border-border2 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green disabled:opacity-60"
+        >
+          {loadingMore ? "Loading…" : `Load ${Math.min(50, totalCount - loadedMembers.length)} more`}
+        </button>
       )}
     </div>
   );

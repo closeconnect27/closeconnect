@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { IconStar, IconUsers, IconMapPin, IconPencil, IconChartBar } from "@tabler/icons-react";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
@@ -10,9 +11,11 @@ import {
   getUserGroupMemberships,
   getCommunityFormFields,
   getCommunityMembers,
+  getCommunityMemberCount,
   getPendingJoinRequests,
   getMyJoinRequestStatus,
 } from "@/lib/queries/membership";
+import { getEvents } from "@/lib/queries/events";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { getMyRating } from "@/lib/queries/ratings";
@@ -25,12 +28,34 @@ import { GroupList } from "@/components/communities/GroupList";
 import { CreateGroupForm } from "@/components/communities/CreateGroupForm";
 import { MemberList } from "@/components/communities/MemberList";
 import { MembersVisibilityToggle } from "@/components/communities/MembersVisibilityToggle";
+import { MemberCountVisibilityToggle } from "@/components/communities/MemberCountVisibilityToggle";
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
 import { ClaimSection } from "@/components/communities/ClaimSection";
 import { CommunityTabs } from "@/components/communities/CommunityTabs";
+import { EventCard } from "@/components/events/EventCard";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { FoundingBadge } from "@/components/ui/FoundingBadge";
+import { FoundingToggle } from "@/components/ui/FoundingToggle";
+import { setCommunityFounding } from "@/app/actions/admin";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IconCalendarEvent } from "@tabler/icons-react";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: community } = await supabase.from("communities").select("name, description, city, category").eq("id", id).single();
+  if (!community) return {};
+
+  const title = `${community.name}${community.city ? ` in ${community.city}` : ""}`;
+  const description = community.description.slice(0, 160);
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -46,6 +71,10 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { data: viewerProfile } = user
+    ? await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
+    : { data: null };
+  const isAdmin = !!viewerProfile?.is_admin;
 
   const visual = getCategoryVisual(community.category);
   const extraCats = (community.extra_categories ?? []).map(getCategoryVisual);
@@ -82,8 +111,14 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
     isNative && user && !isMember ? await getMyJoinRequestStatus(supabase, id, user.id) : null;
 
   const members = isNative ? await getCommunityMembers(supabase, id) : [];
+  const memberCount = isNative ? await getCommunityMemberCount(supabase, id) : 0;
+  const isFull = community.member_limit != null && community.member_count >= community.member_limit;
   const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
   const myRating = isNative && user && !isOwner ? await getMyRating(supabase, id, user.id) : null;
+  // includePast so a community with only past events (or none upcoming)
+  // still shows its history in the Events tab, not just an empty state --
+  // getEvents already excludes drafts (null event_date) unconditionally.
+  const hostedEvents = isMember ? await getEvents(supabase, { communityId: id, includePast: true }) : [];
 
   return (
     <div className="flex-1 pb-10">
@@ -128,6 +163,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
             {community.name}
             {community.is_verified && <VerifiedBadge />}
           </h1>
+          {community.is_founding && <FoundingBadge />}
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -155,10 +191,13 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           )}
           {isNative && (
             <>
-              <span className="flex items-center gap-1.5">
-                <IconUsers size={14} className="text-text3" />
-                {community.member_count} members
-              </span>
+              {(community.member_count_visible || isStaff) && (
+                <span className="flex items-center gap-1.5">
+                  <IconUsers size={14} className="text-text3" />
+                  {community.member_count}
+                  {community.member_limit != null && ` / ${community.member_limit}`} members
+                </span>
+              )}
               <span className="flex items-center gap-1.5">
                 <IconStar size={14} className="text-text3" />
                 {community.avg_rating > 0
@@ -187,6 +226,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 isMember={isMember}
                 isOwner={isOwner}
                 isLoggedIn={!!user}
+                isFull={isFull}
                 pendingStatus={pendingStatus}
                 formFields={formFields}
               />
@@ -219,7 +259,14 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                       <DetailRow label="Type" value={capitalize(community.community_type)} />
                       <DetailRow label="Who can join" value={community.join_mode === "open" ? "Open" : "Request to join"} />
                       {community.city && <DetailRow label="City" value={community.city} />}
+                      {community.member_limit != null && (
+                        <DetailRow label="Member limit" value={`${community.member_count} / ${community.member_limit}`} />
+                      )}
                     </div>
+                    {isOwner && <MemberCountVisibilityToggle communityId={community.id} visible={community.member_count_visible} />}
+                    {isAdmin && (
+                      <FoundingToggle founding={community.is_founding} onToggle={setCommunityFounding.bind(null, community.id)} />
+                    )}
                   </section>
                 }
                 members={
@@ -233,6 +280,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                       <MemberList
                         communityId={community.id}
                         members={members}
+                        totalCount={memberCount}
                         ownerId={community.owner_id}
                         isStaff={isStaff}
                         isOwner={isOwner}
@@ -251,6 +299,19 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                           requests={pendingRequests}
                           formFields={formFields}
                         />
+                      </div>
+                    )}
+                  </section>
+                }
+                events={
+                  <section>
+                    {hostedEvents.length === 0 ? (
+                      <EmptyState icon={IconCalendarEvent} title="No events yet" description="Nothing hosted under this community yet." compact />
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        {hostedEvents.map((e) => (
+                          <EventCard key={e.id} event={e} />
+                        ))}
                       </div>
                     )}
                   </section>

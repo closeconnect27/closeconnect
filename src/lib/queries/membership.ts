@@ -92,19 +92,43 @@ export async function getCommunityFormFields(supabase: SupabaseClient, community
   return data as FormField[];
 }
 
-export async function getCommunityMembers(supabase: SupabaseClient, communityId: string) {
+export type CommunityMember = {
+  user_id: string;
+  role: "owner" | "moderator" | "member";
+  joined_at: string;
+  profiles: { display_name: string; avatar_url: string | null };
+};
+
+const MEMBERS_PAGE_SIZE = 50;
+
+/** Ordered owner/moderator-first, not by join date -- staff always need to
+ * be in the FIRST page regardless of how many ordinary members joined
+ * before them, since MemberList always shows them even when the rest of
+ * the roster is paginated/hidden (0052). Ties within each group still
+ * break by joined_at, oldest first, matching the previous single-order
+ * behavior. */
+export async function getCommunityMembers(supabase: SupabaseClient, communityId: string, offset = 0) {
   const { data, error } = await supabase
     .from("community_members")
     .select("user_id, role, joined_at, profiles(display_name, avatar_url)")
     .eq("community_id", communityId)
-    .order("joined_at");
+    // Alphabetically descending puts 'owner' before 'moderator' before
+    // 'member' -- exactly the staff-first order needed, without a CASE
+    // expression PostgREST's query builder can't express anyway.
+    .order("role", { ascending: false })
+    .order("joined_at", { ascending: true })
+    .range(offset, offset + MEMBERS_PAGE_SIZE - 1);
   if (error) throw error;
-  return data as unknown as {
-    user_id: string;
-    role: "owner" | "moderator" | "member";
-    joined_at: string;
-    profiles: { display_name: string; avatar_url: string | null };
-  }[];
+  return data as unknown as CommunityMember[];
+}
+
+export async function getCommunityMemberCount(supabase: SupabaseClient, communityId: string) {
+  const { count, error } = await supabase
+    .from("community_members")
+    .select("*", { count: "exact", head: true })
+    .eq("community_id", communityId);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function getPendingJoinRequests(supabase: SupabaseClient, communityId: string) {

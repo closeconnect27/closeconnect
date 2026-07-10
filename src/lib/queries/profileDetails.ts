@@ -30,6 +30,11 @@ export type PublicProfileBasic = {
   display_name: string;
   avatar_url: string | null;
   host_rating: number;
+  /** Companion to host_rating (0054) -- lets the UI tell "0 because no
+   * reviews exist yet" (show a "New host" label) apart from "0 because
+   * the real average is that low". */
+  host_rating_count: number;
+  is_founding_host: boolean;
   bio: string | null;
   /** Tiptap ProseMirror JSON -- null for bios written before the rich
    * editor existed. RichTextView falls back to the plain `bio` above
@@ -54,7 +59,7 @@ export async function getPublicProfileBasic(supabase: SupabaseClient, profileId:
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, avatar_url, host_rating, bio, bio_content, profile_visibility, is_verified, verified_phone, verified_email",
+      "id, display_name, avatar_url, host_rating, host_rating_count, is_founding_host, bio, bio_content, profile_visibility, is_verified, verified_phone, verified_email",
     )
     .eq("id", profileId)
     .maybeSingle();

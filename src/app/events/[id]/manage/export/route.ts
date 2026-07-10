@@ -51,16 +51,18 @@ function toCsv(registrations: EventRegistration[], formFields: FormField[]) {
     "Name",
     "Email",
     "Ticket type",
+    "Quantity",
     "Registered at",
-    "Checked in",
+    "Checked in count",
     ...formFields.map((f) => f.label),
   ];
   const rows = registrations.map((r) => [
     r.response_data.name ?? "",
     r.response_data.email ?? "",
     r.event_ticket_types?.name ?? "",
+    String(r.quantity),
     new Date(r.created_at).toISOString(),
-    r.checked_in_at ? "yes" : "no",
+    `${r.checked_in_count}/${r.quantity}`,
     ...formFields.map((f) => r.response_data[f.id] ?? ""),
   ]);
   return [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n");

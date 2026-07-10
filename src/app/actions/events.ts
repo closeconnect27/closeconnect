@@ -161,6 +161,7 @@ export async function registerForEvent(eventId: string, input: EventRegistration
       response_data: { name: parsed.data.name, email: user.email, ...parsed.data.answers },
       status: "approved",
       payment_status: isPaid ? "unpaid" : "paid",
+      quantity: parsed.data.quantity,
     })
     .select("id")
     .single();
@@ -190,8 +191,8 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   if (isPaid) {
     const linkResult = await createPaymentLink({
       registrationId: registration.id,
-      amountRupees: ticketType.price,
-      description: `${ticketType.name} ticket`,
+      amountRupees: ticketType.price * parsed.data.quantity,
+      description: `${ticketType.name} ticket${parsed.data.quantity > 1 ? ` x${parsed.data.quantity}` : ""}`,
       customerName: parsed.data.name,
       customerEmail: user.email ?? "",
     });
@@ -247,15 +248,35 @@ async function sendRegistrationConfirmation(email: string, eventId: string, regi
   });
 }
 
-export async function setCheckIn(eventId: string, responseId: string, checkedIn: boolean) {
+// Partial check-in: `count` is how many of THIS registration's `quantity`
+// people have actually arrived, not a binary in/out. checked_in_at is kept
+// as "first checked in at" (set once, on the 0->1 transition, preserved
+// across later increments) -- every existing reader of checked_in_at
+// (feedback eligibility, no-show/funnel stats) keeps meaning "checked in
+// at all" without needing to know about quantity.
+export async function setCheckInCount(eventId: string, responseId: string, count: number) {
   await requireUser();
   const supabase = await createClient();
 
-  // RLS (form_responses_update_owner) is the real gate -- a non-host caller's
-  // update simply matches zero rows rather than erroring.
+  // RLS (form_responses_update_owner) is the real gate on the update below
+  // -- a non-host caller's select here already comes back empty for the
+  // same reason, so this fetch can't leak another host's registrant data.
+  const { data: existing, error: fetchError } = await supabase
+    .from("form_responses")
+    .select("checked_in_at, quantity")
+    .eq("id", responseId)
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .single();
+  if (fetchError || !existing) return { error: "Not allowed to check in this registrant" };
+  if (count < 0 || count > existing.quantity) return { error: "Invalid check-in count" };
+
   const { data, error } = await supabase
     .from("form_responses")
-    .update({ checked_in_at: checkedIn ? new Date().toISOString() : null })
+    .update({
+      checked_in_count: count,
+      checked_in_at: count > 0 ? existing.checked_in_at ?? new Date().toISOString() : null,
+    })
     .eq("id", responseId)
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
@@ -402,7 +423,7 @@ export async function cancelEvent(eventId: string) {
 
   // RLS (events_update_host_or_admin) is the real gate -- a non-host
   // caller's update simply matches zero rows rather than erroring, same
-  // pattern as setCheckIn above. Registrations (form_responses) are
+  // pattern as setCheckInCount above. Registrations (form_responses) are
   // untouched by design -- people who already registered should still see
   // they signed up for something that got cancelled, not have that record
   // silently disappear.

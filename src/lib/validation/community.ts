@@ -32,6 +32,10 @@ export const createCommunitySchema = z
     community_type: z.enum(["online", "offline", "both"]),
     join_mode: z.enum(["open", "request"]),
     join_form_fields: formFieldsSchema.default([]),
+    // Omitted/undefined means unlimited -- matches the DB column default
+    // (0057). Enforced again at the DB level (a trigger, not just this
+    // schema) since this is also reachable by directly calling the action.
+    member_limit: z.number().int().min(1, "Must be at least 1").max(1_000_000).optional(),
   })
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",
@@ -58,6 +62,7 @@ export const updateCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
+    member_limit: z.number().int().min(1, "Must be at least 1").max(1_000_000).optional(),
   })
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",

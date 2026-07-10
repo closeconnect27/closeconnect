@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconCircleCheck, IconClockHour4 } from "@tabler/icons-react";
+import { IconCircleCheck, IconClockHour4, IconUsersGroup } from "@tabler/icons-react";
 import { DynamicForm } from "@/components/forms/DynamicForm";
 import { joinOpenCommunity, submitJoinRequest } from "@/app/actions/membership";
 import type { FormField } from "@/lib/queries/membership";
@@ -13,6 +13,7 @@ export function JoinSection({
   isMember,
   isOwner,
   isLoggedIn,
+  isFull,
   pendingStatus,
   formFields,
 }: {
@@ -21,6 +22,10 @@ export function JoinSection({
   isMember: boolean;
   isOwner: boolean;
   isLoggedIn: boolean;
+  // member_limit reached (0057) -- checked again server-side by a DB
+  // trigger regardless, this is just what stops the UI from offering an
+  // action that would fail anyway.
+  isFull: boolean;
   pendingStatus: "pending" | "approved" | "rejected" | null;
   formFields: FormField[];
 }) {
@@ -74,6 +79,15 @@ export function JoinSection({
       <p className="flex items-center gap-2 text-[14px] text-text2">
         <IconClockHour4 size={18} className="text-text3" />
         Your request to join is awaiting approval.
+      </p>
+    );
+  }
+
+  if (isFull) {
+    return (
+      <p className="flex items-center gap-2 text-[14px] text-text2">
+        <IconUsersGroup size={18} className="text-text3" />
+        This community is full.
       </p>
     );
   }
