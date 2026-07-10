@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 import { submitRatingSchema } from "@/lib/validation/rating";
 
 export async function submitRating(communityId: string, rating: number, review: string) {
@@ -48,5 +49,6 @@ export async function submitRating(communityId: string, rating: number, review: 
     return { error: error.message };
   }
   revalidatePath(`/communities/${communityId}`);
+  trackServerEvent("rating_submitted", user.id, { community_id: communityId, rating: parsed.data.rating });
   return { error: null };
 }

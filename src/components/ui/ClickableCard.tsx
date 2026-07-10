@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { ReactNode, KeyboardEvent, MouseEvent } from "react";
+import { track } from "@/lib/mixpanel/client";
 
 /**
  * A whole-area-clickable card that can safely contain real, independently
@@ -21,15 +22,23 @@ import type { ReactNode, KeyboardEvent, MouseEvent } from "react";
 export function ClickableCard({
   href,
   className,
+  trackEvent,
+  trackProperties,
   children,
 }: {
   href: string;
   className?: string;
+  /** Plain serializable data, not a callback -- the caller (CommunityCard,
+   * EventCard) is a Server Component, and a function prop can't cross that
+   * boundary. This client component does the actual track() call. */
+  trackEvent?: string;
+  trackProperties?: Record<string, unknown>;
   children: ReactNode;
 }) {
   const router = useRouter();
 
   function navigate() {
+    if (trackEvent) track(trackEvent, trackProperties);
     router.push(href);
   }
 

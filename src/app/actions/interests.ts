@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 
 export async function markInterested(eventId: string, visibleToHost: boolean) {
   const user = await requireUser();
@@ -22,6 +23,7 @@ export async function markInterested(eventId: string, visibleToHost: boolean) {
   }
 
   revalidatePath(`/events/${eventId}`);
+  trackServerEvent("event_interested", user.id, { event_id: eventId, visible_to_host: visibleToHost });
   return { error: null };
 }
 

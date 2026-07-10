@@ -1,33 +1,65 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { HeaderSlotProvider, useHeaderSlotContent } from "@/components/layout/HeaderSlotContext";
+import { track, identify } from "@/lib/mixpanel/client";
 
 // The landing page (/) is a standalone full-bleed hero -- the header/bottom
 // nav are chrome for navigating an app you're already inside of, not for a
 // first-touch marketing page. Every other route keeps them. A client
 // component specifically so usePathname can gate this without turning the
-// (server) root layout's auth lookup into a per-route client fetch.
+// (server) root layout's auth lookup into a per-route client fetch. Also
+// the one place app-wide that sees every route change, so it doubles as
+// the Mixpanel pageview/identify mount point -- no separate provider
+// needed just for that.
 export function SiteChrome({
   isLoggedIn,
+  userId,
   children,
 }: {
   isLoggedIn: boolean;
+  userId: string | null;
   children: React.ReactNode;
 }) {
   return (
     <HeaderSlotProvider>
-      <SiteChromeInner isLoggedIn={isLoggedIn}>{children}</SiteChromeInner>
+      <SiteChromeInner isLoggedIn={isLoggedIn} userId={userId}>
+        {children}
+      </SiteChromeInner>
     </HeaderSlotProvider>
   );
 }
 
-function SiteChromeInner({ isLoggedIn, children }: { isLoggedIn: boolean; children: React.ReactNode }) {
+function SiteChromeInner({
+  isLoggedIn,
+  userId,
+  children,
+}: {
+  isLoggedIn: boolean;
+  userId: string | null;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const slotContent = useHeaderSlotContent();
+
+  useEffect(() => {
+    track("page_view", { path: pathname });
+  }, [pathname]);
+
+  // Identifies once per real login, not on every render -- re-running
+  // identify() on an unchanged userId would just re-send the same
+  // $identify/$set calls on every route change for no reason.
+  const identifiedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (userId && identifiedRef.current !== userId) {
+      identifiedRef.current = userId;
+      identify(userId);
+    }
+  }, [userId]);
 
   return (
     <>

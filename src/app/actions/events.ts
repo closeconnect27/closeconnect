@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { createPaymentLink } from "@/lib/razorpay";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 import {
   createEventSchema,
   updateEventSchema,
@@ -93,6 +94,8 @@ export async function createEvent(input: CreateEventInput) {
       return { error: `Event created, but the registration form failed to save: ${fieldsError.message}` };
     }
   }
+
+  trackServerEvent("event_created", user.id, { event_id: event.id, category: data.category, has_community: !!data.community_id });
 
   // No redirect() here -- same reasoning as createCommunity: the caller
   // (NewEventForm) still has staged cover/gallery images in memory that
@@ -194,6 +197,11 @@ export async function registerForEvent(eventId: string, input: EventRegistration
       console.error("Failed to send registration confirmation email:", e),
     );
   }
+  trackServerEvent("event_registered", user.id, {
+    event_id: eventId,
+    ticket_type_id: parsed.data.ticket_type_id,
+    is_paid: isPaid,
+  });
   return { error: null, paymentLinkUrl };
 }
 

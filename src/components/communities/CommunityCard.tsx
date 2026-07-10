@@ -27,6 +27,8 @@ export function CommunityCard({ community: c }: { community: Community }) {
     <ClickableCard
       href={`/communities/${c.id}`}
       className="card-elevated block h-full w-full cursor-pointer overflow-hidden rounded-card bg-bg2"
+      trackEvent="community_card_opened"
+      trackProperties={{ community_id: c.id, category: c.category, kind: c.kind }}
     >
       <div className="relative h-72" style={{ background: visual.bg }}>
         {c.cover_image_url ? (
@@ -111,7 +113,7 @@ export function CommunityCard({ community: c }: { community: Community }) {
           ) : (
             <span />
           )}
-          {c.kind === "external" && c.external_link && <JoinBadge link={c.external_link} />}
+          {c.kind === "external" && c.external_link && <JoinBadge link={c.external_link} communityId={c.id} />}
         </div>
       </div>
     </ClickableCard>

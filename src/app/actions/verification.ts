@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 import { requestVerificationSchema, type RequestVerificationInput } from "@/lib/validation/verification";
 
 export async function requestCommunityVerification(communityId: string, input: RequestVerificationInput) {
@@ -38,6 +39,7 @@ export async function requestCommunityVerification(communityId: string, input: R
   notifyAdminOfVerificationRequest("community", community?.name ?? "a community").catch((e) =>
     console.error("Failed to send verification request notification email:", e),
   );
+  trackServerEvent("verification_requested", user.id, { target_type: "community", target_id: communityId });
   return { error: null };
 }
 
@@ -70,6 +72,7 @@ export async function requestOrganizerVerification(input: RequestVerificationInp
   notifyAdminOfVerificationRequest("organizer", profile?.display_name ?? "A user").catch((e) =>
     console.error("Failed to send verification request notification email:", e),
   );
+  trackServerEvent("verification_requested", user.id, { target_type: "organizer", target_id: user.id });
   return { error: null };
 }
 

@@ -60,7 +60,9 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        <SiteChrome isLoggedIn={isLoggedIn}>{children}</SiteChrome>
+        <SiteChrome isLoggedIn={isLoggedIn} userId={user?.id ?? null}>
+          {children}
+        </SiteChrome>
       </body>
     </html>
   );

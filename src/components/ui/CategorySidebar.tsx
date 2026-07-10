@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
+import { track } from "@/lib/mixpanel/client";
 
 /**
  * Category filter, replacing the old horizontal Netflix-style rows
@@ -24,6 +25,7 @@ function useCategorySelect(basePath: string) {
   const active = searchParams.get("category") ?? "";
 
   function select(category: string) {
+    if (category) track("category_clicked", { category, base_path: basePath });
     const params = new URLSearchParams(searchParams.toString());
     if (category) params.set("category", category);
     else params.delete("category");

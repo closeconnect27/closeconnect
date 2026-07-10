@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { canReadGroup, canPostToGroup, getGroupMessages, getGroupById } from "@/lib/queries/chat";
+import { markGroupRead } from "@/app/actions/chat";
 import { GroupChat } from "@/components/communities/GroupChat";
 
 export default async function GroupChatPage({
@@ -30,6 +31,13 @@ export default async function GroupChatPage({
 
   const canPost = await canPostToGroup(supabase, group, user.id);
   const messages = await getGroupMessages(supabase, groupId);
+
+  // Fire-and-forget-adjacent: awaited so it's committed before the badge
+  // could plausibly be re-fetched by a nav elsewhere, but never awaited by
+  // the caller of a return value -- this page doesn't hold up rendering
+  // waiting on it. A failed mark-read just means the badge doesn't clear
+  // this one visit, not a broken chat.
+  markGroupRead(groupId).catch((e) => console.error("Failed to mark group read:", e));
 
   return (
     <div className="flex-1 px-4 pb-10 pt-6 sm:px-6">

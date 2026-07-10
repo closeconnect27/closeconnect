@@ -10,9 +10,9 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 // Matches the banner's rendered proportions closely enough across
 // breakpoints (h-40/h-48 mobile up to h-52/h-64 desktop, full width) without
-// excessive letterboxing at either end -- covers only, logos stay a plain
-// center-cropped square (see `shape` below).
+// excessive letterboxing at either end.
 const COVER_ASPECT = 3;
+const LOGO_ASPECT = 1;
 
 /**
  * Single-slot image upload (a logo, a cover) shared by communities and
@@ -85,15 +85,10 @@ export function SingleImageUploader({
       return;
     }
 
-    // Covers get a crop/zoom step so the uploader picks what stays visible
-    // instead of always landing on whatever object-cover's default center
-    // crop happens to show -- logos are square avatars, already fine as a
-    // plain center crop, so this only applies to the wide shape.
-    if (shape === "wide") {
-      setCropSrc(URL.createObjectURL(file));
-    } else {
-      uploadBlob(file, file.name.split(".").pop() ?? "jpg", file.type);
-    }
+    // Crop/zoom step so the uploader picks what stays visible instead of
+    // always landing on whatever the browser's default center-crop shows
+    // -- applies to both shapes now (logos included).
+    setCropSrc(URL.createObjectURL(file));
   }
 
   function closeCrop() {
@@ -103,7 +98,12 @@ export function SingleImageUploader({
 
   async function handleCropConfirm(blob: Blob) {
     closeCrop();
-    await uploadBlob(blob, "jpg", "image/jpeg");
+    // Logos keep png -- often uploaded as a mark on a transparent
+    // background, and jpeg would flatten that to an opaque fill. Covers
+    // stay jpeg -- decorative banners, never need transparency, and jpeg
+    // is smaller for a much larger cropped area.
+    if (shape === "square") await uploadBlob(blob, "png", "image/png");
+    else await uploadBlob(blob, "jpg", "image/jpeg");
   }
 
   async function handleRemove() {
@@ -170,7 +170,14 @@ export function SingleImageUploader({
       {error && <p className="text-[12px] text-pink">{error}</p>}
 
       {cropSrc && (
-        <ImageCropModal imageSrc={cropSrc} aspect={COVER_ASPECT} onCancel={closeCrop} onConfirm={handleCropConfirm} />
+        <ImageCropModal
+          imageSrc={cropSrc}
+          aspect={shape === "square" ? LOGO_ASPECT : COVER_ASPECT}
+          title={`Adjust ${label.toLowerCase()}`}
+          outputFormat={shape === "square" ? "png" : "jpeg"}
+          onCancel={closeCrop}
+          onConfirm={handleCropConfirm}
+        />
       )}
     </div>
   );

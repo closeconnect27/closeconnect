@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 import { getCommunityFormFields } from "@/lib/queries/membership";
 import { formAnswersSchema } from "@/lib/validation/forms";
 import { createGroupSchema, type CreateGroupInput } from "@/lib/validation/community";
@@ -23,6 +24,7 @@ export async function joinOpenCommunity(communityId: string) {
 
   if (error) return { error: error.message };
   revalidatePath(`/communities/${communityId}`);
+  trackServerEvent("community_joined", user.id, { community_id: communityId, join_mode: "open" });
   return { error: null };
 }
 

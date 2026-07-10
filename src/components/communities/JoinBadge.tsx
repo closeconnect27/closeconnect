@@ -2,20 +2,24 @@
 
 import { IconBrandWhatsapp, IconBrandInstagram } from "@tabler/icons-react";
 import { safeJoinHref, isInstagramLink } from "@/lib/validators/links";
+import { track } from "@/lib/mixpanel/client";
 
 // Its own client component because it needs stopPropagation to keep this
 // nested link from also triggering the parent ClickableCard's navigation --
 // can't pass an event handler from the server-rendered card. A real <a>
 // nested in ClickableCard's div wrapper is valid HTML (unlike nesting it in
 // a <Link>/<a>), which is exactly why CommunityCard uses ClickableCard.
-export function JoinBadge({ link }: { link: string }) {
+export function JoinBadge({ link, communityId }: { link: string; communityId?: string }) {
   const insta = isInstagramLink(link);
   return (
     <a
       href={safeJoinHref(link)}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        track(insta ? "instagram_join_clicked" : "whatsapp_join_clicked", { community_id: communityId });
+      }}
       className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-bold"
       style={
         insta

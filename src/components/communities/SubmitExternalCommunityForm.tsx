@@ -8,6 +8,7 @@ import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { CITY_OPTIONS } from "@/lib/cities";
+import { track } from "@/lib/mixpanel/client";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -48,6 +49,13 @@ export function SubmitExternalCommunityForm() {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
+
+    // Tracked here, not after the call -- a successful submission
+    // redirect()s server-side and this component never gets control back
+    // to run a "success" branch. Errors returning { error } are the only
+    // case that resumes here, matching the old site's own fire-on-submit
+    // (not fire-on-confirmed-success) semantics for this event.
+    track("community_submitted", { category, city: city || "none", community_type: communityType });
 
     startTransition(async () => {
       const result = await submitExternalCommunity(parsed.data);

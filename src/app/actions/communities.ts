@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { trackServerEvent } from "@/lib/mixpanel/server";
 import { getCommunityImages } from "@/lib/queries/communities";
 import {
   createCommunitySchema,
@@ -74,6 +75,8 @@ export async function createCommunity(input: CreateCommunityInput) {
       return { error: `Community created, but the join form failed to save: ${fieldsError.message}` };
     }
   }
+
+  trackServerEvent("community_created", user.id, { community_id: community.id, category: data.category, kind: "native" });
 
   // No redirect() here -- the caller (NewCommunityForm) still has staged
   // logo/cover/gallery images in memory that need this id to upload against
@@ -352,6 +355,7 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
   notifyAdminOfPendingClaim(claim.id, community.name).catch((e) =>
     console.error("Failed to send claim notification email:", e),
   );
+  trackServerEvent("claim_submitted", user.id, { community_id: communityId, claim_id: claim.id });
   return { error: null };
 }
 

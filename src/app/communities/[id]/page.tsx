@@ -16,6 +16,7 @@ import {
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { getMyRating } from "@/lib/queries/ratings";
+import { getUnreadCounts } from "@/lib/queries/chat";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { CategoryImage } from "@/components/ui/CategoryImage";
@@ -65,6 +66,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
     isNative && user
       ? await getUserGroupMemberships(supabase, user.id, groups.map((g) => g.id))
       : new Set<string>();
+  // Only the groups the viewer has actually joined can have a meaningful
+  // unread count for them -- get_group_unread_count itself would just
+  // return every message ever sent for a group they've never opened, which
+  // isn't "unread" so much as "never seen at all."
+  const unreadCounts =
+    user && joinedGroupIds.size > 0 ? await getUnreadCounts(supabase, [...joinedGroupIds]) : {};
 
   const formFields =
     isNative && community.join_mode === "request" ? await getCommunityFormFields(supabase, id) : [];
@@ -219,6 +226,8 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                 groups={groups}
                 isMember={isMember}
                 joinedGroupIds={joinedGroupIds}
+                unreadCounts={unreadCounts}
+                currentUserId={user?.id ?? null}
               />
               {isStaff && (
                 <div className="mt-3">
