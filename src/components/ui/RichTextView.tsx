@@ -30,17 +30,17 @@ export function RichTextView({
     extensions: richTextExtensions(),
     content: content ?? (plainFallback ? { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: plainFallback }] }] } : ""),
     editable: false,
-    // true here, unlike RichTextEditor's editable instance -- this is a
-    // READ-ONLY view of server-fetched, deterministic content (same JSON
-    // on the server and the client, no user input involved), so there's
-    // no hydration-mismatch risk to guard against. false was silently
-    // producing an empty <div> in the server-rendered HTML until client
-    // JS hydrated -- confirmed directly (curled a live page, zero
-    // occurrences of "ProseMirror" in the raw response) -- meaning every
-    // community/event/profile description was invisible to anything that
-    // doesn't execute JS (most search crawlers, social link unfurlers),
-    // a real regression against the plain-text description this replaced.
-    immediatelyRender: true,
+    // Tried setting this true, expecting it to bake content into the
+    // server HTML -- it doesn't. Confirmed directly (curled a live page
+    // before and after, zero "ProseMirror" occurrences either way):
+    // ProseMirror's EditorView needs a real browser DOM to construct
+    // anything, which doesn't exist during actual server execution
+    // (Workers has no `document`) -- the flag only controls timing
+    // *within a browser*, it can't manufacture DOM APIs that aren't
+    // there. false is correct and intentional, matching the class
+    // comment above: no SSR content is an accepted, understood tradeoff
+    // against pulling in @tiptap/html + happy-dom for a real SSR path.
+    immediatelyRender: false,
   });
 
   if (!editor) return null;
