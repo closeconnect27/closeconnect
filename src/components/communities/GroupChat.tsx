@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useTransition } from "react";
+import Link from "next/link";
 import {
   IconSend2,
   IconMessageCircle2,
@@ -154,9 +155,12 @@ export function GroupChat({
             return (
               <div key={m.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
                 {!isMine && (
-                  <span className="mb-1 px-1 text-[11px] font-medium text-text3">
+                  <Link
+                    href={`/profile/${m.user_id}`}
+                    className="mb-1 px-1 text-[11px] font-medium text-text3 transition hover:text-green hover:underline"
+                  >
                     {m.profiles?.display_name ?? "member"}
-                  </span>
+                  </Link>
                 )}
                 <div
                   className={`inline-block max-w-[80%] overflow-hidden rounded-2xl text-[14px] leading-relaxed ${

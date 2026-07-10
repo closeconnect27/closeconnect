@@ -21,7 +21,6 @@ import {
 import {
   getEventFormFields,
   getHostableCommunities,
-  getEventImages,
   getEventTicketTypes,
 } from "@/lib/queries/events";
 
@@ -44,7 +43,11 @@ export async function createEvent(input: CreateEventInput) {
     }
   }
 
-  const id = crypto.randomUUID();
+  // data.id is generated client-side by NewEventForm -- same reasoning as
+  // createCommunity's id field (see its comment): lets the rich editor
+  // upload inline description images against this id before the row
+  // exists (0053).
+  const id = data.id;
   const photo = assignPhotoForEntity(data.category, id);
 
   const { data: event, error } = await supabase
@@ -55,6 +58,7 @@ export async function createEvent(input: CreateEventInput) {
       community_id: data.community_id ?? null,
       event_name: data.event_name,
       description: data.description || null,
+      description_content: data.description_content ?? null,
       event_date: data.event_date,
       event_time: data.event_time || null,
       venue: data.venue || null,
@@ -265,48 +269,6 @@ export async function setCheckIn(eventId: string, responseId: string, checkedIn:
   return { error: null };
 }
 
-export async function addEventImage(eventId: string, imageUrl: string) {
-  await requireUser();
-
-  // event_images is publicly rendered on the event page -- without this, a
-  // host (the only caller RLS lets reach the insert) could point it at an
-  // arbitrary external URL instead of a real upload, bypassing the storage
-  // bucket's own type/size limits (SPEC.md Section 11) entirely.
-  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/event-images/${eventId}/`;
-  if (!imageUrl.startsWith(expectedPrefix)) {
-    return { error: "Image must come from this event's own upload" };
-  }
-
-  const supabase = await createClient();
-
-  const existing = await getEventImages(supabase, eventId);
-  if (existing.length >= 5) {
-    return { error: "An event can have at most 5 images" };
-  }
-
-  const { error } = await supabase.from("event_images").insert({
-    event_id: eventId,
-    image_url: imageUrl,
-    sort_order: existing.length,
-  });
-  if (error) return { error: error.message };
-  revalidatePath(`/events/${eventId}`);
-  return { error: null };
-}
-
-export async function removeEventImage(eventId: string, imageId: string, storagePath: string) {
-  await requireUser();
-  const supabase = await createClient();
-
-  // RLS (event_images_delete_host) is the real gate -- a non-host caller's
-  // delete simply matches zero rows rather than erroring.
-  await supabase.storage.from("event-images").remove([storagePath]);
-  const { error } = await supabase.from("event_images").delete().eq("id", imageId);
-  if (error) return { error: error.message };
-  revalidatePath(`/events/${eventId}`);
-  return { error: null };
-}
-
 /** auth.uid() = host_id, or admin -- shared by updateEvent/duplicateEvent
  * per the spec's explicit "(or admin)" carve-out (community editing didn't
  * have this carve-out, hence the different shape from updateCommunity). */
@@ -344,6 +306,7 @@ export async function updateEvent(eventId: string, input: UpdateEventInput) {
     .update({
       event_name: data.event_name,
       description: data.description || null,
+      description_content: data.description_content ?? null,
       event_date: data.event_date,
       event_time: data.event_time || null,
       venue: data.venue || null,
@@ -487,6 +450,7 @@ export async function duplicateEvent(eventId: string) {
       community_id: original.community_id,
       event_name: `${original.event_name} (copy)`,
       description: original.description,
+      description_content: original.description_content,
       event_date: null,
       event_time: original.event_time,
       venue: original.venue,

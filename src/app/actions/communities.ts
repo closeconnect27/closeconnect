@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { trackServerEvent } from "@/lib/mixpanel/server";
 import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
-import { getCommunityImages } from "@/lib/queries/communities";
 import {
   createCommunitySchema,
   updateCommunitySchema,
@@ -33,10 +32,14 @@ export async function createCommunity(input: CreateCommunityInput) {
 
   const supabase = await createClient();
 
-  // Generated here, not left to the column default, so the assigned photo
-  // (which needs a stable id to hash against) can be included in the same
-  // insert instead of a separate update after the fact.
-  const id = crypto.randomUUID();
+  // data.id is generated client-side by NewCommunityForm (not left to the
+  // column default) for two reasons: the assigned photo needs a stable id
+  // to hash against before the insert, and the rich editor needs a real id
+  // to upload inline description images against *before* this row exists
+  // (0053's storage policy allows that specifically for a not-yet-claimed
+  // id). A colliding id would simply fail the insert below (23505) --
+  // practically impossible for a real v4 UUID, not worth a pre-check.
+  const id = data.id;
   const photo = assignPhotoForEntity(data.category, id);
 
   const { data: community, error } = await supabase
@@ -45,6 +48,7 @@ export async function createCommunity(input: CreateCommunityInput) {
       id,
       name: data.name,
       description: data.description,
+      description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
       city: data.city || null,
@@ -90,11 +94,10 @@ export async function createCommunity(input: CreateCommunityInput) {
 
   trackServerEvent("community_created", user.id, { community_id: community.id, category: data.category, kind: "native" });
 
-  // No redirect() here -- the caller (NewCommunityForm) still has staged
-  // logo/cover/gallery images in memory that need this id to upload against
-  // (see uploadStagedImage), and only navigates once that's done. Every
-  // other caller-facing shape in this file returns { error } on failure; a
-  // successful create additionally carries the new id.
+  // No redirect() here -- the caller (NewCommunityForm) still needs the new
+  // id to navigate to /communities/[id] itself. Every other caller-facing
+  // shape in this file returns { error } on failure; a successful create
+  // additionally carries the new id.
   return { error: null, communityId: community.id };
 }
 
@@ -137,6 +140,7 @@ export async function updateCommunity(communityId: string, input: UpdateCommunit
     .update({
       name: data.name,
       description: data.description,
+      description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
       city: data.city || null,
@@ -155,48 +159,29 @@ export async function updateCommunity(communityId: string, input: UpdateCommunit
   redirect(`/communities/${communityId}`);
 }
 
-// Mirrors addEventImage/removeEventImage exactly (0003_event_images.sql's
-// pattern) -- a gallery separate from the single logo/cover, same shape,
-// same defense-in-depth. RLS (community_images_insert_staff/delete_staff,
-// 0032) is the real gate; a non-staff caller's insert/delete simply matches
-// zero rows or fails RLS rather than this action needing its own duplicate
-// ownership check.
-export async function addCommunityImage(communityId: string, imageUrl: string) {
-  await requireUser();
-
-  // community_images is publicly rendered -- without this, staff (the only
-  // caller RLS lets reach the insert) could point it at an arbitrary
-  // external URL instead of a real upload, bypassing the storage bucket's
-  // own type/size limits entirely.
-  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/community-images/${communityId}/`;
-  if (!imageUrl.startsWith(expectedPrefix)) {
-    return { error: "Image must come from this community's own upload" };
-  }
-
+/** Owner-only toggle for whether ordinary members can see the full member
+ * list (0052) -- owner/moderators always show regardless, enforced where
+ * MemberList renders, not here. Explicit ownership check (SPEC.md Section
+ * 11), same pattern as updateCommunity -- RLS (communities_update_owner,
+ * 0017) backs this up independently. */
+export async function toggleMembersListVisibility(communityId: string, visible: boolean) {
+  const user = await requireUser();
   const supabase = await createClient();
 
-  const existing = await getCommunityImages(supabase, communityId);
-  if (existing.length >= 5) {
-    return { error: "A community can have at most 5 images" };
-  }
+  const { data: existing, error: fetchError } = await supabase
+    .from("communities")
+    .select("owner_id")
+    .eq("id", communityId)
+    .single();
+  if (fetchError || !existing) return { error: "Community not found" };
+  if (existing.owner_id !== user.id) return { error: "Only the owner can change this" };
 
-  const { error } = await supabase.from("community_images").insert({
-    community_id: communityId,
-    image_url: imageUrl,
-    sort_order: existing.length,
-  });
+  const { error } = await supabase
+    .from("communities")
+    .update({ members_list_visible: visible })
+    .eq("id", communityId);
   if (error) return { error: error.message };
-  revalidatePath(`/communities/${communityId}`);
-  return { error: null };
-}
 
-export async function removeCommunityImageFromGallery(communityId: string, imageId: string, storagePath: string) {
-  await requireUser();
-  const supabase = await createClient();
-
-  await supabase.storage.from("community-images").remove([storagePath]);
-  const { error } = await supabase.from("community_images").delete().eq("id", imageId);
-  if (error) return { error: error.message };
   revalidatePath(`/communities/${communityId}`);
   return { error: null };
 }
@@ -225,6 +210,7 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
       id,
       name: data.name,
       description: data.description,
+      description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
       city: data.city || null,

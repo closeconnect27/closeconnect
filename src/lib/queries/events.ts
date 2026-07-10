@@ -12,19 +12,16 @@ export type EventTicketType = {
   sort_order: number;
 };
 
-export type EventImage = {
-  id: string;
-  event_id: string;
-  image_url: string;
-  sort_order: number;
-};
-
 export type EventListItem = {
   id: string;
   host_id: string;
   community_id: string | null;
   event_name: string;
   description: string | null;
+  /** Tiptap ProseMirror JSON -- null for rows created before the rich
+   * editor existed. EventDescription (RichTextView) falls back to
+   * rendering the plain `description` above when this is null. */
+  description_content: object | null;
   // null means the event is a draft -- currently only reachable right after
   // duplicateEvent(), before the host has set a real date. Public listing
   // queries exclude these; the detail page 404s them for non-hosts.
@@ -160,16 +157,6 @@ export async function getEventTicketTypes(supabase: SupabaseClient, eventId: str
     .order("sort_order");
   if (error) throw error;
   return data as EventTicketType[];
-}
-
-export async function getEventImages(supabase: SupabaseClient, eventId: string) {
-  const { data, error } = await supabase
-    .from("event_images")
-    .select("*")
-    .eq("event_id", eventId)
-    .order("sort_order");
-  if (error) throw error;
-  return data as EventImage[];
 }
 
 export async function getEventFormFields(supabase: SupabaseClient, eventId: string) {

@@ -31,6 +31,10 @@ export type PublicProfileBasic = {
   avatar_url: string | null;
   host_rating: number;
   bio: string | null;
+  /** Tiptap ProseMirror JSON -- null for bios written before the rich
+   * editor existed. RichTextView falls back to the plain `bio` above
+   * when this is null. */
+  bio_content: object | null;
   profile_visibility: "public" | "members_only" | "private";
   is_verified: boolean;
   verified_phone: boolean;
@@ -49,7 +53,9 @@ export type PublicProfileBasic = {
 export async function getPublicProfileBasic(supabase: SupabaseClient, profileId: string) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_url, host_rating, bio, profile_visibility, is_verified, verified_phone, verified_email")
+    .select(
+      "id, display_name, avatar_url, host_rating, bio, bio_content, profile_visibility, is_verified, verified_phone, verified_email",
+    )
     .eq("id", profileId)
     .maybeSingle();
   if (error) throw error;

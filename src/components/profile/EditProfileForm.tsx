@@ -8,6 +8,7 @@ import { updateProfileSchema } from "@/lib/validation/profile";
 import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CATEGORIES } from "@/lib/categories";
 import type { ProfileDetails, PublicProfileBasic } from "@/lib/queries/profileDetails";
 import type { VerificationRequestStatus } from "@/lib/queries/verification";
@@ -46,7 +47,7 @@ export function EditProfileForm({
   verificationStatus: VerificationRequestStatus;
 }) {
   const router = useRouter();
-  const [bio, setBio] = useState(basic.bio ?? "");
+  const [bio, setBio] = useState({ json: basic.bio_content, text: basic.bio ?? "" });
   const [occupation, setOccupation] = useState(details.occupation ?? "");
   const [company, setCompany] = useState(details.company ?? "");
   const [college, setCollege] = useState(details.college ?? "");
@@ -75,7 +76,8 @@ export function EditProfileForm({
     setError("");
 
     const input = {
-      bio: bio || undefined,
+      bio: bio.text || undefined,
+      bio_content: bio.json,
       occupation: occupation || undefined,
       company: company || undefined,
       college: college || undefined,
@@ -123,8 +125,8 @@ export function EditProfileForm({
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <Field label="Bio">
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={1000} className={inputClass} />
+      <Field label="Bio (up to 500 characters)">
+        <RichTextEditor content={bio.json} onChange={setBio} placeholder="Tell people a bit about yourself" allowImages={false} />
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

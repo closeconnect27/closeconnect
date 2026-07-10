@@ -3,6 +3,7 @@ import { isCategorySlug } from "@/lib/categories";
 import { isCity } from "@/lib/cities";
 import { formFieldsSchema, formAnswersSchema } from "@/lib/validation/forms";
 import { isValidPaymentLink } from "@/lib/validators/links";
+import { descriptionContentField } from "@/lib/validation/richText";
 
 // See lib/validation/community.ts's cityField for why this is a direct
 // refine(isCity), not wrapped in another arrow function.
@@ -22,8 +23,14 @@ const ticketTypeSchema = z.object({
 
 export const createEventSchema = z
   .object({
+    // Generated client-side (crypto.randomUUID()) before the form even
+    // renders -- same reasoning as createCommunitySchema's id field, so
+    // the rich editor can upload inline description images against this
+    // id's storage folder before the row exists (0053).
+    id: z.string().uuid(),
     event_name: z.string().trim().min(3, "Event name must be at least 3 characters").max(100),
     description: z.string().trim().max(3000).optional(),
+    description_content: descriptionContentField,
     event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
     event_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
     venue: z.string().trim().max(160).optional(),
@@ -58,6 +65,7 @@ export const updateEventSchema = z
   .object({
     event_name: z.string().trim().min(3, "Event name must be at least 3 characters").max(100),
     description: z.string().trim().max(3000).optional(),
+    description_content: descriptionContentField,
     event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
     event_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
     venue: z.string().trim().max(160).optional(),

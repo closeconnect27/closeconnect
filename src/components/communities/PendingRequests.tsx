@@ -44,7 +44,9 @@ export function PendingRequests({
       {requests.map((req) => (
         <div key={req.id} className="card-elevated rounded-card bg-bg2 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-[14px] font-bold text-text">{req.profiles?.display_name ?? "Someone"}</span>
+            <Link href={`/profile/${req.respondent_id}`} className="text-[14px] font-bold text-text transition hover:text-green hover:underline">
+              {req.profiles?.display_name ?? "Someone"}
+            </Link>
             {/* profile_details_select_staff_reviewing (0033) lets staff see
                 this applicant's full profile while the request is pending,
                 regardless of their profile_visibility setting -- the

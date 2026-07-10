@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidLinkedInUrl, isValidGithubUrl, isValidInstagramUrl } from "@/lib/validators/links";
 import { isCategorySlug } from "@/lib/categories";
+import { bioContentField } from "@/lib/validation/richText";
 
 // Forms convert an empty input to `undefined` before this runs (matching
 // the cityField/extra_cities pattern in validation/community.ts), so a
@@ -13,7 +14,8 @@ const instagramField = z.string().trim().refine(isValidInstagramUrl, "Must be an
 // pass (display_name has never had an edit path at all; adding one is a
 // separate concern from the new profile-detail fields this schema covers).
 export const updateProfileSchema = z.object({
-  bio: z.string().trim().max(1000).optional(),
+  bio: z.string().trim().max(500).optional(),
+  bio_content: bioContentField,
   occupation: z.string().trim().max(100).optional(),
   company: z.string().trim().max(100).optional(),
   college: z.string().trim().max(100).optional(),

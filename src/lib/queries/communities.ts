@@ -9,6 +9,11 @@ export type Community = {
   id: string;
   name: string;
   description: string;
+  /** Tiptap ProseMirror JSON -- null for rows created before the rich
+   * editor existed, or a plain textarea submission (e.g. the external
+   * community listing form). RichTextView falls back to rendering the
+   * plain `description` above when this is null. */
+  description_content: object | null;
   category: string;
   extra_categories: string[] | null;
   city: string | null;
@@ -31,6 +36,10 @@ export type Community = {
   // -- see src/lib/unsplash.ts. Null only for rows that predate this
   // system and haven't been backfilled yet; CategoryImage is the fallback.
   unsplash_image_url: string | null;
+  // Owner-controlled: when false, ordinary members can't see the full
+  // member list -- the owner/moderators always show regardless (enforced
+  // in MemberList, not RLS -- see 0052).
+  members_list_visible: boolean;
 };
 
 export type CommunityFilters = {
@@ -114,23 +123,6 @@ export async function getCommunityById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase.from("communities").select("*").eq("id", id).single();
   if (error) throw error;
   return data as Community;
-}
-
-export type CommunityImage = {
-  id: string;
-  community_id: string;
-  image_url: string;
-  sort_order: number;
-};
-
-export async function getCommunityImages(supabase: SupabaseClient, communityId: string) {
-  const { data, error } = await supabase
-    .from("community_images")
-    .select("*")
-    .eq("community_id", communityId)
-    .order("sort_order");
-  if (error) throw error;
-  return data as CommunityImage[];
 }
 
 /** Per-category community counts, matching the same primary-or-extra rule above. */

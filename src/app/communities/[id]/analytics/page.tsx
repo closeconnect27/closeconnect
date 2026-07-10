@@ -136,10 +136,10 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
             <div className="flex flex-col gap-2">
               {activeMembers.map((m, i) => (
                 <div key={m.userId} className="card-elevated flex items-center justify-between gap-3 rounded-card bg-bg2 p-3">
-                  <span className="flex items-center gap-2 text-[13px] font-medium text-text">
+                  <Link href={`/profile/${m.userId}`} className="flex items-center gap-2 text-[13px] font-medium text-text transition hover:text-green hover:underline">
                     <span className="font-mono text-[11px] text-text3">#{i + 1}</span>
                     {m.displayName}
-                  </span>
+                  </Link>
                   <span className="text-[12px] text-text3">{m.messageCount} messages</span>
                 </div>
               ))}

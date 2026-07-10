@@ -166,6 +166,42 @@ export async function reviewJoinRequest(
   return { error: null };
 }
 
+/** Owner-only promote/demote between 'member' and 'moderator' ("admin" in
+ * the UI) -- explicit check here (SPEC.md Section 11), not just RLS. RLS
+ * (community_members_update_staff, 0010) is the real backstop: its `with
+ * check` requires the CALLER to already have role='owner' in this
+ * community (or be a platform admin), so even a direct API call can't
+ * promote/demote past this same restriction. Never targets the owner's
+ * own row -- that would either strand the community with no owner or be a
+ * no-op fight against owner_id, which stays authoritative regardless of
+ * this table (see communitySeed's isOwner fallback elsewhere). */
+export async function setMemberRole(communityId: string, targetUserId: string, role: "moderator" | "member") {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: community, error: fetchError } = await supabase
+    .from("communities")
+    .select("owner_id")
+    .eq("id", communityId)
+    .single();
+  if (fetchError || !community) return { error: "Community not found" };
+  if (community.owner_id !== user.id) return { error: "Only the owner can change member roles" };
+  if (targetUserId === community.owner_id) return { error: "The owner's role can't be changed" };
+
+  const { data, error } = await supabase
+    .from("community_members")
+    .update({ role })
+    .eq("community_id", communityId)
+    .eq("user_id", targetUserId)
+    .select();
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "That person isn't a member of this community" };
+
+  revalidatePath(`/communities/${communityId}`);
+  return { error: null };
+}
+
 export async function removeMember(communityId: string, targetUserId: string) {
   const user = await requireUser();
 

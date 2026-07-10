@@ -6,12 +6,11 @@ import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { createCommunitySchema } from "@/lib/validation/community";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
-import { createCommunity, addCommunityImage } from "@/app/actions/communities";
+import { createCommunity } from "@/app/actions/communities";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
-import { StagedGalleryPicker } from "@/components/ui/StagedGalleryPicker";
-import { uploadStagedImage } from "@/lib/uploadStagedImage";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CITY_OPTIONS } from "@/lib/cities";
 
 const inputClass =
@@ -19,8 +18,14 @@ const inputClass =
 
 export function NewCommunityForm() {
   const router = useRouter();
+  // Generated once, up front, not at submit time -- the rich editor needs
+  // a stable id to upload inline images against before this community
+  // exists (0053's storage policy allows that for a not-yet-claimed id).
+  // useState(() => ...), not a bare crypto.randomUUID() call, so it's
+  // computed once on mount and stays stable across re-renders.
+  const [communityId] = useState(() => crypto.randomUUID());
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState({ json: null as object | null, text: "" });
   const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
@@ -28,7 +33,6 @@ export function NewCommunityForm() {
   const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [joinMode, setJoinMode] = useState<"open" | "request">("open");
   const [joinFormFields, setJoinFormFields] = useState<FormFieldDraft[]>([]);
-  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -43,8 +47,10 @@ export function NewCommunityForm() {
     setError("");
 
     const input = {
+      id: communityId,
       name,
-      description,
+      description: description.text,
+      description_content: description.json,
       category,
       extra_categories: extraCategories,
       city: city || undefined,
@@ -66,25 +72,7 @@ export function NewCommunityForm() {
         setError(result?.error ?? "Could not create community");
         return;
       }
-      const id = result.communityId;
-
-      // The community exists now, so staged gallery photos can finally
-      // upload against a real path -- failures here don't block navigation
-      // (the community itself is fine either way).
-      const failures: string[] = [];
-      for (const file of galleryFiles) {
-        const ext = file.name.split(".").pop() ?? "jpg";
-        const { url, error: uploadError } = await uploadStagedImage("community-images", `${id}/gallery/${crypto.randomUUID()}.${ext}`, file, file.type);
-        if (url) await addCommunityImage(id, url);
-        else failures.push(`gallery photo (${uploadError})`);
-      }
-
-      // A failed image upload doesn't block navigation (the community
-      // itself is created fine either way), but an error banner on this
-      // page would vanish unseen the instant we navigate -- land on Edit
-      // instead so "some images failed" is somewhere they can act on it,
-      // rather than a clean success page silently missing a photo.
-      router.push(failures.length > 0 ? `/communities/${id}/edit` : `/communities/${id}`);
+      router.push(`/communities/${result.communityId}`);
     });
   }
 
@@ -97,21 +85,16 @@ export function NewCommunityForm() {
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <Field label="Gallery (optional)">
-            <StagedGalleryPicker files={galleryFiles} onChange={setGalleryFiles} />
-          </Field>
-
           <Field label="Name">
             <input value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
           </Field>
 
           <Field label="Description">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              rows={4}
-              className={inputClass}
+            <RichTextEditor
+              content={description.json}
+              onChange={setDescription}
+              placeholder="What's this community about?"
+              imageUpload={{ bucket: "community-images", entityId: communityId }}
             />
           </Field>
 

@@ -7,13 +7,12 @@ import { createEventSchema } from "@/lib/validation/event";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
-import { createEvent, addEventImage } from "@/app/actions/events";
+import { createEvent } from "@/app/actions/events";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
-import { StagedGalleryPicker } from "@/components/ui/StagedGalleryPicker";
-import { uploadStagedImage } from "@/lib/uploadStagedImage";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CITY_OPTIONS } from "@/lib/cities";
 
 function todayIso() {
@@ -25,8 +24,14 @@ const inputClass =
 
 export function NewEventForm({ hostableCommunities }: { hostableCommunities: { id: string; name: string }[] }) {
   const router = useRouter();
+  // Generated once, up front -- same reasoning as NewCommunityForm's
+  // communityId: the rich editor needs a stable id to upload inline
+  // images against before this event exists (0053). Not to be confused
+  // with the `communityId` state below, which is which *existing*
+  // community (if any) this event attaches to.
+  const [eventId] = useState(() => crypto.randomUUID());
   const [eventName, setEventName] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState({ json: null as object | null, text: "" });
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [venue, setVenue] = useState("");
@@ -38,7 +43,6 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
     { name: "General", price: 0, payment_link: "", quantity_available: "" },
   ]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
-  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -47,8 +51,10 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
     setError("");
 
     const input = {
+      id: eventId,
       event_name: eventName,
-      description: description || undefined,
+      description: description.text || undefined,
+      description_content: description.json,
       event_date: eventDate,
       event_time: eventTime || undefined,
       venue: venue || undefined,
@@ -77,24 +83,12 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
         setError(result?.error ?? "Could not create event");
         return;
       }
-      const id = result.eventId;
 
-      // Same reasoning as NewCommunityForm: the event exists now, so staged
-      // gallery photos can finally upload against a real path. Failures
-      // don't block navigation -- land on the manage page instead of the
-      // detail page so "some images failed" is somewhere actionable, not a
-      // vanished banner.
-      const failures: string[] = [];
-      for (const file of galleryFiles) {
-        const ext = file.name.split(".").pop() ?? "jpg";
-        // No subfolder here -- matches EventImageUploader's existing path
-        // convention exactly (only cover images live under .../cover/).
-        const { url, error: uploadError } = await uploadStagedImage("event-images", `${id}/${crypto.randomUUID()}.${ext}`, file, file.type);
-        if (url) await addEventImage(id, url);
-        else failures.push(`gallery photo (${uploadError})`);
-      }
-
-      router.push(failures.length > 0 ? `/events/${id}/manage` : `/events/${id}`);
+      // No staged image uploads here anymore -- inline description images
+      // need the event to already exist (storage RLS checks an owned row
+      // at the target path), so they're only available once editing an
+      // existing event, not during this create flow.
+      router.push(`/events/${result.eventId}`);
     });
   }
 
@@ -105,20 +99,16 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
         <p className="mb-8 text-[14px] text-text3">Registrants sign in to reserve a spot.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <Field label="Gallery (optional)">
-            <StagedGalleryPicker files={galleryFiles} onChange={setGalleryFiles} />
-          </Field>
-
           <Field label="Event name">
             <input value={eventName} onChange={(e) => setEventName(e.target.value)} required className={inputClass} />
           </Field>
 
           <Field label="Description">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className={inputClass}
+            <RichTextEditor
+              content={description.json}
+              onChange={setDescription}
+              placeholder="What's this event about?"
+              imageUpload={{ bucket: "event-images", entityId: eventId }}
             />
           </Field>
 

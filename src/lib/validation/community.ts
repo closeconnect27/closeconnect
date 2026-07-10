@@ -3,6 +3,7 @@ import { isCategorySlug } from "@/lib/categories";
 import { isCity } from "@/lib/cities";
 import { formFieldsSchema } from "@/lib/validation/forms";
 import { isValidExternalLink } from "@/lib/validators/links";
+import { descriptionContentField } from "@/lib/validation/richText";
 
 // Forms convert an empty selection to `undefined` before this ever runs
 // (`city: city || undefined`), so this only ever validates a real,
@@ -15,8 +16,15 @@ const extraCitiesField = z.array(z.string().refine(isCity)).max(5).default([]);
 
 export const createCommunitySchema = z
   .object({
+    // Generated client-side (crypto.randomUUID()) before the form even
+    // renders, not left to the insert's column default -- so the rich
+    // editor can upload inline description images against this id's
+    // storage folder *before* the row exists (0053 opens the bucket
+    // policy for a not-yet-claimed id specifically to allow this).
+    id: z.string().uuid(),
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
     description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
+    description_content: descriptionContentField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
@@ -45,6 +53,7 @@ export const updateCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
     description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
+    description_content: descriptionContentField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
@@ -69,6 +78,7 @@ export const submitExternalCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
     description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
+    description_content: descriptionContentField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,

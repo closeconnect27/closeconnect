@@ -86,9 +86,13 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
             </span>
             <div className="flex flex-wrap gap-2">
               {visibleInterested.map((u) => (
-                <span key={u.userId} className="rounded-full border border-border2 px-3 py-1.5 text-[12px] text-text2">
+                <Link
+                  key={u.userId}
+                  href={`/profile/${u.userId}`}
+                  className="rounded-full border border-border2 px-3 py-1.5 text-[12px] text-text2 transition hover:border-green hover:text-green"
+                >
                   {u.displayName}
-                </span>
+                </Link>
               ))}
             </div>
           </div>

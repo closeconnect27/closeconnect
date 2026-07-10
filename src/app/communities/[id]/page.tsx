@@ -3,7 +3,7 @@ import Link from "next/link";
 import { IconStar, IconUsers, IconMapPin, IconPencil, IconChartBar } from "@tabler/icons-react";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { createClient } from "@/lib/supabase/server";
-import { getCommunityById, getCommunityImages } from "@/lib/queries/communities";
+import { getCommunityById } from "@/lib/queries/communities";
 import {
   getCommunityMembership,
   getCommunityGroups,
@@ -24,10 +24,12 @@ import { JoinSection } from "@/components/communities/JoinSection";
 import { GroupList } from "@/components/communities/GroupList";
 import { CreateGroupForm } from "@/components/communities/CreateGroupForm";
 import { MemberList } from "@/components/communities/MemberList";
+import { MembersVisibilityToggle } from "@/components/communities/MembersVisibilityToggle";
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
 import { ClaimSection } from "@/components/communities/ClaimSection";
-import { Linkify } from "@/components/ui/Linkify";
+import { CommunityTabs } from "@/components/communities/CommunityTabs";
+import { RichTextView } from "@/components/ui/RichTextView";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,7 +84,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   const members = isNative ? await getCommunityMembers(supabase, id) : [];
   const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
   const myRating = isNative && user && !isOwner ? await getMyRating(supabase, id, user.id) : null;
-  const images = await getCommunityImages(supabase, id);
 
   return (
     <div className="flex-1 pb-10">
@@ -168,24 +169,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           )}
         </div>
 
-        <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
-          <Linkify text={community.description} />
-        </p>
-
-        {images.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Photos</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {images.map((img) => (
-                // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-                <img
-                  key={img.id}
-                  src={img.image_url}
-                  alt=""
-                  className="h-48 w-full rounded-card object-cover sm:h-40"
-                />
-              ))}
-            </div>
+        {/* Pre-join / non-native: description shown plain here. Once a
+            member of a native community, it moves into the About tab
+            below instead, alongside the rest of the community's details. */}
+        {(!isNative || !isMember) && (
+          <div className="mt-4 text-[15px] leading-relaxed">
+            <RichTextView content={community.description_content} plainFallback={community.description} />
           </div>
         )}
 
@@ -204,11 +193,10 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
             </div>
 
-            {isNative && (
-              <section>
-                <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Groups</h2>
-                {isMember ? (
-                  <>
+            {isMember ? (
+              <CommunityTabs
+                groups={
+                  <section>
                     <GroupList
                       communityId={community.id}
                       groups={groups}
@@ -222,37 +210,56 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                         <CreateGroupForm communityId={community.id} />
                       </div>
                     )}
-                  </>
-                ) : (
-                  <p className="rounded-card border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
-                    Join this community to see its groups.
-                  </p>
-                )}
-              </section>
-            )}
+                  </section>
+                }
+                about={
+                  <section className="flex flex-col gap-4">
+                    <RichTextView content={community.description_content} plainFallback={community.description} />
+                    <div className="flex flex-col gap-2 rounded-card border border-border bg-bg2 p-4 text-[13px] text-text2">
+                      <DetailRow label="Type" value={capitalize(community.community_type)} />
+                      <DetailRow label="Who can join" value={community.join_mode === "open" ? "Open" : "Request to join"} />
+                      {community.city && <DetailRow label="City" value={community.city} />}
+                    </div>
+                  </section>
+                }
+                members={
+                  <section className="flex flex-col gap-8">
+                    <div>
+                      {isOwner && (
+                        <div className="mb-3">
+                          <MembersVisibilityToggle communityId={community.id} visible={community.members_list_visible} />
+                        </div>
+                      )}
+                      <MemberList
+                        communityId={community.id}
+                        members={members}
+                        ownerId={community.owner_id}
+                        isStaff={isStaff}
+                        isOwner={isOwner}
+                        membersListVisible={community.members_list_visible}
+                        currentUserId={user?.id ?? null}
+                      />
+                    </div>
 
-            <section>
-              <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Members</h2>
-              <MemberList
-                communityId={community.id}
-                members={members}
-                ownerId={community.owner_id}
-                isStaff={isStaff}
-                currentUserId={user?.id ?? null}
+                    {isStaff && pendingRequests.length > 0 && (
+                      <div>
+                        <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">
+                          Pending requests
+                        </h2>
+                        <PendingRequests
+                          communityId={community.id}
+                          requests={pendingRequests}
+                          formFields={formFields}
+                        />
+                      </div>
+                    )}
+                  </section>
+                }
               />
-            </section>
-
-            {isStaff && (
-              <section>
-                <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">
-                  Pending requests
-                </h2>
-                <PendingRequests
-                  communityId={community.id}
-                  requests={pendingRequests}
-                  formFields={formFields}
-                />
-              </section>
+            ) : (
+              <p className="rounded-card border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
+                Join this community to see its groups and members.
+              </p>
             )}
           </div>
         )}
@@ -274,6 +281,19 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           ← Back to communities
         </Link>
       </div>
+    </div>
+  );
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-text3">{label}</span>
+      <span className="font-medium text-text">{value}</span>
     </div>
   );
 }

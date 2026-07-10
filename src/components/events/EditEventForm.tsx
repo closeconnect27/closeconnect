@@ -11,6 +11,7 @@ import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CITY_OPTIONS } from "@/lib/cities";
 import type { EventDetail, EventTicketType } from "@/lib/queries/events";
 import type { FormField } from "@/lib/queries/membership";
@@ -39,7 +40,10 @@ export function EditEventForm({
   hasRegistrations: boolean;
 }) {
   const [eventName, setEventName] = useState(event.event_name);
-  const [description, setDescription] = useState(event.description ?? "");
+  const [description, setDescription] = useState({
+    json: event.description_content,
+    text: event.description ?? "",
+  });
   const [eventDate, setEventDate] = useState(event.event_date ?? "");
   const [eventTime, setEventTime] = useState(event.event_time ?? "");
   const [venue, setVenue] = useState(event.venue ?? "");
@@ -77,7 +81,8 @@ export function EditEventForm({
 
     const input = {
       event_name: eventName,
-      description: description || undefined,
+      description: description.text || undefined,
+      description_content: description.json,
       event_date: eventDate,
       event_time: eventTime || undefined,
       venue: venue || undefined,
@@ -134,11 +139,11 @@ export function EditEventForm({
         </Field>
 
         <Field label="Description">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className={inputClass}
+          <RichTextEditor
+            content={description.json}
+            onChange={setDescription}
+            placeholder="What's this event about?"
+            imageUpload={{ bucket: "event-images", entityId: event.id }}
           />
         </Field>
 

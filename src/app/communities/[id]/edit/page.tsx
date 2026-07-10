@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getCommunityById, getCommunityImages } from "@/lib/queries/communities";
+import { getCommunityById } from "@/lib/queries/communities";
 import { getMyVerificationRequestStatus } from "@/lib/queries/verification";
 import { EditCommunityForm } from "@/components/communities/EditCommunityForm";
 
@@ -26,10 +26,7 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
     redirect(`/communities/${id}`);
   }
 
-  const [images, verificationStatus] = await Promise.all([
-    getCommunityImages(supabase, id),
-    getMyVerificationRequestStatus(supabase, "community", id, user.id),
-  ]);
+  const verificationStatus = await getMyVerificationRequestStatus(supabase, "community", id, user.id);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -41,7 +38,7 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
           ← Back to community
         </Link>
         <h1 className="mb-6 font-heading text-[18px] font-bold leading-tight">Edit community</h1>
-        <EditCommunityForm community={community} images={images} verificationStatus={verificationStatus} />
+        <EditCommunityForm community={community} verificationStatus={verificationStatus} />
       </div>
     </div>
   );

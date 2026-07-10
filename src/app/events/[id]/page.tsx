@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getEventById,
   getEventTicketTypes,
-  getEventImages,
   getEventFormFields,
   getTicketAvailability,
   getMyEventCheckIn,
@@ -17,11 +16,10 @@ import { communitySeed } from "@/lib/categoryImages";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { EventRegistration } from "@/components/events/EventRegistration";
 import { InterestedButton } from "@/components/events/InterestedButton";
-import { EventImageUploader } from "@/components/events/EventImageUploader";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
 import { EventFeedbackSection } from "@/components/events/EventFeedbackSection";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
-import { Linkify } from "@/components/ui/Linkify";
+import { RichTextView } from "@/components/ui/RichTextView";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,9 +47,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, images, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList] = await Promise.all([
+  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList] = await Promise.all([
     getEventTicketTypes(supabase, id),
-    getEventImages(supabase, id),
     getEventFormFields(supabase, id),
     getTicketAvailability(supabase, id),
     user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
@@ -158,40 +155,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           </Link>
         )}
 
-        {event.description && (
-          <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-text2">
-            <Linkify text={event.description} />
-          </p>
-        )}
-
-        {images.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Photos</h2>
-            {/* Real cards, not the old cover-banner grid -- these were
-                getting squeezed into a fixed h-48/h-64 strip alongside the
-                cover image, which made a host's actual photos borderline
-                illegible. This is its own section people scroll to, sized
-                like any other photo card on the site. */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {images.map((img) => (
-                // eslint-disable-next-line @next/next/no-img-element -- host-uploaded, not from next/image's configured remote patterns
-                <img
-                  key={img.id}
-                  src={img.image_url}
-                  alt=""
-                  className="h-48 w-full rounded-card object-cover sm:h-40"
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isHost && (
-          <div className="mt-6">
-            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Manage photos</h2>
-            <EventImageUploader eventId={event.id} images={images} />
-          </div>
-        )}
+        <div className="mt-4 text-[15px] leading-relaxed">
+          <RichTextView content={event.description_content} plainFallback={event.description} />
+        </div>
 
         <div className="mt-8">
           {!event.event_date ? (
@@ -261,7 +227,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 {feedbackList.map((f) => (
                   <div key={f.user_id} className="rounded-card-sm border border-border2 bg-bg2 p-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-bold text-text">{f.display_name}</span>
+                      <Link href={`/profile/${f.user_id}`} className="text-[13px] font-bold text-text transition hover:text-green hover:underline">
+                        {f.display_name}
+                      </Link>
                       <span className="flex items-center gap-1 text-[12px] text-text3">
                         <IconStar size={12} className="fill-green text-green" />
                         {f.rating}/5

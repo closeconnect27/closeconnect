@@ -27,7 +27,11 @@ export async function updateProfile(input: UpdateProfileInput) {
   // argument; this doesn't).
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({ bio: data.bio || null, profile_visibility: data.profile_visibility })
+    .update({
+      bio: data.bio || null,
+      bio_content: data.bio_content ?? null,
+      profile_visibility: data.profile_visibility,
+    })
     .eq("id", user.id);
   if (profileError) return { error: profileError.message };
 

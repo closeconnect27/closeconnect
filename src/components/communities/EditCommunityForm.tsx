@@ -4,22 +4,23 @@ import { useState, useTransition } from "react";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateCommunitySchema } from "@/lib/validation/community";
 import { updateCommunity } from "@/app/actions/communities";
-import { CommunityImageGalleryUploader } from "@/components/communities/CommunityImageGalleryUploader";
 import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CITY_OPTIONS } from "@/lib/cities";
-import type { Community, CommunityImage } from "@/lib/queries/communities";
+import type { Community } from "@/lib/queries/communities";
 import type { VerificationRequestStatus } from "@/lib/queries/verification";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
-// Editable: name, description, category, extra_categories, city (plus the
-// gallery, its own uploader below -- logo/cover uploads were removed, the
-// app always shows a category Unsplash placeholder instead now).
+// Editable: name, description (rich, with up to 5 inline images -- the
+// old separate gallery feature was removed in favor of this), category,
+// extra_categories, city. Logo/cover uploads were removed too, the app
+// always shows a category Unsplash placeholder instead now.
 // Deliberately not here: owner_id, claim_status, join_mode (changing
 // join_mode once members exist under the old mode is a real product risk,
 // not an oversight -- flagged separately, not just left off silently) and
@@ -28,15 +29,16 @@ const inputClass =
 // independently of what this form does or doesn't show.
 export function EditCommunityForm({
   community,
-  images,
   verificationStatus,
 }: {
   community: Community;
-  images: CommunityImage[];
   verificationStatus: VerificationRequestStatus;
 }) {
   const [name, setName] = useState(community.name);
-  const [description, setDescription] = useState(community.description);
+  const [description, setDescription] = useState({
+    json: community.description_content,
+    text: community.description,
+  });
   const [category, setCategory] = useState<CategorySlug>(community.category as CategorySlug);
   const [extraCategories, setExtraCategories] = useState<string[]>(community.extra_categories ?? []);
   const [city, setCity] = useState(community.city ?? "");
@@ -56,7 +58,8 @@ export function EditCommunityForm({
 
     const input = {
       name,
-      description,
+      description: description.text,
+      description_content: description.json,
       category,
       extra_categories: extraCategories,
       city: city || undefined,
@@ -97,23 +100,17 @@ export function EditCommunityForm({
         />
       </div>
 
-      <div>
-        <span className="mb-2 block text-[12px] font-bold text-text3">Gallery</span>
-        <CommunityImageGalleryUploader communityId={community.id} images={images} />
-      </div>
-
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <Field label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
         </Field>
 
         <Field label="Description">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-            rows={4}
-            className={inputClass}
+          <RichTextEditor
+            content={description.json}
+            onChange={setDescription}
+            placeholder="What's this community about?"
+            imageUpload={{ bucket: "community-images", entityId: community.id }}
           />
         </Field>
 

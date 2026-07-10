@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
+import { RichTextView } from "@/components/ui/RichTextView";
 
 // bio/profile_visibility come from `basic` (profiles, always public, 0035)
 // -- always resolves for any real profile id and shows regardless of
@@ -91,7 +92,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
         {/* Always visible regardless of profile_visibility (0035) -- bio
             lives on `profiles`, not the gated profile_details. */}
-        {basic.bio && <p className="mt-6 whitespace-pre-wrap text-[14px] leading-relaxed text-text2">{basic.bio}</p>}
+        {(basic.bio_content || basic.bio) && (
+          <div className="mt-6 text-[14px] leading-relaxed">
+            <RichTextView content={basic.bio_content} plainFallback={basic.bio} />
+          </div>
+        )}
 
         {/* Organizer stats: computed live (getOrganizerStats), not stored --
             shown whenever there's anything to show, same as bio, regardless

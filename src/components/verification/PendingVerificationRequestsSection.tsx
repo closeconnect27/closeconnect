@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { reviewVerificationRequest, toggleContactVerification } from "@/app/actions/verification";
 import type { PendingVerificationRequest } from "@/lib/queries/verification";
 
@@ -48,10 +49,21 @@ export function PendingVerificationRequestsSection({ requests }: { requests: Pen
         {requests.map((req) => (
           <div key={req.id} className="card-elevated rounded-card bg-bg2 p-4">
             <p className="text-[14px] font-bold text-text">
-              {req.targetLabel}{" "}
+              {req.target_type === "organizer" ? (
+                <Link href={`/profile/${req.target_id}`} className="transition hover:text-green hover:underline">
+                  {req.targetLabel}
+                </Link>
+              ) : (
+                req.targetLabel
+              )}{" "}
               <span className="font-mono text-[11px] font-normal uppercase text-text3">({req.target_type})</span>
             </p>
-            <p className="mt-1 text-[12px] text-text3">Requested by {req.requesterName}</p>
+            <p className="mt-1 text-[12px] text-text3">
+              Requested by{" "}
+              <Link href={`/profile/${req.requested_by}`} className="font-medium text-text2 transition hover:text-green hover:underline">
+                {req.requesterName}
+              </Link>
+            </p>
             {req.note && <p className="mt-2 text-[13px] text-text2">&ldquo;{req.note}&rdquo;</p>}
 
             {req.target_type === "organizer" && (
