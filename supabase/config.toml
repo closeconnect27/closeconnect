@@ -155,8 +155,13 @@ max_indexes = 5
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "http://localhost:3000"
+# in emails. Now the real production domain -- this used to be localhost,
+# which is harmless for local dev (still covered by additional_redirect_urls
+# below) but wrong as the site's own canonical URL once it's actually live:
+# GoTrue falls back to THIS value whenever a redirectTo doesn't match the
+# allow-list, so leaving it as localhost meant every such fallback sent
+# production users to a URL that doesn't exist for them.
+site_url = "https://closeconnect.in"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
@@ -165,8 +170,13 @@ site_url = "http://localhost:3000"
 # the old 127.0.0.1-only entries, so GoTrue silently falls back to site_url
 # and drops the callback path entirely, skipping the code exchange (this was
 # the actual cause of "signed in with Google but the app still shows signed
-# out" -- not a code bug in the callback route itself).
-additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3000/**"]
+# out" -- not a code bug in the callback route itself). https://closeconnect.in/**
+# is the same fix for production -- without it, a live redirectTo of
+# closeconnect.in/auth/callback falls back to site_url and drops the
+# callback path exactly the same way, which is what was landing real users
+# on http://localhost:3000/?code=... after clicking a magic link or
+# finishing Google sign-in.
+additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3000/**", "https://closeconnect.in/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
