@@ -30,7 +30,17 @@ export function RichTextView({
     extensions: richTextExtensions(),
     content: content ?? (plainFallback ? { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: plainFallback }] }] } : ""),
     editable: false,
-    immediatelyRender: false,
+    // true here, unlike RichTextEditor's editable instance -- this is a
+    // READ-ONLY view of server-fetched, deterministic content (same JSON
+    // on the server and the client, no user input involved), so there's
+    // no hydration-mismatch risk to guard against. false was silently
+    // producing an empty <div> in the server-rendered HTML until client
+    // JS hydrated -- confirmed directly (curled a live page, zero
+    // occurrences of "ProseMirror" in the raw response) -- meaning every
+    // community/event/profile description was invisible to anything that
+    // doesn't execute JS (most search crawlers, social link unfurlers),
+    // a real regression against the plain-text description this replaced.
+    immediatelyRender: true,
   });
 
   if (!editor) return null;
