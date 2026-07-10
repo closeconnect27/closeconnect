@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { IconMapPin } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import type { EventListItem } from "@/lib/queries/events";
 import { ClickableCard } from "@/components/ui/ClickableCard";
 import { CategoryImage } from "@/components/ui/CategoryImage";
+import { EventHostLink } from "@/components/events/EventHostLink";
 
 // District-scale card: the photo is the card, not a header strip on top of
 // one -- large hero imagery, bold confident type, generous sizing, built to
@@ -62,16 +62,7 @@ export function EventCard({ event: e }: { event: EventListItem }) {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-text2">
           {e.host && (
             <span>
-              by{" "}
-              {/* stopPropagation, not a plain <span> -- ClickableCard's
-                  whole-card navigation is a click handler on a wrapping
-                  <div>, not a real <a>, so a nested <Link> here is valid
-                  HTML; it just needs to stop the click from also bubbling
-                  up into the card's own navigate() (same pattern as
-                  JoinBadge). */}
-              <Link href={`/profile/${e.host_id}`} onClick={(ev) => ev.stopPropagation()} className="hover:text-green hover:underline">
-                {e.host.display_name}
-              </Link>
+              by <EventHostLink hostId={e.host_id} name={e.host.display_name} />
             </span>
           )}
           {e.community && (
