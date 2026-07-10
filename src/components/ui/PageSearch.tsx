@@ -30,7 +30,13 @@ export function PageSearch({ basePath, placeholder }: { basePath: string; placeh
         name="q"
         defaultValue={searchParams.get("q") ?? ""}
         placeholder={placeholder}
-        className="w-full bg-transparent text-[14px] text-text outline-none placeholder:text-text3"
+        // page-search-input, not just outline-none -- the global
+        // input:focus-visible ring (globals.css) has higher specificity
+        // than a plain .outline-none utility and was winning anyway,
+        // drawing a second rectangular outline inset inside this pill,
+        // on top of the pill's own focus-within:border-green above. See
+        // the matching override in globals.css.
+        className="page-search-input w-full bg-transparent text-[14px] text-text outline-none placeholder:text-text3"
       />
     </form>
   );

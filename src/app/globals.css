@@ -252,6 +252,21 @@ textarea:focus-visible,
      class-based ancestor's inherited value. */
   color: var(--text);
 }
+/* The global input/textarea/button focus-visible ring further up this file
+   is a plain `input:focus-visible` etc. selector, higher-specificity than
+   the .outline-none utility on the search input below and unrelated (no
+   matching selector) to this contenteditable ProseMirror root -- but
+   !important here removes any doubt either way. Both this and the search
+   input already show their own focus state as a border-color change on
+   the wrapping pill/box (focus-within:border-green), so the global ring
+   would only ever add a second, inset outline on top of that, not a
+   missing focus indicator. */
+.rich-text-editor .ProseMirror:focus,
+.rich-text-editor .ProseMirror:focus-visible,
+.page-search-input:focus,
+.page-search-input:focus-visible {
+  outline: none !important;
+}
 .rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text3);

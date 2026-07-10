@@ -309,7 +309,7 @@ export function RichTextEditor({
       )}
       {error && <p className="text-[12px] text-pink">{error}</p>}
 
-      <div className="rich-text-editor rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px]">
+      <div className="rich-text-editor rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus-within:border-green">
         <EditorContent editor={editor} />
       </div>
     </div>
