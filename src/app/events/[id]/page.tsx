@@ -66,19 +66,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     <div className="flex-1 pb-10">
       <PageViewTracker targetType="event" targetId={event.id} viewerId={user?.id ?? null} />
       <div className="relative h-48 w-full overflow-hidden sm:h-64" style={{ background: visual.bg }}>
-        {event.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- host-uploaded, not from next/image's configured remote patterns
-          <img src={event.cover_image_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <CategoryImage
-            slug={event.category ?? "other"}
-            seed={communitySeed(event.id)}
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover"
-          />
-        )}
+        <CategoryImage
+          slug={event.category ?? "other"}
+          seed={communitySeed(event.id)}
+          unsplashImageUrl={event.unsplash_image_url}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
       </div>
 

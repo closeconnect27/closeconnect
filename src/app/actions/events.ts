@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { createPaymentLink } from "@/lib/razorpay";
 import { trackServerEvent } from "@/lib/mixpanel/server";
+import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
 import {
   createEventSchema,
   updateEventSchema,
@@ -43,9 +44,13 @@ export async function createEvent(input: CreateEventInput) {
     }
   }
 
+  const id = crypto.randomUUID();
+  const photo = assignPhotoForEntity(data.category, id);
+
   const { data: event, error } = await supabase
     .from("events")
     .insert({
+      id,
       host_id: user.id,
       community_id: data.community_id ?? null,
       event_name: data.event_name,
@@ -56,9 +61,13 @@ export async function createEvent(input: CreateEventInput) {
       city: data.city || null,
       extra_cities: data.extra_cities,
       category: data.category,
+      unsplash_image_url: photo.imageUrl,
+      unsplash_photo_id: photo.photoId,
     })
     .select()
     .single();
+
+  if (!error) triggerDownloadPing(photo.photoId);
 
   if (error || !event) {
     return { error: error?.message ?? "Could not create event" };
@@ -424,39 +433,6 @@ export async function updateEventTicketsAndForm(eventId: string, input: UpdateEv
   return { error: null };
 }
 
-export async function setEventCoverImage(eventId: string, imageUrl: string) {
-  const user = await requireUser();
-
-  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/event-images/${eventId}/`;
-  if (!imageUrl.startsWith(expectedPrefix)) {
-    return { error: "Image must come from this event's own upload" };
-  }
-
-  const supabase = await createClient();
-  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
-  if (!auth.ok) return { error: auth.error };
-
-  const { error } = await supabase.from("events").update({ cover_image_url: imageUrl }).eq("id", eventId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/events/${eventId}`);
-  return { error: null };
-}
-
-export async function removeEventCoverImage(eventId: string, storagePath: string) {
-  const user = await requireUser();
-  const supabase = await createClient();
-  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
-  if (!auth.ok) return { error: auth.error };
-
-  await supabase.storage.from("event-images").remove([storagePath]);
-  const { error } = await supabase.from("events").update({ cover_image_url: null }).eq("id", eventId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/events/${eventId}`);
-  return { error: null };
-}
-
 export async function cancelEvent(eventId: string) {
   await requireUser();
   const supabase = await createClient();
@@ -496,10 +472,17 @@ export async function duplicateEvent(eventId: string) {
   // when an admin duplicates someone else's event; they shouldn't end up
   // owning a copy of it. community_id, name, description, etc. all carry
   // over; event_date and status don't (a fresh draft always starts
-  // 'active' regardless of whether the original was cancelled).
+  // 'active' regardless of whether the original was cancelled). The photo
+  // doesn't carry over either -- a copy is its own entity with its own id,
+  // so it gets its own independent assignment rather than visually
+  // duplicating the original everywhere it appears.
+  const copyId = crypto.randomUUID();
+  const copyPhoto = assignPhotoForEntity(original.category ?? "other", copyId);
+
   const { data: copy, error: insertError } = await supabase
     .from("events")
     .insert({
+      id: copyId,
       host_id: user.id,
       community_id: original.community_id,
       event_name: `${original.event_name} (copy)`,
@@ -509,13 +492,15 @@ export async function duplicateEvent(eventId: string) {
       venue: original.venue,
       city: original.city,
       category: original.category,
-      cover_image_url: original.cover_image_url,
       status: "active",
+      unsplash_image_url: copyPhoto.imageUrl,
+      unsplash_photo_id: copyPhoto.photoId,
     })
     .select()
     .single();
 
   if (insertError || !copy) return { error: insertError?.message ?? "Could not duplicate event" };
+  triggerDownloadPing(copyPhoto.photoId);
 
   const [ticketTypes, formFields] = await Promise.all([
     getEventTicketTypes(supabase, eventId),

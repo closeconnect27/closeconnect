@@ -34,19 +34,21 @@ export type EventListItem = {
   city: string | null;
   extra_cities: string[] | null;
   category: string | null;
-  cover_image_url: string | null;
   status: "active" | "cancelled";
+  // Assigned once at creation (or by backfill), not recomputed per render
+  // -- see src/lib/unsplash.ts. Null only for rows predating this system.
+  unsplash_image_url: string | null;
   avg_feedback_rating: number;
   feedback_count: number;
   created_at: string;
   host: { display_name: string } | null;
-  community: { id: string; name: string; logo_url: string | null } | null;
+  community: { id: string; name: string } | null;
   event_ticket_types: { price: number }[];
 };
 
 export type EventDetail = Omit<EventListItem, "host" | "community"> & {
   host: { id: string; display_name: string; avatar_url: string | null; host_rating: number } | null;
-  community: { id: string; name: string; logo_url: string | null } | null;
+  community: { id: string; name: string } | null;
 };
 
 export type EventRegistration = {
@@ -84,7 +86,7 @@ export type EventFilters = {
 // infer which relationship "host:profiles(...)" means and 404s the query
 // entirely (PGRST201, ambiguous embed) without this hint.
 const EVENT_LIST_SELECT =
-  "*, host:profiles!events_host_id_fkey(display_name), community:communities(id,name,logo_url), event_ticket_types(price)";
+  "*, host:profiles!events_host_id_fkey(display_name), community:communities(id,name), event_ticket_types(price)";
 
 function todayIso() {
   const d = new Date();
@@ -143,7 +145,7 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
 export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating), community:communities(id,name,logo_url)")
+    .select("*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating), community:communities(id,name)")
     .eq("id", id)
     .single();
   if (error) throw error;

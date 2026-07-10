@@ -17,8 +17,6 @@ export type Community = {
   kind: "native" | "external";
   external_link: string | null;
   join_mode: "open" | "request";
-  cover_image_url: string | null;
-  logo_url: string | null;
   // Nullable since 0024: an external community starts unowned (a public,
   // no-login submission) until a claim is approved.
   owner_id: string | null;
@@ -29,6 +27,10 @@ export type Community = {
   status: "active" | "hidden" | "reported";
   created_at: string;
   is_verified: boolean;
+  // Assigned once at creation (or by backfill), not recomputed per render
+  // -- see src/lib/unsplash.ts. Null only for rows that predate this
+  // system and haven't been backfilled yet; CategoryImage is the fallback.
+  unsplash_image_url: string | null;
 };
 
 export type CommunityFilters = {

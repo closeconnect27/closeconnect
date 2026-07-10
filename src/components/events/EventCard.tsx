@@ -24,25 +24,15 @@ export function EventCard({ event: e }: { event: EventListItem }) {
       trackProperties={{ event_id: e.id, category: e.category }}
     >
       <div className="relative h-72" style={{ background: visual.bg }}>
-        {e.cover_image_url ? (
-          // Host's own uploaded photo takes priority over the generic
-          // category stock image -- this card never read cover_image_url
-          // at all before, so every event showed the same placeholder art
-          // as every other event in its category regardless of what the
-          // host actually uploaded. Matches CommunityCard's identical
-          // cover-image-first priority.
-          // eslint-disable-next-line @next/next/no-img-element -- host-uploaded, not from next/image's configured remote patterns
-          <img src={e.cover_image_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <CategoryImage
-            slug={e.category ?? "other"}
-            seed={communitySeed(e.id)}
-            alt=""
-            fill
-            sizes="(max-width: 640px) 80vw, 320px"
-            className="object-cover"
-          />
-        )}
+        <CategoryImage
+          slug={e.category ?? "other"}
+          seed={communitySeed(e.id)}
+          unsplashImageUrl={e.unsplash_image_url}
+          alt=""
+          fill
+          sizes="(max-width: 640px) 80vw, 320px"
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-black/20" />
 
         <div className="absolute left-3 top-3 flex w-14 flex-col items-center overflow-hidden rounded-lg bg-bg2/95 text-center shadow-card">
@@ -72,22 +62,7 @@ export function EventCard({ event: e }: { event: EventListItem }) {
           {e.host && <span>by {e.host.display_name}</span>}
           {e.community && (
             <span className="flex items-center gap-1.5 text-green">
-              ·
-              {e.community.logo_url ? (
-                // bg-bg2 + border + shrink-0, matching the other two
-                // logo_url call sites (community detail header, community
-                // card) -- without a fill color behind it, object-scale-down
-                // leaves a distracting uneven/see-through gap around any
-                // non-square logo, and without shrink-0 this could get
-                // squeezed smaller than 16px by the flex row's text.
-                // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-                <img
-                  src={e.community.logo_url}
-                  alt=""
-                  className="h-5 w-5 shrink-0 rounded-full border border-border bg-bg2 object-scale-down"
-                />
-              ) : null}
-              {e.community.name}
+              · {e.community.name}
             </span>
           )}
         </div>

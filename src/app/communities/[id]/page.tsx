@@ -88,19 +88,15 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
     <div className="flex-1 pb-10">
       <PageViewTracker targetType="community" targetId={community.id} viewerId={user?.id ?? null} />
       <div className="relative h-40 w-full sm:h-52" style={{ background: visual.bg }}>
-        {community.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-          <img src={community.cover_image_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <CategoryImage
-            slug={community.category}
-            seed={communitySeed(community.id)}
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover"
-          />
-        )}
+        <CategoryImage
+          slug={community.category}
+          seed={communitySeed(community.id)}
+          unsplashImageUrl={community.unsplash_image_url}
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
       </div>
 
@@ -127,17 +123,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         </div>
 
         <div className="flex items-center gap-3">
-          {community.logo_url && (
-            // object-scale-down, not object-cover -- cover crops/zooms into
-            // a non-square logo instead of showing it as uploaded, same fix
-            // already applied to the browse-grid card (CommunityCard).
-            // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-            <img
-              src={community.logo_url}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-full border border-border bg-bg2 object-scale-down"
-            />
-          )}
           <h1 className="flex items-center gap-1.5 font-heading text-[18px] font-bold leading-tight">
             {community.name}
             {community.is_verified && <VerifiedBadge />}
@@ -219,22 +204,32 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
             </div>
 
-            <section>
-              <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Groups</h2>
-              <GroupList
-                communityId={community.id}
-                groups={groups}
-                isMember={isMember}
-                joinedGroupIds={joinedGroupIds}
-                unreadCounts={unreadCounts}
-                currentUserId={user?.id ?? null}
-              />
-              {isStaff && (
-                <div className="mt-3">
-                  <CreateGroupForm communityId={community.id} />
-                </div>
-              )}
-            </section>
+            {isNative && (
+              <section>
+                <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Groups</h2>
+                {isMember ? (
+                  <>
+                    <GroupList
+                      communityId={community.id}
+                      groups={groups}
+                      isMember={isMember}
+                      joinedGroupIds={joinedGroupIds}
+                      unreadCounts={unreadCounts}
+                      currentUserId={user?.id ?? null}
+                    />
+                    {isStaff && (
+                      <div className="mt-3">
+                        <CreateGroupForm communityId={community.id} />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="rounded-card border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
+                    Join this community to see its groups.
+                  </p>
+                )}
+              </section>
+            )}
 
             <section>
               <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Members</h2>

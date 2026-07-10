@@ -5,7 +5,6 @@ import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateEventSchema, updateEventTicketsAndFormSchema } from "@/lib/validation/event";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { updateEvent, updateEventTicketsAndForm } from "@/app/actions/events";
-import { EventCoverImageUploader } from "@/components/events/EventCoverImageUploader";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { Combobox } from "@/components/ui/Combobox";
@@ -19,8 +18,9 @@ import type { FormField } from "@/lib/queries/membership";
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
-// Editable: name, description, date, time, venue, city, category, cover
-// image. Not here, deliberately: host_id, community_id (excluded per spec),
+// Editable: name, description, date, time, venue, city, category. Cover
+// image upload was removed (the app always shows a category Unsplash
+// placeholder now). Not here, deliberately: host_id, community_id (excluded per spec),
 // status (cancelling is its own action). ticket_types/form_fields are a
 // separate form below, gated on hasRegistrations -- editing those after
 // registrants exist is the real, unsolved risk (e.g. changing a paid
@@ -128,8 +128,6 @@ export function EditEventForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <EventCoverImageUploader eventId={event.id} currentUrl={event.cover_image_url} />
-
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <Field label="Event name">
           <input value={eventName} onChange={(e) => setEventName(e.target.value)} required className={inputClass} />

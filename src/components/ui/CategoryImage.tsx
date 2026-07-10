@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { getCategoryImage } from "@/lib/categoryImages";
+import { resolveEntityImage } from "@/lib/categoryImages";
 
 /**
- * Unsplash photo for a category, ported from reference_current_index.html's
- * CAT_IMAGES/getCatImage approach. On load failure, renders nothing so the
- * parent's own solid/gradient background (set via getCategoryVisual) shows
- * through -- mirrors the reference's onerror fallback, just without the
- * local SVG fallback tier since this app doesn't have those assets.
+ * An entity's own persisted Unsplash assignment (unsplashImageUrl, from
+ * src/lib/unsplash.ts) when present, else a deterministic pick from the
+ * category's verified pool (rows that predate that system). On load
+ * failure, renders nothing so the parent's own solid/gradient background
+ * (set via getCategoryVisual) shows through.
  */
 export function CategoryImage({
   slug,
   seed,
+  unsplashImageUrl,
   alt,
   fill,
   size,
@@ -22,6 +23,10 @@ export function CategoryImage({
 }: {
   slug: string;
   seed: number;
+  /** The entity's own assigned photo, if it has one (Community/Event's
+   * unsplash_image_url) -- omit for contexts with no single entity (e.g.
+   * a bare category badge). */
+  unsplashImageUrl?: string | null;
   alt: string;
   fill?: boolean;
   size?: number;
@@ -31,7 +36,7 @@ export function CategoryImage({
   const [errored, setErrored] = useState(false);
   if (errored) return null;
 
-  const src = getCategoryImage(slug, seed, size ? { w: size * 2, h: size * 2 } : undefined);
+  const src = resolveEntityImage(unsplashImageUrl, slug, seed, size ? { w: size * 2, h: size * 2 } : undefined);
 
   if (fill) {
     return (

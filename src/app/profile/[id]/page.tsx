@@ -277,17 +277,12 @@ async function ProfileDetailSections({
                   href={`/communities/${c.id}`}
                   className="flex items-center gap-2 rounded-full border border-border2 py-1.5 pl-1.5 pr-3 text-[13px] font-medium text-text2 transition hover:border-green hover:text-green"
                 >
-                  {c.logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-                    <img src={c.logo_url} alt="" className="h-6 w-6 rounded-full object-scale-down" />
-                  ) : (
-                    <span
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
-                      style={{ background: visual.bg, color: visual.light }}
-                    >
-                      {c.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
+                  <span
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
+                    style={{ background: visual.bg, color: visual.light }}
+                  >
+                    {c.name.charAt(0).toUpperCase()}
+                  </span>
                   {c.name}
                 </Link>
               );

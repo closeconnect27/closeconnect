@@ -6,11 +6,10 @@ import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { createCommunitySchema } from "@/lib/validation/community";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
-import { createCommunity, setCommunityImage, addCommunityImage } from "@/app/actions/communities";
+import { createCommunity, addCommunityImage } from "@/app/actions/communities";
 import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
-import { StagedImagePicker } from "@/components/ui/StagedImagePicker";
 import { StagedGalleryPicker } from "@/components/ui/StagedGalleryPicker";
 import { uploadStagedImage } from "@/lib/uploadStagedImage";
 import { CITY_OPTIONS } from "@/lib/cities";
@@ -29,8 +28,6 @@ export function NewCommunityForm() {
   const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [joinMode, setJoinMode] = useState<"open" | "request">("open");
   const [joinFormFields, setJoinFormFields] = useState<FormFieldDraft[]>([]);
-  const [logoBlob, setLogoBlob] = useState<Blob | null>(null);
-  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -71,20 +68,10 @@ export function NewCommunityForm() {
       }
       const id = result.communityId;
 
-      // The community exists now, so staged images can finally upload
-      // against a real path -- failures here don't block navigation (the
-      // community itself is fine either way).
+      // The community exists now, so staged gallery photos can finally
+      // upload against a real path -- failures here don't block navigation
+      // (the community itself is fine either way).
       const failures: string[] = [];
-      if (logoBlob) {
-        const { url, error: uploadError } = await uploadStagedImage("community-images", `${id}/logo/${crypto.randomUUID()}.jpg`, logoBlob, "image/jpeg");
-        if (url) await setCommunityImage(id, "logo", url);
-        else failures.push(`logo (${uploadError})`);
-      }
-      if (coverBlob) {
-        const { url, error: uploadError } = await uploadStagedImage("community-images", `${id}/cover/${crypto.randomUUID()}.jpg`, coverBlob, "image/jpeg");
-        if (url) await setCommunityImage(id, "cover", url);
-        else failures.push(`cover (${uploadError})`);
-      }
       for (const file of galleryFiles) {
         const ext = file.name.split(".").pop() ?? "jpg";
         const { url, error: uploadError } = await uploadStagedImage("community-images", `${id}/gallery/${crypto.randomUUID()}.${ext}`, file, file.type);
@@ -110,11 +97,6 @@ export function NewCommunityForm() {
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="flex flex-wrap gap-6">
-            <StagedImagePicker shape="square" label="Logo (optional)" value={logoBlob} onChange={setLogoBlob} />
-            <StagedImagePicker shape="wide" label="Cover image (optional)" value={coverBlob} onChange={setCoverBlob} />
-          </div>
-
           <Field label="Gallery (optional)">
             <StagedGalleryPicker files={galleryFiles} onChange={setGalleryFiles} />
           </Field>

@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateCommunitySchema } from "@/lib/validation/community";
 import { updateCommunity } from "@/app/actions/communities";
-import { CommunityImageUploader } from "@/components/communities/CommunityImageUploader";
 import { CommunityImageGalleryUploader } from "@/components/communities/CommunityImageGalleryUploader";
 import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
@@ -18,8 +17,10 @@ import type { VerificationRequestStatus } from "@/lib/queries/verification";
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
-// Editable: name, description, logo, cover, category, extra_categories,
-// city. Deliberately not here: owner_id, claim_status, join_mode (changing
+// Editable: name, description, category, extra_categories, city (plus the
+// gallery, its own uploader below -- logo/cover uploads were removed, the
+// app always shows a category Unsplash placeholder instead now).
+// Deliberately not here: owner_id, claim_status, join_mode (changing
 // join_mode once members exist under the old mode is a real product risk,
 // not an oversight -- flagged separately, not just left off silently) and
 // community_type (not named in the editable-fields list this was scoped
@@ -93,23 +94,6 @@ export function EditCommunityForm({
           targetId={community.id}
           isVerified={community.is_verified}
           initialStatus={verificationStatus}
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-6">
-        <CommunityImageUploader
-          communityId={community.id}
-          kind="logo"
-          currentUrl={community.logo_url}
-          shape="square"
-          label="Logo"
-        />
-        <CommunityImageUploader
-          communityId={community.id}
-          kind="cover"
-          currentUrl={community.cover_image_url}
-          shape="wide"
-          label="Cover image"
         />
       </div>
 

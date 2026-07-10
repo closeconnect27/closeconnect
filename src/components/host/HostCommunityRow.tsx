@@ -27,7 +27,15 @@ export function HostCommunityRow({
       className="card-elevated flex items-center gap-3 rounded-card bg-bg2 p-3 sm:p-4"
     >
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-card-sm" style={{ background: visual.bg }}>
-        <CategoryImage slug={c.category} seed={communitySeed(c.id)} alt="" fill sizes="56px" className="object-cover" />
+        <CategoryImage
+          slug={c.category}
+          seed={communitySeed(c.id)}
+          unsplashImageUrl={c.unsplash_image_url}
+          alt=""
+          fill
+          sizes="56px"
+          className="object-cover"
+        />
       </div>
 
       <div className="min-w-0 flex-1">

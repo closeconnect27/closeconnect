@@ -31,36 +31,15 @@ export function CommunityCard({ community: c }: { community: Community }) {
       trackProperties={{ community_id: c.id, category: c.category, kind: c.kind }}
     >
       <div className="relative h-72" style={{ background: visual.bg }}>
-        {c.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns
-          <img src={c.cover_image_url} alt="" className="h-full w-full object-cover" />
-        ) : c.logo_url ? (
-          // No real cover yet -- a small square logo stretched full-bleed
-          // with object-cover would crop/distort it, so it's shown
-          // contained and centered instead, like a badge on the category
-          // color, rather than the generic Unsplash placeholder.
-          // object-scale-down (not object-contain) -- contain still
-          // upscales a logo smaller than this 112px box to fill it, which
-          // reads as blurry/"enlarged" next to the actual uploaded file;
-          // scale-down never grows the image past its own native size.
-          <div className="flex h-full w-full items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- owner-uploaded, not from next/image's configured remote patterns */}
-            <img
-              src={c.logo_url}
-              alt=""
-              className="h-28 w-28 rounded-full border-4 border-white/20 bg-bg2 object-scale-down shadow-lg"
-            />
-          </div>
-        ) : (
-          <CategoryImage
-            slug={c.category}
-            seed={communitySeed(c.id)}
-            alt=""
-            fill
-            sizes="(max-width: 640px) 80vw, 320px"
-            className="object-cover"
-          />
-        )}
+        <CategoryImage
+          slug={c.category}
+          seed={communitySeed(c.id)}
+          unsplashImageUrl={c.unsplash_image_url}
+          alt=""
+          fill
+          sizes="(max-width: 640px) 80vw, 320px"
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-black/20" />
 
         <div className="absolute right-3 top-3 flex gap-1.5">

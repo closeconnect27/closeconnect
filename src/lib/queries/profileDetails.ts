@@ -59,7 +59,6 @@ export async function getPublicProfileBasic(supabase: SupabaseClient, profileId:
 export type PublicJoinedCommunity = {
   id: string;
   name: string;
-  logo_url: string | null;
   category: string;
   role: "owner" | "moderator" | "member";
 };
@@ -82,7 +81,7 @@ export async function getCommunitiesJoinedPublic(supabase: SupabaseClient, profi
   const roleByCommunity = new Map(memberships.map((m) => [m.community_id as string, m.role as string]));
   const { data, error } = await supabase
     .from("communities")
-    .select("id, name, logo_url, category")
+    .select("id, name, category")
     .in("id", [...roleByCommunity.keys()]);
   if (error) throw error;
 

@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { trackServerEvent } from "@/lib/mixpanel/server";
+import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
 import { getCommunityImages } from "@/lib/queries/communities";
 import {
   createCommunitySchema,
@@ -32,9 +33,16 @@ export async function createCommunity(input: CreateCommunityInput) {
 
   const supabase = await createClient();
 
+  // Generated here, not left to the column default, so the assigned photo
+  // (which needs a stable id to hash against) can be included in the same
+  // insert instead of a separate update after the fact.
+  const id = crypto.randomUUID();
+  const photo = assignPhotoForEntity(data.category, id);
+
   const { data: community, error } = await supabase
     .from("communities")
     .insert({
+      id,
       name: data.name,
       description: data.description,
       category: data.category,
@@ -45,9 +53,13 @@ export async function createCommunity(input: CreateCommunityInput) {
       kind: "native",
       join_mode: data.join_mode,
       owner_id: user.id,
+      unsplash_image_url: photo.imageUrl,
+      unsplash_photo_id: photo.photoId,
     })
     .select()
     .single();
+
+  if (!error) triggerDownloadPing(photo.photoId);
 
   if (error || !community) {
     // 23505 = unique_violation -- communities_unique_name_per_category_native
@@ -143,69 +155,6 @@ export async function updateCommunity(communityId: string, input: UpdateCommunit
   redirect(`/communities/${communityId}`);
 }
 
-const COMMUNITY_IMAGE_KINDS = ["logo", "cover"] as const;
-type CommunityImageKind = (typeof COMMUNITY_IMAGE_KINDS)[number];
-const COMMUNITY_IMAGE_COLUMN: Record<CommunityImageKind, "logo_url" | "cover_image_url"> = {
-  logo: "logo_url",
-  cover: "cover_image_url",
-};
-
-export async function setCommunityImage(communityId: string, kind: CommunityImageKind, imageUrl: string) {
-  const user = await requireUser();
-
-  // community-images is publicly rendered -- without this, an owner (the
-  // only caller RLS/this check lets reach the update) could point a
-  // logo/cover at an arbitrary external URL instead of a real upload,
-  // bypassing the storage bucket's own type/size limits entirely (same
-  // defense as addEventImage).
-  const expectedPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/community-images/${communityId}/`;
-  if (!imageUrl.startsWith(expectedPrefix)) {
-    return { error: "Image must come from this community's own upload" };
-  }
-
-  const supabase = await createClient();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("communities")
-    .select("owner_id")
-    .eq("id", communityId)
-    .single();
-  if (fetchError || !existing) return { error: "Community not found" };
-  if (existing.owner_id !== user.id) return { error: "Only the owner can edit this community" };
-
-  const { error } = await supabase
-    .from("communities")
-    .update({ [COMMUNITY_IMAGE_COLUMN[kind]]: imageUrl })
-    .eq("id", communityId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/communities/${communityId}`);
-  return { error: null };
-}
-
-export async function removeCommunityImage(communityId: string, kind: CommunityImageKind, storagePath: string) {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("communities")
-    .select("owner_id")
-    .eq("id", communityId)
-    .single();
-  if (fetchError || !existing) return { error: "Community not found" };
-  if (existing.owner_id !== user.id) return { error: "Only the owner can edit this community" };
-
-  await supabase.storage.from("community-images").remove([storagePath]);
-  const { error } = await supabase
-    .from("communities")
-    .update({ [COMMUNITY_IMAGE_COLUMN[kind]]: null })
-    .eq("id", communityId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/communities/${communityId}`);
-  return { error: null };
-}
-
 // Mirrors addEventImage/removeEventImage exactly (0003_event_images.sql's
 // pattern) -- a gallery separate from the single logo/cover, same shape,
 // same defense-in-depth. RLS (community_images_insert_staff/delete_staff,
@@ -267,9 +216,13 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
 
   const supabase = await createClient();
 
+  const id = crypto.randomUUID();
+  const photo = assignPhotoForEntity(data.category, id);
+
   const { data: community, error } = await supabase
     .from("communities")
     .insert({
+      id,
       name: data.name,
       description: data.description,
       category: data.category,
@@ -281,6 +234,8 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
       kind: "external",
       owner_id: null,
       claim_status: "unclaimed",
+      unsplash_image_url: photo.imageUrl,
+      unsplash_photo_id: photo.photoId,
     })
     .select()
     .single();
@@ -290,6 +245,7 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
     return { error: error?.message ?? "Could not submit this listing" };
   }
 
+  triggerDownloadPing(photo.photoId);
   redirect(`/communities/${community.id}`);
 }
 

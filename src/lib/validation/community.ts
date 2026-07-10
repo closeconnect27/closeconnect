@@ -16,7 +16,7 @@ const extraCitiesField = z.array(z.string().refine(isCity)).max(5).default([]);
 export const createCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
-    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
@@ -44,7 +44,7 @@ export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 export const updateCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
-    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
@@ -68,7 +68,7 @@ export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 export const submitExternalCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
-    description: z.string().trim().min(10, "Description must be at least 10 characters").max(2000),
+    description: z.string().trim().min(10, "Description must be at least 10 characters").max(3000),
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
