@@ -1,0 +1,25 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "closeconnect-monitor",
+	"main": "worker.js",
+	"compatibility_date": "2026-07-04",
+	// Every 5 minutes -- frequent enough to catch an outage quickly without
+	// being noisy; state-change-only alerting (see worker.js) means this
+	// interval doesn't affect how many emails get sent, only how fast a
+	// real change is noticed.
+	"triggers": {
+		"crons": ["*/5 * * * *"]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "MONITOR_STATE",
+			"id": "5ddafcf27a3a46599de9788f9acf3784"
+		}
+	],
+	"vars": {
+		// Not a secret -- just an address. RESEND_API_KEY (the actual
+		// credential) is set separately via `wrangler secret put`, never
+		// committed here.
+		"ADMIN_EMAIL": "closeconnect27@gmail.com"
+	}
+}
