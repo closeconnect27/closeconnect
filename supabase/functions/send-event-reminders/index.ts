@@ -119,6 +119,26 @@ Deno.serve(async (req) => {
       }),
     );
 
+    // In-app notification alongside the email above -- this is the
+    // scheduled-reminder counterpart to notify_event_reminder_now (0061),
+    // which only covers a reminder due *immediately* at insert time; a
+    // future-dated one is only ever actually delivered here, on the cron
+    // tick that finds it due, so this is the one place that can notify for
+    // it. Service-role client already bypasses RLS, same as the email send
+    // above -- no separate policy needed for this insert.
+    if (respondentIds.length > 0) {
+      const { error: notifyError } = await supabase.from("notifications").insert(
+        respondentIds.map((userId) => ({
+          user_id: userId,
+          type: "event_message",
+          title: "Message from the host",
+          body: reminder.message,
+          link: `/events/${reminder.event_id}`,
+        })),
+      );
+      if (notifyError) console.error(`Reminder ${reminder.id}: failed to insert notifications: ${notifyError.message}`);
+    }
+
     processed += 1;
   }
 

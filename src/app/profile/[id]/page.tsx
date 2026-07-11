@@ -103,7 +103,15 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <span className="hidden sm:inline">Edit profile</span>
             </Link>
           )}
-          {!isOwner && viewer && basic.profile_visibility !== "private" && (
+          {/* Not just "visibility !== private" -- a members_only profile the
+              viewer doesn't share a community with is still blocked (details
+              null) even though it isn't private, and profile_follows_insert_own
+              (0061) only allows an instant follow when the RLS visibility
+              check actually passes. `details` non-null is exactly that
+              check already evaluated server-side, so gating on it here
+              keeps this button from ever attempting an insert RLS would
+              reject. */}
+          {!isOwner && viewer && basic.profile_visibility !== "private" && details && (
             <FollowButton targetId={id} initiallyFollowing={isFollowing} />
           )}
         </div>
@@ -173,6 +181,12 @@ async function RestrictedProfileNotice({
   }
 
   if (visibility === "members_only") {
+    // has_accepted_follow_request(id) unlocks profile_details visibility
+    // regardless of profile_visibility (see profile_details_select RLS,
+    // 0035/0036) -- so a members_only profile the viewer doesn't share a
+    // community with is still reachable through the same request/approve
+    // flow private profiles use, not a permanent dead end.
+    const requestStatus = await getFollowRequestStatus(supabase, targetId, viewerId!);
     return (
       <div className="mt-8">
         <EmptyState
@@ -180,6 +194,9 @@ async function RestrictedProfileNotice({
           title="Only shared community members can view this profile"
           compact
         />
+        <div className="mt-4 flex justify-center">
+          <RequestToFollowButton targetId={targetId} initialStatus={requestStatus} />
+        </div>
       </div>
     );
   }
