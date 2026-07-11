@@ -39,7 +39,7 @@ export function FoundingToggle({
         }`}
       >
         <IconSeeding size={14} />
-        {founding ? "Founding -- click to unmark" : "Mark as Founding (admin)"}
+        {founding ? "Founding -- click to unmark" : "Mark as founding member"}
       </button>
       {error && <p className="text-[12px] text-pink">{error}</p>}
     </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { IconPlus, IconCalendarEvent, IconUsers } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 const NAV_LINKS = [
   { href: "/events", label: "Events" },
@@ -25,10 +26,12 @@ const NAV_LINKS = [
 // alongside whatever the page put there.
 export function Header({
   isLoggedIn,
+  userId,
   pathname,
   slot,
 }: {
   isLoggedIn: boolean;
+  userId: string | null;
   pathname?: string;
   slot?: React.ReactNode;
 }) {
@@ -75,6 +78,7 @@ export function Header({
             <IconPlus size={15} />
             Create
           </Link>
+          {isLoggedIn && userId && <NotificationBell userId={userId} />}
           <ThemeToggle />
         </div>
       </div>

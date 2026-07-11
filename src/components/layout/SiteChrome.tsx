@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { Footer } from "@/components/layout/Footer";
 import { HeaderSlotProvider, useHeaderSlotContent } from "@/components/layout/HeaderSlotContext";
 import { track, identify } from "@/lib/mixpanel/client";
 
@@ -63,11 +64,14 @@ function SiteChromeInner({
 
   return (
     <>
-      {!isHome && <Header isLoggedIn={isLoggedIn} pathname={pathname} slot={slotContent} />}
+      {!isHome && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
           Only needed when BottomNav is actually rendered. */}
-      <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "" : "pb-16 sm:pb-0"}`}>{children}</div>
+      <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "" : "pb-16 sm:pb-0"}`}>
+        {children}
+        <Footer />
+      </div>
       {!isHome && <BottomNav isLoggedIn={isLoggedIn} />}
     </>
   );

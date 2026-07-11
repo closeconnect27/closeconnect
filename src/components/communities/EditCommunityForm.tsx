@@ -95,7 +95,6 @@ export function EditCommunityForm({
           </p>
         </div>
         <RequestVerificationButton
-          targetType="community"
           targetId={community.id}
           isVerified={community.is_verified}
           initialStatus={verificationStatus}

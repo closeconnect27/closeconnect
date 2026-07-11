@@ -251,6 +251,14 @@ textarea:focus-visible,
      still overrides this exactly as before -- inline styles always beat a
      class-based ancestor's inherited value. */
   color: var(--text);
+  /* DM Sans (the ambient body font this inherits from otherwise) has no
+     emoji glyphs, and Tailwind's preflight sets button { font-family:
+     inherit }, which pulls that same font stack into the emoji-picker
+     buttons and any emoji typed/inserted into a description. Relying on
+     implicit fallback for glyphs missing from a custom webfont is
+     inconsistent across browsers -- naming actual emoji fonts explicitly
+     is the standard, reliable fix. */
+  font-family: var(--font-dm-sans), "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
 }
 /* The global input/textarea/button focus-visible ring further up this file
    is a plain `input:focus-visible` etc. selector, higher-specificity than

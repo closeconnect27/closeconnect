@@ -22,6 +22,7 @@ import {
   getCommunitiesJoinedPublic,
   getEventsAttendedPublic,
   getFollowRequestStatus,
+  getIsFollowing,
 } from "@/lib/queries/profileDetails";
 import { getOrganizerStats } from "@/lib/queries/verification";
 import { getCategoryVisual, getCategory } from "@/lib/categories";
@@ -33,6 +34,7 @@ import { FoundingBadge } from "@/components/ui/FoundingBadge";
 import { FoundingToggle } from "@/components/ui/FoundingToggle";
 import { setHostFounding } from "@/app/actions/admin";
 import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
+import { FollowButton } from "@/components/profile/FollowButton";
 import { RichTextView } from "@/components/ui/RichTextView";
 
 // bio/profile_visibility come from `basic` (profiles, always public, 0035)
@@ -53,9 +55,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const basic = await getPublicProfileBasic(supabase, id);
   if (!basic) notFound();
 
-  const [details, stats] = await Promise.all([
+  const [details, stats, isFollowing] = await Promise.all([
     getProfileDetails(supabase, id),
     getOrganizerStats(supabase, id),
+    getIsFollowing(supabase, id, viewer?.id ?? null),
   ]);
   const isOwner = viewer?.id === id;
   const { data: viewerProfile } = viewer
@@ -99,6 +102,9 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <IconPencil size={14} />
               <span className="hidden sm:inline">Edit profile</span>
             </Link>
+          )}
+          {!isOwner && viewer && basic.profile_visibility !== "private" && (
+            <FollowButton targetId={id} initiallyFollowing={isFollowing} />
           )}
         </div>
 

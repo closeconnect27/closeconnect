@@ -1,6 +1,6 @@
 import type { Icon } from "@tabler/icons-react";
 
-export function StatCard({ icon: IconComponent, label, value }: { icon: Icon; label: string; value: number }) {
+export function StatCard({ icon: IconComponent, label, value }: { icon: Icon; label: string; value: number | string }) {
   return (
     <div className="card-elevated flex flex-1 items-center gap-3 rounded-card bg-bg2 p-4">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-tint">

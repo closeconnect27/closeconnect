@@ -101,7 +101,7 @@ export function CommunityCard({ community: c }: { community: Community }) {
   );
 }
 
-const TYPE_LABELS = { online: "Online", offline: "Offline", both: "Both" } as const;
+const TYPE_LABELS = { online: "Online", offline: "Offline", both: "Offline+Online" } as const;
 const TYPE_DOT_COLORS = { online: "#25D366", offline: "#7c3aed", both: "#9ca3af" } as const;
 
 function TypeBadge({ type }: { type: Community["community_type"] }) {

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileDetails, getPublicProfileBasic } from "@/lib/queries/profileDetails";
-import { getMyVerificationRequestStatus } from "@/lib/queries/verification";
 import { EditProfileForm } from "@/components/profile/EditProfileForm";
 
 export default async function EditProfilePage() {
@@ -14,10 +13,9 @@ export default async function EditProfilePage() {
   // profile_details_select grants `id = auth.uid()` unconditionally too
   // (0035) -- every profile has had a details row since signup or the
   // 0033 backfill.
-  const [basic, details, verificationStatus] = await Promise.all([
+  const [basic, details] = await Promise.all([
     getPublicProfileBasic(supabase, user.id),
     getProfileDetails(supabase, user.id),
-    getMyVerificationRequestStatus(supabase, "organizer", user.id, user.id),
   ]);
   if (!basic || !details) {
     throw new Error("Profile missing for the signed-in user -- this should never happen");
@@ -30,7 +28,7 @@ export default async function EditProfilePage() {
           ← Back to profile
         </Link>
         <h1 className="mb-6 font-heading text-[18px] font-bold leading-tight">Edit profile</h1>
-        <EditProfileForm basic={basic} details={details} verificationStatus={verificationStatus} />
+        <EditProfileForm basic={basic} details={details} />
       </div>
     </div>
   );

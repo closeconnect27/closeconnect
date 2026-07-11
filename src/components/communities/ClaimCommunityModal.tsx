@@ -2,9 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconPaperclip, IconTrash } from "@tabler/icons-react";
 import { claimCommunitySchema } from "@/lib/validation/community";
 import { submitCommunityClaim } from "@/app/actions/communities";
+import { uploadClaimProofImage } from "@/lib/uploadClaimProofImage";
+
+const MAX_IMAGES = 5;
 
 export function ClaimCommunityModal({
   communityId,
@@ -19,15 +22,47 @@ export function ClaimCommunityModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [proof, setProof] = useState("");
+  const [images, setImages] = useState<{ path: string; previewUrl: string }[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [, startTransition] = useTransition();
+
+  async function handleFilesSelected(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError("");
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      setError(`Up to ${MAX_IMAGES} images`);
+      return;
+    }
+
+    setUploadingImages(true);
+    for (const file of Array.from(files).slice(0, remaining)) {
+      const { path, error: uploadError } = await uploadClaimProofImage(file, communityId);
+      if (uploadError || !path) {
+        setError(uploadError ?? "Could not upload image");
+        continue;
+      }
+      setImages((prev) => [...prev, { path, previewUrl: URL.createObjectURL(file) }]);
+    }
+    setUploadingImages(false);
+  }
+
+  function removeImage(path: string) {
+    setImages((prev) => prev.filter((img) => img.path !== path));
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    const parsed = claimCommunitySchema.safeParse({ name, phone, proof: proof || undefined });
+    const parsed = claimCommunitySchema.safeParse({
+      name,
+      phone,
+      proof: proof || undefined,
+      proofImagePaths: images.map((img) => img.path),
+    });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
@@ -93,6 +128,41 @@ export function ClaimCommunityModal({
               rows={3}
               className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
             />
+
+            <div className="flex flex-col gap-2">
+              <label className="btn-secondary w-fit cursor-pointer px-4 py-2 text-[13px]">
+                <IconPaperclip size={14} />
+                {uploadingImages ? "Uploading…" : "Attach proof images"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  hidden
+                  disabled={uploadingImages || images.length >= MAX_IMAGES}
+                  onChange={(e) => {
+                    void handleFilesSelected(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {images.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {images.map((img) => (
+                    <div key={img.path} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview, not a next/image remote pattern */}
+                      <img src={img.previewUrl} alt="" className="h-16 w-16 rounded-card-sm border border-border2 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(img.path)}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-text2 shadow-card transition hover:text-pink"
+                      >
+                        <IconTrash size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {error && <p className="text-[13px] text-pink">{error}</p>}
 

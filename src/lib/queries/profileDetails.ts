@@ -157,6 +157,21 @@ export async function getFollowRequestStatus(supabase: SupabaseClient, targetId:
   return (data?.status ?? "none") as FollowRequestStatus;
 }
 
+/** Instant-follow relationship (0061, public/members_only profiles) --
+ * separate from getFollowRequestStatus above, which is the private-profile
+ * request/approval flow. */
+export async function getIsFollowing(supabase: SupabaseClient, targetId: string, viewerId: string | null) {
+  if (!viewerId || viewerId === targetId) return false;
+  const { data, error } = await supabase
+    .from("profile_follows")
+    .select("follower_id")
+    .eq("follower_id", viewerId)
+    .eq("followee_id", targetId)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
 export type IncomingFollowRequest = {
   id: string;
   requester_id: string;

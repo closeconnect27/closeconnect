@@ -8,8 +8,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // interface, same policy check either way.
 const SIGNED_URL_TTL_SECONDS = 3600;
 
-export async function resolveAttachmentUrl(supabase: SupabaseClient, path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from("chat-attachments").createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+export async function resolveAttachmentUrl(
+  supabase: SupabaseClient,
+  path: string,
+  bucket: string = "chat-attachments",
+): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
   if (error || !data) return null;
   return data.signedUrl;
 }

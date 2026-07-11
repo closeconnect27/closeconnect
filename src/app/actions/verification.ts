@@ -36,52 +36,19 @@ export async function requestCommunityVerification(communityId: string, input: R
   revalidatePath(`/communities/${communityId}/edit`);
 
   const { data: community } = await supabase.from("communities").select("name").eq("id", communityId).maybeSingle();
-  notifyAdminOfVerificationRequest("community", community?.name ?? "a community").catch((e) =>
+  notifyAdminOfVerificationRequest(community?.name ?? "a community").catch((e) =>
     console.error("Failed to send verification request notification email:", e),
   );
   trackServerEvent("verification_requested", user.id, { target_type: "community", target_id: communityId });
   return { error: null };
 }
 
-export async function requestOrganizerVerification(input: RequestVerificationInput) {
-  const user = await requireUser();
-
-  const parsed = requestVerificationSchema.safeParse(input);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("verification_requests").insert({
-    target_type: "organizer",
-    target_id: user.id,
-    requested_by: user.id,
-    note: parsed.data.note || null,
-  });
-
-  if (error) {
-    if (error.code === "23505") return { error: "Your verification request is already pending." };
-    return { error: error.message };
-  }
-
-  revalidatePath("/profile");
-  revalidatePath(`/profile/${user.id}`);
-
-  const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
-  notifyAdminOfVerificationRequest("organizer", profile?.display_name ?? "A user").catch((e) =>
-    console.error("Failed to send verification request notification email:", e),
-  );
-  trackServerEvent("verification_requested", user.id, { target_type: "organizer", target_id: user.id });
-  return { error: null };
-}
-
-// Fire-and-forget, same shape as notifyAdminOfPendingClaim (communities.ts)
-// -- never blocks the requester's own submission on email delivery, and no
-// one-click approve/reject links (unlike claims): verification review has
-// no equivalent throwaway "reject with no downside" action, and always
-// happens from the dashboard already.
-async function notifyAdminOfVerificationRequest(targetType: "community" | "organizer", label: string) {
+// Organizer verification is automatic now (see 0060 migration: owning a
+// community or hosting an event sets profiles.is_verified directly) -- no
+// request/review flow for it anymore. Fire-and-forget, same shape as
+// notifyAdminOfPendingClaim (communities.ts) -- never blocks the
+// requester's own submission on email delivery.
+async function notifyAdminOfVerificationRequest(label: string) {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return;
 
@@ -90,9 +57,9 @@ async function notifyAdminOfVerificationRequest(targetType: "community" | "organ
 
   await sendEmail({
     to: adminEmail,
-    subject: `New ${targetType} verification request: ${label}`,
+    subject: `New community verification request: ${label}`,
     html: `
-      <p>A new ${targetType} verification request${targetType === "community" ? ` for <strong>${label}</strong>` : ` from <strong>${label}</strong>`} is waiting for review.</p>
+      <p>A new community verification request for <strong>${label}</strong> is waiting for review.</p>
       <p><a href="${dashboardLink}">Review in dashboard</a></p>
     `,
   });
@@ -134,7 +101,10 @@ export async function reviewVerificationRequest(
 // Deliberately separate from the request/review queue above -- phone/email
 // verification stays fully manual (an admin confirms directly with the
 // organizer, e.g. a call, then flips this), not something an organizer can
-// request or trigger themselves.
+// request or trigger themselves. No admin UI currently calls this (its one
+// trigger point lived in the now-removed organizer branch of
+// PendingVerificationRequestsSection) -- kept as-is since removing
+// verified_phone/verified_email themselves wasn't asked for.
 export async function toggleContactVerification(
   profileId: string,
   field: "verified_phone" | "verified_email",

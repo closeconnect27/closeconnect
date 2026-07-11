@@ -9,6 +9,7 @@ import {
   getEventFormFields,
   getTicketAvailability,
   getMyEventCheckIn,
+  getMyRegistrationCount,
 } from "@/lib/queries/events";
 import { getMyInterestStatus } from "@/lib/queries/interests";
 import { getMyEventFeedback, getEventFeedbackList } from "@/lib/queries/eventFeedback";
@@ -69,15 +70,17 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList] = await Promise.all([
-    getEventTicketTypes(supabase, id),
-    getEventFormFields(supabase, id),
-    getTicketAvailability(supabase, id),
-    user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
-    user ? getMyEventCheckIn(supabase, id, user.id) : Promise.resolve(false),
-    user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
-    getEventFeedbackList(supabase, id),
-  ]);
+  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList, myRegistrationCount] =
+    await Promise.all([
+      getEventTicketTypes(supabase, id),
+      getEventFormFields(supabase, id),
+      getTicketAvailability(supabase, id),
+      user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
+      user ? getMyEventCheckIn(supabase, id, user.id) : Promise.resolve(false),
+      user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
+      getEventFeedbackList(supabase, id),
+      user ? getMyRegistrationCount(supabase, id, user.id) : Promise.resolve(0),
+    ]);
 
   const dateLabel = formatEventDate(event.event_date);
 
@@ -225,6 +228,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 availability={availability}
                 isLoggedIn={!!user}
                 email={user?.email}
+                alreadyRegisteredCount={myRegistrationCount}
               />
             </>
           )}

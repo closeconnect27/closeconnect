@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
 import { updateProfile } from "@/app/actions/profile";
 import { updateProfileSchema } from "@/lib/validation/profile";
-import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { CATEGORIES } from "@/lib/categories";
 import type { ProfileDetails, PublicProfileBasic } from "@/lib/queries/profileDetails";
-import type { VerificationRequestStatus } from "@/lib/queries/verification";
 
 const INTEREST_OPTIONS = CATEGORIES.map((c) => ({ value: c.slug, label: `${c.emoji} ${c.label}` }));
 
@@ -40,11 +38,9 @@ const VISIBILITY_OPTIONS = [
 export function EditProfileForm({
   basic,
   details,
-  verificationStatus,
 }: {
   basic: PublicProfileBasic;
   details: ProfileDetails;
-  verificationStatus: VerificationRequestStatus;
 }) {
   const router = useRouter();
   const [bio, setBio] = useState({ json: basic.bio_content, text: basic.bio ?? "" });
@@ -113,15 +109,9 @@ export function EditProfileForm({
           <p className="mt-1 text-[12px] text-text3">
             {basic.is_verified
               ? "You're a verified organizer."
-              : "A verified badge shows you've been reviewed by an admin."}
+              : "You'll be automatically verified once you own a community or host an event."}
           </p>
         </div>
-        <RequestVerificationButton
-          targetType="organizer"
-          targetId={basic.id}
-          isVerified={basic.is_verified}
-          initialStatus={verificationStatus}
-        />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">

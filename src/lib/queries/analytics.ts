@@ -129,42 +129,6 @@ export async function getNewMembersByMonth(supabase: SupabaseClient, communityId
     .sort((a, b) => a.month.localeCompare(b.month));
 }
 
-export type TrafficSourceBreakdown = Record<
-  "direct" | "search" | "social" | "instagram" | "linkedin" | "other" | "unknown",
-  number
->;
-
-/** "unknown" covers rows recorded before referrer_source existed
- * (0038) -- null in the DB, not a real classification bucket, so it's kept
- * separate rather than silently folded into "other". */
-export async function getTrafficSourceBreakdown(
-  supabase: SupabaseClient,
-  targetType: "community" | "event",
-  targetId: string,
-): Promise<TrafficSourceBreakdown> {
-  const { data, error } = await supabase
-    .from("page_views")
-    .select("referrer_source")
-    .eq("target_type", targetType)
-    .eq("target_id", targetId);
-  if (error) throw error;
-
-  const breakdown: TrafficSourceBreakdown = {
-    direct: 0,
-    search: 0,
-    social: 0,
-    instagram: 0,
-    linkedin: 0,
-    other: 0,
-    unknown: 0,
-  };
-  for (const row of data ?? []) {
-    const source = (row.referrer_source ?? "unknown") as keyof TrafficSourceBreakdown;
-    breakdown[source] += 1;
-  }
-  return breakdown;
-}
-
 export type ActiveMember = { userId: string; displayName: string; messageCount: number };
 
 /** Ranked by message count in this community's groups -- community_messages

@@ -12,23 +12,12 @@ import {
   computeAcceptanceRate,
   computeConversionRate,
   getNewMembersByMonth,
-  getTrafficSourceBreakdown,
   getMostActiveMembers,
 } from "@/lib/queries/analytics";
 import { StatCard } from "@/components/ui/StatCard";
 import { DailyBarChart } from "@/components/analytics/DailyBarChart";
 import { PercentageBar } from "@/components/analytics/PercentageBar";
 import { EmptyState } from "@/components/ui/EmptyState";
-
-const SOURCE_COLORS: Record<string, string> = {
-  direct: "#5dcaa5",
-  search: "#818cf8",
-  social: "#c4b5fd",
-  instagram: "#f9a8d4",
-  linkedin: "#93c5fd",
-  other: "#a8a8a8",
-  unknown: "#444444",
-};
 
 export default async function CommunityAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,17 +43,15 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
     redirect(`/communities/${id}`);
   }
 
-  const [viewCount, viewsByDay, joinMetrics, newMembersByMonth, traffic, activeMembers] = await Promise.all([
+  const [viewCount, viewsByDay, joinMetrics, newMembersByMonth, activeMembers] = await Promise.all([
     getViewCount(supabase, "community", id),
     getViewsByDay(supabase, "community", id),
     getJoinRequestMetrics(supabase, id),
     getNewMembersByMonth(supabase, id),
-    getTrafficSourceBreakdown(supabase, "community", id),
     getMostActiveMembers(supabase, id),
   ]);
 
   const acceptanceRate = computeAcceptanceRate(joinMetrics.totals);
-  const totalTraffic = Object.values(traffic).reduce((a, b) => a + b, 0);
   // views -> a join request being *submitted* (approved+pending+rejected),
   // not views -> current member_count -- member_count can shrink (someone
   // leaves) independently of how many people the page ever converted,
@@ -83,7 +70,7 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard icon={IconChartBar} label="Total views" value={viewCount} />
           <StatCard icon={IconUsers} label="Members" value={community.member_count} />
-          <StatCard icon={IconInbox} label="Join requests" value={totalJoinAttempts} />
+          <StatCard icon={IconInbox} label="Pending join requests" value={joinMetrics.totals.pending} />
           <StatCard
             icon={IconChartBar}
             label="Acceptance rate"
@@ -92,7 +79,7 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
           <StatCard
             icon={IconChartBar}
             label="Views -> join rate"
-            value={conversionRate === null ? 0 : Math.round(conversionRate * 100)}
+            value={`${conversionRate === null ? 0 : Math.round(conversionRate * 100)}%`}
           />
         </div>
 
@@ -120,22 +107,6 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
                   />
                 ))}
               </div>
-            )}
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Traffic sources</h2>
-          <div className="card-elevated flex flex-col gap-2 rounded-card bg-bg2 p-4">
-            {totalTraffic === 0 ? (
-              <p className="text-[12px] text-text3">No view data yet.</p>
-            ) : (
-              Object.entries(traffic)
-                .filter(([, count]) => count > 0)
-                .sort((a, b) => b[1] - a[1])
-                .map(([source, count]) => (
-                  <PercentageBar key={source} label={source} count={count} total={totalTraffic} color={SOURCE_COLORS[source]} />
-                ))
             )}
           </div>
         </section>

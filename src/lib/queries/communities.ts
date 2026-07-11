@@ -50,6 +50,8 @@ export type Community = {
   // can succeed through any path -- enforced at the DB level, not just by
   // hiding the Join button.
   member_limit: number | null;
+  /** Null when unclaimed (external community with no owner yet). */
+  owner: { id: string; display_name: string } | null;
 };
 
 export type CommunityFilters = {
@@ -129,8 +131,15 @@ export async function getCommunitiesByCity(supabase: SupabaseClient, city: City,
   return data as Community[];
 }
 
+// owner:profiles(...) must pin the FK explicitly (!communities_owner_id_fkey)
+// -- community_members also FKs to profiles, so an unqualified embed can't
+// tell which relationship "owner:profiles(...)" means and 404s the query.
 export async function getCommunityById(supabase: SupabaseClient, id: string) {
-  const { data, error } = await supabase.from("communities").select("*").eq("id", id).single();
+  const { data, error } = await supabase
+    .from("communities")
+    .select("*, owner:profiles!communities_owner_id_fkey(id,display_name)")
+    .eq("id", id)
+    .single();
   if (error) throw error;
   return data as Community;
 }

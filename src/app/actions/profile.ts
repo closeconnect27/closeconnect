@@ -82,6 +82,45 @@ export async function requestToFollowProfile(targetId: string) {
   return { error: null };
 }
 
+// Instant follow (0061) -- public/members_only profiles only. RLS
+// (profile_follows_insert_own) rejects this for a private target, so
+// there's no need to re-check visibility here; a rejected insert just
+// surfaces as a generic error, same as any other RLS-enforced boundary in
+// this app.
+export async function followProfile(targetId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("profile_follows").insert({
+    follower_id: user.id,
+    followee_id: targetId,
+  });
+
+  if (error) {
+    if (error.code === "23505") return { error: null }; // already following -- idempotent
+    if (error.code === "23514") return { error: "You can't follow your own profile." };
+    return { error: error.message };
+  }
+
+  revalidatePath(`/profile/${targetId}`);
+  return { error: null };
+}
+
+export async function unfollowProfile(targetId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("profile_follows")
+    .delete()
+    .eq("follower_id", user.id)
+    .eq("followee_id", targetId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/profile/${targetId}`);
+  return { error: null };
+}
+
 export async function reviewFollowRequest(requestId: string, decision: "accepted" | "rejected") {
   const user = await requireUser();
   const supabase = await createClient();

@@ -50,9 +50,17 @@ const FONT_SIZES = [
   { label: "Huge", value: "28px" },
 ];
 
-const COLORS = ["#e5484d", "#f5a623", "#12a150", "#0b6bcb", "#8e4ec6", "#1a1a1a"];
+// #1a1a1a (near-black) used to be here as a 6th swatch -- it's the exact
+// same hex as --bg3, this editor's own dark-mode background, so picking it
+// made the selected text invisible against its own container. Every color
+// below is checked to have real contrast against both themes' surfaces.
+const COLORS = ["#e5484d", "#f5a623", "#12a150", "#0b6bcb", "#8e4ec6", "#0d9488"];
 
-const EMOJI = ["😀", "😂", "🎉", "❤️", "👍", "🔥", "✨", "🙌", "😍", "🤔", "🥳", "👏", "💯", "🚀", "😅", "🙏"];
+// Single-codepoint emoji only -- the original list had "❤️" (U+2764 +
+// U+FE0F variation selector), a multi-codepoint sequence more prone to
+// being split at the wrong boundary by insertContent/text-node merging
+// than a plain single-codepoint emoji like the heart below.
+const EMOJI = ["😀", "😂", "🎉", "💖", "👍", "🔥", "✨", "🙌", "😍", "🤔", "🥳", "👏", "💯", "🚀", "😅", "🙏"];
 
 const MAX_IMAGES = 5;
 // Must match the community-images/event-images bucket's own limits (0018,
@@ -100,6 +108,33 @@ export function RichTextEditor({
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange({ json: editor.getJSON(), text: editor.getText() });
+    },
+    // Without this, pasting or dragging an image (very natural in a rich
+    // editor) falls through to Tiptap's own default image handling, which
+    // needs a data: URI -- but allowBase64 is deliberately off (a pasted
+    // screenshot could otherwise bloat the stored JSONB row arbitrarily),
+    // so the default path silently inserts an imageResize node with no
+    // src at all. Confirmed this exact shape already sitting in production
+    // data (a real community's description). Routing both paths through
+    // the same upload flow as the toolbar button fixes it instead of just
+    // suppressing the broken insert.
+    editorProps: {
+      handlePaste: (_view, event) => {
+        const file = Array.from(event.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
+        if (!file) return false;
+        event.preventDefault();
+        if (allowImages) void handleImagePick(file);
+        else setError("Images aren't supported here.");
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        const file = Array.from(event.dataTransfer?.files ?? []).find((f) => f.type.startsWith("image/"));
+        if (!file) return false;
+        event.preventDefault();
+        if (allowImages) void handleImagePick(file);
+        else setError("Images aren't supported here.");
+        return true;
+      },
     },
   });
 
@@ -367,6 +402,7 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
                 setOpen(false);
               }}
               className="rounded-card-sm p-1 text-[16px] hover:bg-bg3"
+              style={{ fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif' }}
             >
               {e}
             </button>

@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { requestCommunityVerification, requestOrganizerVerification } from "@/app/actions/verification";
+import { requestCommunityVerification } from "@/app/actions/verification";
 import type { VerificationRequestStatus } from "@/lib/queries/verification";
 
+// Community verification only now -- organizer verification is automatic
+// (owning a community or hosting an event sets it directly, see 0060),
+// so there's no button/request flow left for that target type.
 export function RequestVerificationButton({
-  targetType,
   targetId,
   isVerified,
   initialStatus,
 }: {
-  targetType: "community" | "organizer";
   targetId: string;
   isVerified: boolean;
   initialStatus: VerificationRequestStatus;
@@ -26,10 +27,7 @@ export function RequestVerificationButton({
   function handleSubmit() {
     setError("");
     startTransition(async () => {
-      const result =
-        targetType === "community"
-          ? await requestCommunityVerification(targetId, { note: note || undefined })
-          : await requestOrganizerVerification({ note: note || undefined });
+      const result = await requestCommunityVerification(targetId, { note: note || undefined });
       if (result.error) setError(result.error);
       else {
         setStatus("pending");

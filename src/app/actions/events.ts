@@ -156,8 +156,7 @@ export async function registerForEvent(eventId: string, input: EventRegistration
       ticket_type_id: parsed.data.ticket_type_id,
       respondent_id: user.id,
       // Email comes from the verified session, never client input -- a
-      // registrant can't spoof someone else's email or dodge the
-      // one-registration-per-account constraint by varying it.
+      // registrant can't spoof someone else's email.
       response_data: { name: parsed.data.name, email: user.email, ...parsed.data.answers },
       status: "approved",
       payment_status: isPaid ? "unpaid" : "paid",
@@ -170,12 +169,6 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     if (error?.message.includes("wait a moment")) return { error: error.message };
     // Raised by enforce_ticket_capacity() (0030) -- already user-facing text.
     if (error?.message.includes("sold out")) return { error: error.message };
-    // 23505 = unique_violation -- the one-registration-per-event-respondent
-    // index (0015, migrated off the old email-based one now that every
-    // registrant has a real account).
-    if (error?.code === "23505") {
-      return { error: "You've already registered for this event." };
-    }
     return { error: error?.message ?? "Could not complete registration" };
   }
 
@@ -211,6 +204,17 @@ export async function registerForEvent(eventId: string, input: EventRegistration
       console.error("Failed to send registration confirmation email:", e),
     );
   }
+  // Self-notification (recipient = the acting user) -- inserted directly
+  // under this request's own RLS-scoped client, allowed by
+  // notifications_insert_self (0061), unlike every other notification
+  // type which goes through a security definer trigger instead.
+  await supabase.from("notifications").insert({
+    user_id: user.id,
+    type: "event_registered",
+    title: "You're registered!",
+    body: ticketType.name,
+    link: `/events/${eventId}`,
+  });
   trackServerEvent("event_registered", user.id, {
     event_id: eventId,
     ticket_type_id: parsed.data.ticket_type_id,
@@ -438,6 +442,33 @@ export async function cancelEvent(eventId: string) {
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath(`/events/${eventId}/manage`);
+  revalidatePath("/host/dashboard");
+  return { error: null };
+}
+
+// Scoped to drafts only (event_date is null) -- a real, published event
+// with actual registrants should be cancelled (cancelEvent), not deleted
+// outright. form_fields/form_responses are polymorphic (owner_type/
+// owner_id), not FK'd to events, so nothing cascades when the event row
+// goes -- deleted explicitly here first. event_ticket_types does cascade
+// (0001_init.sql), so no manual cleanup needed for those.
+export async function deleteDraftEvent(eventId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
+  if (!auth.ok) return { error: auth.error };
+
+  const { data: event } = await supabase.from("events").select("event_date").eq("id", eventId).single();
+  if (!event) return { error: "Event not found" };
+  if (event.event_date !== null) return { error: "Only drafts can be deleted this way" };
+
+  await supabase.from("form_responses").delete().eq("owner_type", "event").eq("owner_id", eventId);
+  await supabase.from("form_fields").delete().eq("owner_type", "event").eq("owner_id", eventId);
+
+  const { error } = await supabase.from("events").delete().eq("id", eventId);
+  if (error) return { error: error.message };
+
   revalidatePath("/host/dashboard");
   return { error: null };
 }

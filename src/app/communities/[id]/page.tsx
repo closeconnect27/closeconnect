@@ -166,6 +166,35 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           {community.is_founding && <FoundingBadge />}
         </div>
 
+        {community.owner && (
+          <p className="mt-1 text-[13px] text-text2">
+            Owned by{" "}
+            <Link href={`/profile/${community.owner.id}`} className="font-medium text-text hover:text-green hover:underline">
+              {community.owner.display_name}
+            </Link>
+          </p>
+        )}
+
+        {/* Join/request action surfaces immediately below the header --
+            the decision a visitor is here to make -- rather than after
+            the description and meta row. Visible pre-join since it's the
+            whole point of a non-member's visit here. */}
+        {isNative && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <JoinSection
+              communityId={community.id}
+              joinMode={community.join_mode}
+              isMember={isMember}
+              isOwner={isOwner}
+              isLoggedIn={!!user}
+              isFull={isFull}
+              pendingStatus={pendingStatus}
+              formFields={formFields}
+            />
+            <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap gap-2">
           {isOwner && (
             <Link href={`/communities/${community.id}/edit`} className="btn-secondary px-4 py-2 text-[13px]">
@@ -219,20 +248,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
         {isNative && (
           <div className="mt-8 flex flex-col gap-8">
-            <div className="flex flex-wrap gap-3">
-              <JoinSection
-                communityId={community.id}
-                joinMode={community.join_mode}
-                isMember={isMember}
-                isOwner={isOwner}
-                isLoggedIn={!!user}
-                isFull={isFull}
-                pendingStatus={pendingStatus}
-                formFields={formFields}
-              />
-              <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
-            </div>
-
             {isMember ? (
               <CommunityTabs
                 groups={
@@ -256,14 +271,13 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                   <section className="flex flex-col gap-4">
                     <RichTextView content={community.description_content} plainFallback={community.description} />
                     <div className="flex flex-col gap-2 rounded-card border border-border bg-bg2 p-4 text-[13px] text-text2">
-                      <DetailRow label="Type" value={capitalize(community.community_type)} />
+                      <DetailRow label="Type" value={communityTypeLabel(community.community_type)} />
                       <DetailRow label="Who can join" value={community.join_mode === "open" ? "Open" : "Request to join"} />
                       {community.city && <DetailRow label="City" value={community.city} />}
                       {community.member_limit != null && (
                         <DetailRow label="Member limit" value={`${community.member_count} / ${community.member_limit}`} />
                       )}
                     </div>
-                    {isOwner && <MemberCountVisibilityToggle communityId={community.id} visible={community.member_count_visible} />}
                     {isAdmin && (
                       <FoundingToggle founding={community.is_founding} onToggle={setCommunityFounding.bind(null, community.id)} />
                     )}
@@ -273,8 +287,9 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                   <section className="flex flex-col gap-8">
                     <div>
                       {isOwner && (
-                        <div className="mb-3">
+                        <div className="mb-3 flex flex-wrap gap-2">
                           <MembersVisibilityToggle communityId={community.id} visible={community.members_list_visible} />
+                          <MemberCountVisibilityToggle communityId={community.id} visible={community.member_count_visible} />
                         </div>
                       )}
                       <MemberList
@@ -346,8 +361,9 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   );
 }
 
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function communityTypeLabel(type: string) {
+  if (type === "both") return "Offline+Online";
+  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

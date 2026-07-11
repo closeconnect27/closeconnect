@@ -24,6 +24,7 @@ export function EventRegistration({
   availability,
   isLoggedIn,
   email,
+  alreadyRegisteredCount = 0,
 }: {
   eventId: string;
   ticketTypes: EventTicketType[];
@@ -31,6 +32,10 @@ export function EventRegistration({
   availability: Map<string, number>;
   isLoggedIn: boolean;
   email?: string;
+  // Duplicate registrations are allowed at the DB level (0059) -- this is
+  // just what triggers the "you've already registered, register again?"
+  // confirmation instead of silently resubmitting.
+  alreadyRegisteredCount?: number;
 }) {
   const router = useRouter();
   const [ticketTypeId, setTicketTypeId] = useState(ticketTypes[0]?.id ?? "");
@@ -40,6 +45,7 @@ export function EventRegistration({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
+  const [confirmingReRegister, setConfirmingReRegister] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
@@ -58,10 +64,20 @@ export function EventRegistration({
       setError("Choose a ticket type");
       return;
     }
+    if (alreadyRegisteredCount > 0 && !confirmingReRegister) {
+      setConfirmingReRegister(true);
+      return;
+    }
+    submitRegistration();
+  }
+
+  function submitRegistration() {
     startTransition(async () => {
       const result = await registerForEvent(eventId, { ticket_type_id: ticketTypeId, name, answers, quantity });
-      if (result?.error) setError(result.error);
-      else {
+      if (result?.error) {
+        setError(result.error);
+        setConfirmingReRegister(false);
+      } else {
         setPaymentLinkUrl(result.paymentLinkUrl ?? null);
         setDone(true);
       }
@@ -199,13 +215,33 @@ export function EventRegistration({
 
       {error && <p className="text-[13px] text-pink">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending || !ticketTypeId || (selectedTicket ? isSoldOut(selectedTicket) : false)}
-        className="btn-primary py-3 text-[14px]"
-      >
-        {pending ? "Registering…" : "Register"}
-      </button>
+      {confirmingReRegister ? (
+        <div className="flex flex-col gap-2 rounded-card-sm border border-border2 bg-bg3 p-3">
+          <p className="text-[13px] text-text2">
+            You&apos;ve already registered for this event. Register again?
+          </p>
+          <div className="flex gap-2">
+            <button type="submit" disabled={pending} className="btn-primary px-4 py-2 text-[13px]">
+              {pending ? "Registering…" : "Yes, register again"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingReRegister(false)}
+              className="btn-secondary px-4 py-2 text-[13px]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="submit"
+          disabled={pending || !ticketTypeId || (selectedTicket ? isSoldOut(selectedTicket) : false)}
+          className="btn-primary py-3 text-[14px]"
+        >
+          {pending ? "Registering…" : "Register"}
+        </button>
+      )}
     </form>
   );
 }

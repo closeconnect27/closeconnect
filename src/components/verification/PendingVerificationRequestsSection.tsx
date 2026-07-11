@@ -3,15 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { reviewVerificationRequest, toggleContactVerification } from "@/app/actions/verification";
+import { reviewVerificationRequest } from "@/app/actions/verification";
 import type { PendingVerificationRequest } from "@/lib/queries/verification";
 
 // Admin-only (the page gates whether this even renders), same pattern as
-// PendingClaimsSection. Phone/email toggles only appear for organizer-type
-// requests -- they're a separate, deliberately manual confirmation (an
-// admin actually talks to the organizer, e.g. a call) bundled into the
-// same review moment rather than their own request queue, since there's
-// no user-facing "request phone verification" flow to begin with.
+// PendingClaimsSection. Community verification only -- organizer
+// verification is automatic now (0060), so a pending request here is
+// always target_type='community'.
 export function PendingVerificationRequestsSection({ requests }: { requests: PendingVerificationRequest[] }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -29,14 +27,6 @@ export function PendingVerificationRequestsSection({ requests }: { requests: Pen
     });
   }
 
-  function handleToggleContact(profileId: string, field: "verified_phone" | "verified_email", value: boolean) {
-    startTransition(async () => {
-      const result = await toggleContactVerification(profileId, field, value);
-      if (result?.error) setError(result.error);
-      else router.refresh();
-    });
-  }
-
   if (requests.length === 0) return null;
 
   return (
@@ -48,16 +38,7 @@ export function PendingVerificationRequestsSection({ requests }: { requests: Pen
       <div className="flex flex-col gap-3">
         {requests.map((req) => (
           <div key={req.id} className="card-elevated rounded-card bg-bg2 p-4">
-            <p className="text-[14px] font-bold text-text">
-              {req.target_type === "organizer" ? (
-                <Link href={`/profile/${req.target_id}`} className="transition hover:text-green hover:underline">
-                  {req.targetLabel}
-                </Link>
-              ) : (
-                req.targetLabel
-              )}{" "}
-              <span className="font-mono text-[11px] font-normal uppercase text-text3">({req.target_type})</span>
-            </p>
+            <p className="text-[14px] font-bold text-text">{req.targetLabel}</p>
             <p className="mt-1 text-[12px] text-text3">
               Requested by{" "}
               <Link href={`/profile/${req.requested_by}`} className="font-medium text-text2 transition hover:text-green hover:underline">
@@ -65,27 +46,6 @@ export function PendingVerificationRequestsSection({ requests }: { requests: Pen
               </Link>
             </p>
             {req.note && <p className="mt-2 text-[13px] text-text2">&ldquo;{req.note}&rdquo;</p>}
-
-            {req.target_type === "organizer" && (
-              <div className="mt-3 flex gap-4 text-[12px] text-text2">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    onChange={(e) => handleToggleContact(req.target_id, "verified_phone", e.target.checked)}
-                    className="accent-green"
-                  />
-                  Confirmed phone
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    onChange={(e) => handleToggleContact(req.target_id, "verified_email", e.target.checked)}
-                    className="accent-green"
-                  />
-                  Confirmed email
-                </label>
-              </div>
-            )}
 
             <div className="mt-3 flex gap-2">
               <button

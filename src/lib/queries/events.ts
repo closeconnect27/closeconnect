@@ -258,16 +258,30 @@ export async function getTicketAvailability(supabase: SupabaseClient, eventId: s
 }
 
 /** Whether the signed-in user has an approved registration for this event
- * with checked_in_at set -- the gate for leaving event feedback. */
+ * with checked_in_at set -- the gate for leaving event feedback. Re-registering
+ * is allowed (0059), so a user can have more than one row here -- checked in
+ * on any one of them counts. */
 export async function getMyEventCheckIn(supabase: SupabaseClient, eventId: string, userId: string) {
   const { data } = await supabase
     .from("form_responses")
     .select("checked_in_at")
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
-    .eq("respondent_id", userId)
-    .maybeSingle();
-  return !!data?.checked_in_at;
+    .eq("respondent_id", userId);
+  return (data ?? []).some((r) => r.checked_in_at);
+}
+
+/** How many times the signed-in user has already registered for this event
+ * (0059 dropped the one-per-account DB constraint) -- used to prompt "you've
+ * already registered, register again?" before a repeat submission. */
+export async function getMyRegistrationCount(supabase: SupabaseClient, eventId: string, userId: string) {
+  const { count } = await supabase
+    .from("form_responses")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .eq("respondent_id", userId);
+  return count ?? 0;
 }
 
 export async function getEventRegistrationById(supabase: SupabaseClient, eventId: string, responseId: string) {

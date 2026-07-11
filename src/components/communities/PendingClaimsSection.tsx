@@ -42,6 +42,20 @@ export function PendingClaimsSection({ claims }: { claims: PendingClaim[] }) {
               <span>{claim.email}</span>
               {claim.proof && <span className="text-text3">Proof: {claim.proof}</span>}
             </div>
+            {claim.proofImageUrls.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {claim.proofImageUrls.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- signed URL, not a static remote pattern next/image can optimize */}
+                    <img
+                      src={url}
+                      alt="Claim proof"
+                      className="h-20 w-20 rounded-card-sm border border-border2 object-cover transition hover:border-green"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => handleReview(claim.id, "approved")}

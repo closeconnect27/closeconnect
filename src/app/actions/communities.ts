@@ -307,6 +307,7 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
       phone: data.phone,
       email: user.email,
       proof: data.proof || null,
+      proof_image_paths: data.proofImagePaths && data.proofImagePaths.length > 0 ? data.proofImagePaths : null,
     })
     .select("id")
     .single();

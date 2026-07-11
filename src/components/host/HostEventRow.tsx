@@ -1,16 +1,18 @@
-import Link from "next/link";
 import { IconMapPin, IconUsers, IconCircleCheck } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import type { MyEvent } from "@/lib/queries/dashboard";
+import { ClickableCard } from "@/components/ui/ClickableCard";
+import { DeleteDraftEventButton } from "@/components/host/DeleteDraftEventButton";
 
 export function HostEventRow({ event: e, linkHref }: { event: MyEvent; linkHref?: string }) {
   const visual = getCategoryVisual(e.category ?? "other");
   const { month, day } = formatDateChip(e.event_date);
+  const isDraft = e.event_date === null;
 
   return (
-    <Link
+    <ClickableCard
       href={linkHref ?? `/events/${e.id}/manage`}
-      className="card-elevated flex items-center gap-3 rounded-card bg-bg2 p-3 sm:p-4"
+      className="card-elevated flex cursor-pointer items-center gap-3 rounded-card bg-bg2 p-3 sm:p-4"
     >
       <div
         className="flex w-12 shrink-0 flex-col items-center overflow-hidden rounded-card-sm text-center"
@@ -59,7 +61,9 @@ export function HostEventRow({ event: e, linkHref }: { event: MyEvent; linkHref?
           {e.checkedInCount} in
         </span>
       </div>
-    </Link>
+
+      {isDraft && <DeleteDraftEventButton eventId={e.id} />}
+    </ClickableCard>
   );
 }
 

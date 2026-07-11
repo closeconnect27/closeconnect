@@ -111,6 +111,9 @@ export const claimCommunitySchema = z.object({
   name: z.string().trim().min(2, "Your name must be at least 2 characters").max(100),
   phone: z.string().trim().min(6, "Enter a valid phone number").max(20),
   proof: z.string().trim().max(500).optional(),
+  // Storage paths (claim-proof-images bucket), uploaded client-side before
+  // submit -- resolved to signed URLs for admin review, never public.
+  proofImagePaths: z.array(z.string()).max(5, "Up to 5 images").optional(),
 });
 
 export type ClaimCommunityInput = z.infer<typeof claimCommunitySchema>;
