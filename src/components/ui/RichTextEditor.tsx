@@ -392,7 +392,15 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
         <IconMoodSmile size={15} />
       </ToolbarButton>
       {open && (
-        <div className="card-elevated absolute left-0 top-full z-30 mt-1 grid grid-cols-8 gap-1 rounded-card-sm bg-bg2 p-2">
+        <div className="card-elevated absolute left-0 top-full z-30 mt-1 grid w-72 grid-cols-8 gap-1 rounded-card-sm bg-bg2 p-2">
+          {/* Explicit w-72 -- inside an absolutely-positioned, width:auto
+              parent, grid-cols-8's `repeat(8, minmax(0, 1fr))` has no
+              shrink-to-fit basis to size the 1fr tracks against, so every
+              column collapsed to 0px (confirmed via getComputedStyle:
+              gridTemplateColumns was literally "0px 0px 0px 0px 0px 0px 0px
+              0px") -- emoji rendered stacked/overlapping instead of in a
+              grid. A fixed container width gives the columns something
+              real to divide. */}
           {EMOJI.map((e) => (
             <button
               key={e}

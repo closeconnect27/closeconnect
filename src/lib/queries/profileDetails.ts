@@ -157,19 +157,29 @@ export async function getFollowRequestStatus(supabase: SupabaseClient, targetId:
   return (data?.status ?? "none") as FollowRequestStatus;
 }
 
-/** Instant-follow relationship (0061, public/members_only profiles) --
- * separate from getFollowRequestStatus above, which is the private-profile
- * request/approval flow. */
+/** Whether the viewer is following this profile at all -- "following" means
+ * either an instant follow (profile_follows, 0061, public/members_only) OR
+ * an accepted follow request (profile_follow_requests, 0035, the private
+ * flow). These are two different tables/mechanisms, but from the UI's
+ * side it's one concept: if either exists, the button should say
+ * "Following", regardless of the profile's current visibility -- a
+ * profile switching from private to public later shouldn't make an
+ * existing follower look unfollowed. */
 export async function getIsFollowing(supabase: SupabaseClient, targetId: string, viewerId: string | null) {
   if (!viewerId || viewerId === targetId) return false;
-  const { data, error } = await supabase
-    .from("profile_follows")
-    .select("follower_id")
-    .eq("follower_id", viewerId)
-    .eq("followee_id", targetId)
-    .maybeSingle();
-  if (error) throw error;
-  return !!data;
+  const [{ data: follow, error: followError }, { data: request, error: requestError }] = await Promise.all([
+    supabase.from("profile_follows").select("follower_id").eq("follower_id", viewerId).eq("followee_id", targetId).maybeSingle(),
+    supabase
+      .from("profile_follow_requests")
+      .select("id")
+      .eq("requester_id", viewerId)
+      .eq("target_id", targetId)
+      .eq("status", "accepted")
+      .maybeSingle(),
+  ]);
+  if (followError) throw followError;
+  if (requestError) throw requestError;
+  return !!follow || !!request;
 }
 
 export type IncomingFollowRequest = {

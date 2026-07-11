@@ -103,15 +103,17 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <span className="hidden sm:inline">Edit profile</span>
             </Link>
           )}
-          {/* Not just "visibility !== private" -- a members_only profile the
-              viewer doesn't share a community with is still blocked (details
-              null) even though it isn't private, and profile_follows_insert_own
-              (0061) only allows an instant follow when the RLS visibility
-              check actually passes. `details` non-null is exactly that
-              check already evaluated server-side, so gating on it here
-              keeps this button from ever attempting an insert RLS would
-              reject. */}
-          {!isOwner && viewer && basic.profile_visibility !== "private" && details && (
+          {/* `details` non-null means this viewer can actually see the
+              profile -- public, members_only+shared-community, or (for a
+              private profile) an already-accepted follow request. That
+              last case is the only way isFollowing can be true while
+              profile_visibility is "private": has_accepted_follow_request
+              unlocks profile_details regardless of visibility (0035/0036),
+              and getIsFollowing checks that same acceptance, so a private
+              profile only ever reaches this branch already-followed --
+              never in a state where clicking "Follow" here would hit
+              profile_follows_insert_own's private-blocking RLS. */}
+          {!isOwner && viewer && details && (
             <FollowButton targetId={id} initiallyFollowing={isFollowing} />
           )}
         </div>

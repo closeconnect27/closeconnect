@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { IconUserPlus, IconUserCheck } from "@tabler/icons-react";
 import { followProfile, unfollowProfile } from "@/app/actions/profile";
 
-// Instant, no-approval follow -- only ever rendered for public/members_only
-// profiles (see PublicProfilePage); private profiles keep the existing
-// RequestToFollowButton request/approval flow instead.
+// "Following" is a unified concept (getIsFollowing) covering both an
+// instant follow (public/members_only) and an accepted request (the
+// private-profile flow) -- so this button also renders, already in its
+// "Following" state, for a private profile the viewer was approved into.
+// Un-following there revokes that approval too (unfollowProfile clears
+// both tables), which can flip the profile back to blocked -- router.refresh()
+// after every toggle keeps the rest of the page (details, the tabs below)
+// in sync with whatever visibility now actually allows, rather than the
+// stale already-rendered content sticking around untouched.
 export function FollowButton({ targetId, initiallyFollowing }: { targetId: string; initiallyFollowing: boolean }) {
+  const router = useRouter();
   const [following, setFollowing] = useState(initiallyFollowing);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -21,6 +29,8 @@ export function FollowButton({ targetId, initiallyFollowing }: { targetId: strin
       if (result?.error) {
         setError(result.error);
         setFollowing(!next);
+      } else {
+        router.refresh();
       }
     });
   }

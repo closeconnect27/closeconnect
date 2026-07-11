@@ -106,16 +106,27 @@ export async function followProfile(targetId: string) {
   return { error: null };
 }
 
+// "Following" is a unified concept (getIsFollowing) across two backing
+// tables -- an instant follow (profile_follows) or an accepted request
+// (profile_follow_requests, the private-profile flow) -- so unfollowing
+// has to tear down whichever one actually applies, not just the first.
+// Both deletes are harmless no-ops when that particular relationship
+// doesn't exist (RLS-scoped .eq() filters just match zero rows).
 export async function unfollowProfile(targetId: string) {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("profile_follows")
-    .delete()
-    .eq("follower_id", user.id)
-    .eq("followee_id", targetId);
-  if (error) return { error: error.message };
+  const [{ error: followError }, { error: requestError }] = await Promise.all([
+    supabase.from("profile_follows").delete().eq("follower_id", user.id).eq("followee_id", targetId),
+    supabase
+      .from("profile_follow_requests")
+      .delete()
+      .eq("requester_id", user.id)
+      .eq("target_id", targetId)
+      .eq("status", "accepted"),
+  ]);
+  if (followError) return { error: followError.message };
+  if (requestError) return { error: requestError.message };
 
   revalidatePath(`/profile/${targetId}`);
   return { error: null };
