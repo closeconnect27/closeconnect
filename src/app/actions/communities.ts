@@ -17,14 +17,23 @@ import {
   type SubmitExternalCommunityInput,
   type ClaimCommunityInput,
 } from "@/lib/validation/community";
+import { deserializeDescriptionContent } from "@/lib/validation/richText";
 
-export async function createCommunity(input: CreateCommunityInput) {
+export async function createCommunity(
+  input: Omit<CreateCommunityInput, "description_content"> & { description_content: string | null },
+) {
   const user = await requireUser();
 
   // Never trust client-side validation alone (SPEC.md Section 11) -- this
   // Server Action is callable directly, not just from the form that happens
-  // to validate first.
-  const parsed = createCommunitySchema.safeParse(input);
+  // to validate first. description_content arrives as a JSON string, not
+  // the parsed object -- see serializeDescriptionContent's comment
+  // (Server Actions silently corrupt a large nested object graph crossing
+  // this exact boundary).
+  const parsed = createCommunitySchema.safeParse({
+    ...input,
+    description_content: deserializeDescriptionContent(input.description_content),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -102,10 +111,20 @@ export async function createCommunity(input: CreateCommunityInput) {
   return { error: null, communityId: community.id };
 }
 
-export async function updateCommunity(communityId: string, input: UpdateCommunityInput) {
+export async function updateCommunity(
+  communityId: string,
+  input: Omit<UpdateCommunityInput, "description_content"> & { description_content: string | null },
+) {
   const user = await requireUser();
 
-  const parsed = updateCommunitySchema.safeParse(input);
+  // description_content arrives as a JSON string, not the parsed object --
+  // see serializeDescriptionContent's comment (Server Actions silently
+  // corrupt a large nested object graph crossing this exact boundary).
+  // Reconstructed here before the normal object-shaped schema validates it.
+  const parsed = updateCommunitySchema.safeParse({
+    ...input,
+    description_content: deserializeDescriptionContent(input.description_content),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }

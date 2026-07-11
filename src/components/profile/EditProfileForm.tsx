@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
 import { updateProfile } from "@/app/actions/profile";
 import { updateProfileSchema } from "@/lib/validation/profile";
+import { serializeDescriptionContent } from "@/lib/validation/richText";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
@@ -92,7 +93,13 @@ export function EditProfileForm({
     }
 
     startTransition(async () => {
-      const result = await updateProfile(parsed.data);
+      // bio_content crosses the Server Action boundary as a JSON string,
+      // not the raw object -- see serializeDescriptionContent's comment
+      // for why.
+      const result = await updateProfile({
+        ...parsed.data,
+        bio_content: serializeDescriptionContent(parsed.data.bio_content as object | null),
+      });
       if (result?.error) setError(result.error);
       else router.push(`/profile/${details.id}`);
     });

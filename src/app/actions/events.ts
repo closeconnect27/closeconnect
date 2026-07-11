@@ -23,12 +23,21 @@ import {
   getHostableCommunities,
   getEventTicketTypes,
 } from "@/lib/queries/events";
+import { deserializeDescriptionContent } from "@/lib/validation/richText";
 
-export async function createEvent(input: CreateEventInput) {
+export async function createEvent(
+  input: Omit<CreateEventInput, "description_content"> & { description_content: string | null },
+) {
   const user = await requireUser();
 
   // Never trust client-side validation alone (SPEC.md Section 11).
-  const parsed = createEventSchema.safeParse(input);
+  // description_content arrives as a JSON string, not the parsed object --
+  // see serializeDescriptionContent's comment (Server Actions silently
+  // corrupt a large nested object graph crossing this exact boundary).
+  const parsed = createEventSchema.safeParse({
+    ...input,
+    description_content: deserializeDescriptionContent(input.description_content),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
@@ -309,10 +318,19 @@ async function requireEventHostOrAdmin(supabase: Awaited<ReturnType<typeof creat
   return { ok: false as const, error: "Only the host can do this" };
 }
 
-export async function updateEvent(eventId: string, input: UpdateEventInput) {
+export async function updateEvent(
+  eventId: string,
+  input: Omit<UpdateEventInput, "description_content"> & { description_content: string | null },
+) {
   const user = await requireUser();
 
-  const parsed = updateEventSchema.safeParse(input);
+  // description_content arrives as a JSON string, not the parsed object --
+  // see serializeDescriptionContent's comment (Server Actions silently
+  // corrupt a large nested object graph crossing this exact boundary).
+  const parsed = updateEventSchema.safeParse({
+    ...input,
+    description_content: deserializeDescriptionContent(input.description_content),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }

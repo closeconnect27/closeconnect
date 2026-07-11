@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateCommunitySchema } from "@/lib/validation/community";
+import { serializeDescriptionContent } from "@/lib/validation/richText";
 import { updateCommunity } from "@/app/actions/communities";
 import { RequestVerificationButton } from "@/components/verification/RequestVerificationButton";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
@@ -75,7 +76,13 @@ export function EditCommunityForm({
     }
 
     startTransition(async () => {
-      const result = await updateCommunity(community.id, parsed.data);
+      // description_content crosses the Server Action boundary as a JSON
+      // string, not the raw object -- see serializeDescriptionContent's
+      // comment for why.
+      const result = await updateCommunity(community.id, {
+        ...parsed.data,
+        description_content: serializeDescriptionContent(parsed.data.description_content as object | null),
+      });
       if (result?.error) setError(result.error);
     });
   }

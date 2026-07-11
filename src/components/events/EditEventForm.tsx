@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { updateEventSchema, updateEventTicketsAndFormSchema } from "@/lib/validation/event";
+import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { updateEvent, updateEventTicketsAndForm } from "@/app/actions/events";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
@@ -98,7 +99,13 @@ export function EditEventForm({
     }
 
     startTransition(async () => {
-      const result = await updateEvent(event.id, parsed.data);
+      // description_content crosses the Server Action boundary as a JSON
+      // string, not the raw object -- see serializeDescriptionContent's
+      // comment for why.
+      const result = await updateEvent(event.id, {
+        ...parsed.data,
+        description_content: serializeDescriptionContent(parsed.data.description_content as object | null),
+      });
       if (result?.error) setError(result.error);
     });
   }

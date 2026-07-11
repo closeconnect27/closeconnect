@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { createEventSchema } from "@/lib/validation/event";
+import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
@@ -78,7 +79,13 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
     }
 
     startTransition(async () => {
-      const result = await createEvent(parsed.data);
+      // description_content crosses the Server Action boundary as a JSON
+      // string, not the raw object -- see serializeDescriptionContent's
+      // comment for why.
+      const result = await createEvent({
+        ...parsed.data,
+        description_content: serializeDescriptionContent(parsed.data.description_content as object | null),
+      });
       if (result?.error || !result?.eventId) {
         setError(result?.error ?? "Could not create event");
         return;

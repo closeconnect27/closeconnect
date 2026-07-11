@@ -4,12 +4,21 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfileSchema, type UpdateProfileInput } from "@/lib/validation/profile";
+import { deserializeDescriptionContent } from "@/lib/validation/richText";
 
-export async function updateProfile(input: UpdateProfileInput) {
+export async function updateProfile(
+  input: Omit<UpdateProfileInput, "bio_content"> & { bio_content: string | null },
+) {
   const user = await requireUser();
 
   // Never trust client-side validation alone (SPEC.md Section 11).
-  const parsed = updateProfileSchema.safeParse(input);
+  // bio_content arrives as a JSON string, not the parsed object -- see
+  // serializeDescriptionContent's comment (Server Actions silently corrupt
+  // a large nested object graph crossing this exact boundary).
+  const parsed = updateProfileSchema.safeParse({
+    ...input,
+    bio_content: deserializeDescriptionContent(input.bio_content),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }

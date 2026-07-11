@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES, type CategorySlug } from "@/lib/categories";
 import { createCommunitySchema } from "@/lib/validation/community";
+import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { createCommunity } from "@/app/actions/communities";
@@ -69,7 +70,13 @@ export function NewCommunityForm() {
     }
 
     startTransition(async () => {
-      const result = await createCommunity(parsed.data);
+      // description_content crosses the Server Action boundary as a JSON
+      // string, not the raw object -- see serializeDescriptionContent's
+      // comment for why.
+      const result = await createCommunity({
+        ...parsed.data,
+        description_content: serializeDescriptionContent(parsed.data.description_content as object | null),
+      });
       if (result?.error || !result?.communityId) {
         setError(result?.error ?? "Could not create community");
         return;
