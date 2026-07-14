@@ -202,7 +202,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               Edit
             </Link>
           )}
-          {isStaff && (
+          {/* Native only -- every stat on the analytics page (join
+              requests, member growth, active members) is a native
+              community_members/join_mode concept that never populates
+              for an external listing, even one a claim gave a real
+              owner_id to. */}
+          {isNative && isStaff && (
             <Link href={`/communities/${community.id}/analytics`} className="btn-secondary px-4 py-2 text-[13px]">
               <IconChartBar size={14} />
               Analytics

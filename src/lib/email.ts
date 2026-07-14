@@ -15,6 +15,13 @@ export async function sendEmail({ to, subject, html }: { to: string; subject: st
     body: JSON.stringify({ from: FROM, to, subject, html }),
   });
   if (!res.ok) {
-    console.error(`Resend send failed for ${to}: ${res.status} ${await res.text()}`);
+    const body = await res.text();
+    // Throws, rather than only logging -- every caller now awaits this
+    // (Cloudflare Workers can kill an un-awaited promise before its fetch
+    // completes, which is what silently dropped these before), so a
+    // caller's own try/catch needs a real rejection to actually see a
+    // Resend-side failure (bad from-domain, invalid key, rate limit) --
+    // a resolved promise that only logged internally was invisible to it.
+    throw new Error(`Resend send failed for ${to}: ${res.status} ${body}`);
   }
 }

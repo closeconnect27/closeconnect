@@ -68,9 +68,15 @@ export async function submitJoinRequest(communityId: string, answers: Record<str
     return { error: error.message };
   }
   revalidatePath(`/communities/${communityId}`);
-  notifyOwnerOfPendingRequest(communityId).catch((e) =>
-    console.error("Failed to send join-request notification email:", e),
-  );
+  // Awaited, not fire-and-forget -- Cloudflare Workers can terminate an
+  // un-awaited promise the instant this action's response is sent,
+  // killing the fetch to Resend before it completes. A failure here still
+  // doesn't fail the join request itself (only logs).
+  try {
+    await notifyOwnerOfPendingRequest(communityId);
+  } catch (e) {
+    console.error("Failed to send join-request notification email:", e);
+  }
   return { error: null };
 }
 

@@ -39,7 +39,11 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
   // is the fallback for a moderator role.
   const membership = await getCommunityMembership(supabase, id, user.id);
   const isStaff = community.owner_id === user.id || membership?.role === "owner" || membership?.role === "moderator";
-  if (!isStaff) {
+  // Native only -- every stat below is a community_members/join_mode
+  // concept that never populates for an external listing, even one a
+  // claim gave a real owner_id to (community_members is never seeded for
+  // kind='external', so isStaff can still be true via owner_id alone).
+  if (!isStaff || community.kind !== "native") {
     redirect(`/communities/${id}`);
   }
 

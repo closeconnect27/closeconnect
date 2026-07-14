@@ -205,13 +205,16 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   revalidatePath(`/events/${eventId}`);
   // The UI's "A confirmation has been sent to your email" line pre-dates
   // this -- it was display text with no actual send behind it (found while
-  // auditing this exact claim). Fire-and-forget, same as the other
-  // notification emails: never blocks the registrant's own success path on
-  // Resend being reachable.
+  // auditing this exact claim). Awaited, not fire-and-forget -- Cloudflare
+  // Workers can terminate an un-awaited promise the instant this action's
+  // response is sent, killing the fetch to Resend before it completes. A
+  // failure here still doesn't fail the registration itself (only logs).
   if (user.email) {
-    sendRegistrationConfirmation(user.email, eventId, parsed.data.name).catch((e) =>
-      console.error("Failed to send registration confirmation email:", e),
-    );
+    try {
+      await sendRegistrationConfirmation(user.email, eventId, parsed.data.name);
+    } catch (e) {
+      console.error("Failed to send registration confirmation email:", e);
+    }
   }
   // Self-notification (recipient = the acting user) -- inserted directly
   // under this request's own RLS-scoped client, allowed by

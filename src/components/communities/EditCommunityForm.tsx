@@ -158,17 +158,23 @@ export function EditCommunityForm({
           />
         </Field>
 
-        <Field label="Limit members (optional)">
-          <input
-            type="number"
-            min={1}
-            value={memberLimit}
-            onChange={(e) => setMemberLimit(e.target.value)}
-            placeholder="No limit"
-            className={inputClass}
-          />
-          <p className="text-[11px] text-text3">Once this many people have joined, new joins are blocked until someone leaves.</p>
-        </Field>
+        {/* Native only -- external communities never populate
+            community_members (no join mechanic, they just link out), so
+            the limit trigger (0057) can never actually enforce this for
+            one -- setting it would be a silently inert field. */}
+        {community.kind === "native" && (
+          <Field label="Limit members (optional)">
+            <input
+              type="number"
+              min={1}
+              value={memberLimit}
+              onChange={(e) => setMemberLimit(e.target.value)}
+              placeholder="No limit"
+              className={inputClass}
+            />
+            <p className="text-[11px] text-text3">Once this many people have joined, new joins are blocked until someone leaves.</p>
+          </Field>
+        )}
 
         {error && <p className="text-[13px] text-pink">{error}</p>}
 

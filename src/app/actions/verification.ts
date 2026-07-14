@@ -36,18 +36,22 @@ export async function requestCommunityVerification(communityId: string, input: R
   revalidatePath(`/communities/${communityId}/edit`);
 
   const { data: community } = await supabase.from("communities").select("name").eq("id", communityId).maybeSingle();
-  notifyAdminOfVerificationRequest(community?.name ?? "a community").catch((e) =>
-    console.error("Failed to send verification request notification email:", e),
-  );
+  // Awaited, not fire-and-forget -- Cloudflare Workers can terminate an
+  // un-awaited promise the instant this action's response is sent,
+  // killing the fetch to Resend before it completes. A failure here still
+  // doesn't fail the request itself (only logs).
+  try {
+    await notifyAdminOfVerificationRequest(community?.name ?? "a community");
+  } catch (e) {
+    console.error("Failed to send verification request notification email:", e);
+  }
   trackServerEvent("verification_requested", user.id, { target_type: "community", target_id: communityId });
   return { error: null };
 }
 
 // Organizer verification is automatic now (see 0060 migration: owning a
 // community or hosting an event sets profiles.is_verified directly) -- no
-// request/review flow for it anymore. Fire-and-forget, same shape as
-// notifyAdminOfPendingClaim (communities.ts) -- never blocks the
-// requester's own submission on email delivery.
+// request/review flow for it anymore.
 async function notifyAdminOfVerificationRequest(label: string) {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return;

@@ -341,9 +341,16 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
   }
 
   revalidatePath(`/communities/${communityId}`);
-  notifyAdminOfPendingClaim(claim.id, community.name).catch((e) =>
-    console.error("Failed to send claim notification email:", e),
-  );
+  // Awaited, not fire-and-forget -- Cloudflare Workers can (and does, per a
+  // real report) terminate an un-awaited promise the instant this action's
+  // response is sent, killing the fetch to Resend before it completes. A
+  // failure here still doesn't fail the claim itself (the try/catch only
+  // logs), it just no longer races the Worker's own teardown.
+  try {
+    await notifyAdminOfPendingClaim(claim.id, community.name);
+  } catch (e) {
+    console.error("Failed to send claim notification email:", e);
+  }
   trackServerEvent("claim_submitted", user.id, { community_id: communityId, claim_id: claim.id });
   return { error: null };
 }
@@ -355,9 +362,11 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
 // behind it. See app/api/claims/[id]/decide/route.ts for the one guard in
 // place (first decision wins; a second click/prefetch is a no-op). The
 // authenticated in-app buttons in PendingClaimsSection still work exactly
-// as before -- this is an additional path, not a replacement. Fire-and-forget
-// from the caller (never blocks the claimant's own submission on email
-// delivery) -- a failed send here means a missed heads-up, not a broken claim.
+// as before -- this is an additional path, not a replacement. Awaited by
+// the caller now, not fire-and-forget (see the try/catch around the call
+// site) -- a failed send here still doesn't fail the claim itself, that's
+// what the caller's catch is for, but the fetch needs to actually
+// complete before the Worker can tear this request down.
 async function notifyAdminOfPendingClaim(claimId: string, communityName: string) {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return;
