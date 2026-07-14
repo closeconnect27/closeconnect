@@ -17,10 +17,10 @@ export default function TermsOfServicePage() {
 
         <Section title="1. About the Service">
           <p>
-            CloseConnect is a hyperlocal platform that helps users discover local events, form groups with nearby users, and
-            access group-based discounts from local businesses and event organizers. CloseConnect facilitates connections
-            and transactions between users and local merchants/organizers; it does not itself organize events or sell
-            goods, except where explicitly stated.
+            CloseConnect is a hyperlocal platform that helps users discover local events, join or form interest-based
+            communities, and coordinate group attendance at events. CloseConnect facilitates event ticketing and community
+            discovery between users and local event organizers; it does not itself organize events or sell goods, except
+            where explicitly stated.
           </p>
         </Section>
 
@@ -41,32 +41,32 @@ export default function TermsOfServicePage() {
         <Section title="4. Payments">
           <ul className="list-disc pl-5">
             <li>
-              Payments made through the Service (for event registrations, group deals, or purchases) are processed via our
+              Payments made through the Service (for paid event registrations and ticket purchases) are processed via our
               third-party payment partner (Razorpay).
             </li>
             <li>All prices are displayed in Indian Rupees (INR) unless stated otherwise.</li>
             <li>
-              Refunds, if applicable, are governed by the specific refund policy of the event organizer or merchant
-              offering the deal, communicated at the time of purchase.
+              Refunds, if applicable, are governed by the specific refund policy of the event organizer, communicated at
+              the time of registration.
             </li>
           </ul>
         </Section>
 
-        <Section title="5. Group Formation & Conduct">
-          <p>Users may form or join groups to unlock discounts or coordinate event attendance. You agree to:</p>
+        <Section title="5. Communities & Group Conduct">
+          <p>Users may join or form communities to coordinate around shared interests and event attendance. You agree to:</p>
           <ul className="list-disc pl-5">
-            <li>Provide accurate information when joining or forming a group</li>
+            <li>Provide accurate information when joining or forming a community</li>
             <li>Not use the Service to harass, spam, defraud, or mislead other users</li>
-            <li>Not use group features for unrelated commercial solicitation</li>
+            <li>Not use community features for unrelated commercial solicitation</li>
           </ul>
-          <p className="mt-3">CloseConnect reserves the right to remove any user or group that violates these Terms.</p>
+          <p className="mt-3">CloseConnect reserves the right to remove any user or community that violates these Terms.</p>
         </Section>
 
-        <Section title="6. Local Business & Event Organizer Listings">
+        <Section title="6. Event Organizer Listings">
           <p>
-            Deals, discounts, and events are provided by third-party businesses and organizers. CloseConnect makes
-            reasonable efforts to verify listings but is not responsible for the accuracy of third-party offers, the
-            quality of goods/services provided, or an organizer&apos;s fulfillment of an event.
+            Events are listed by third-party organizers or by CloseConnect. CloseConnect makes reasonable efforts to
+            verify listings but is not responsible for the accuracy of third-party event details, or an organizer&apos;s
+            fulfillment of an event.
           </p>
         </Section>
 
