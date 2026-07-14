@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendEmail } from "@/lib/email";
+import { sendRegistrationConfirmationEmail, sendPaymentPendingEmail } from "@/lib/eventRegistrationEmails";
 import { createPaymentLink } from "@/lib/razorpay";
 import { trackServerEvent } from "@/lib/mixpanel/server";
 import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
@@ -209,59 +209,55 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   // Workers can terminate an un-awaited promise the instant this action's
   // response is sent, killing the fetch to Resend before it completes. A
   // failure here still doesn't fail the registration itself (only logs).
-  if (user.email) {
-    try {
-      await sendRegistrationConfirmation(user.email, eventId, parsed.data.name);
-    } catch (e) {
-      console.error("Failed to send registration confirmation email:", e);
+  //
+  // Paid tickets get a "complete your payment" email/notification here,
+  // never the real "you're registered" one -- that's only true once
+  // Razorpay actually reports the payment captured (the webhook sends it
+  // instead, see app/api/webhooks/razorpay/route.ts). Sending "you're
+  // registered" before any money has moved is exactly the bug a real user
+  // hit: an email confirming a spot that wasn't actually confirmed yet.
+  if (isPaid) {
+    if (user.email) {
+      try {
+        await sendPaymentPendingEmail(supabase, {
+          email: user.email,
+          eventId,
+          registrantName: parsed.data.name,
+          paymentLinkUrl,
+          amountRupees: ticketType.price * parsed.data.quantity,
+        });
+      } catch (e) {
+        console.error("Failed to send payment-pending email:", e);
+      }
     }
+  } else {
+    if (user.email) {
+      try {
+        await sendRegistrationConfirmationEmail(supabase, { email: user.email, eventId, registrantName: parsed.data.name });
+      } catch (e) {
+        console.error("Failed to send registration confirmation email:", e);
+      }
+    }
+    // Self-notification (recipient = the acting user) -- inserted directly
+    // under this request's own RLS-scoped client, allowed by
+    // notifications_insert_self (0061), unlike every other notification
+    // type which goes through a security definer trigger instead. Paid
+    // tickets get their "You're registered!" notification from the
+    // webhook once payment actually completes, not here.
+    await supabase.from("notifications").insert({
+      user_id: user.id,
+      type: "event_registered",
+      title: "You're registered!",
+      body: ticketType.name,
+      link: `/events/${eventId}`,
+    });
   }
-  // Self-notification (recipient = the acting user) -- inserted directly
-  // under this request's own RLS-scoped client, allowed by
-  // notifications_insert_self (0061), unlike every other notification
-  // type which goes through a security definer trigger instead.
-  await supabase.from("notifications").insert({
-    user_id: user.id,
-    type: "event_registered",
-    title: "You're registered!",
-    body: ticketType.name,
-    link: `/events/${eventId}`,
-  });
   trackServerEvent("event_registered", user.id, {
     event_id: eventId,
     ticket_type_id: parsed.data.ticket_type_id,
     is_paid: isPaid,
   });
   return { error: null, paymentLinkUrl };
-}
-
-function formatEventDateForEmail(isoDate: string | null) {
-  if (!isoDate) return "Date to be announced";
-  const [y, m, d] = isoDate.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
-}
-
-async function sendRegistrationConfirmation(email: string, eventId: string, registrantName: string) {
-  const supabase = await createClient();
-  const { data: event } = await supabase
-    .from("events")
-    .select("event_name, event_date, venue, city")
-    .eq("id", eventId)
-    .single();
-  if (!event) return;
-
-  const dateLabel = formatEventDateForEmail(event.event_date);
-  const place = [event.venue, event.city].filter(Boolean).join(", ");
-
-  await sendEmail({
-    to: email,
-    subject: `You're registered: ${event.event_name}`,
-    html: `
-      <p>Hi ${registrantName},</p>
-      <p>You're registered for <strong>${event.event_name}</strong>.</p>
-      <p>${dateLabel}${place ? ` &middot; ${place}` : ""}</p>
-    `,
-  });
 }
 
 // Partial check-in: `count` is how many of THIS registration's `quantity`

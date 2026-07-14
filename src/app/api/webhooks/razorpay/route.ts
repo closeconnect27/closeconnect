@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+import { sendRegistrationConfirmationEmail } from "@/lib/eventRegistrationEmails";
 
 // Razorpay webhook -- payment_link.paid / payment.captured mark a
 // registration as paid. Three things this endpoint is careful about, in
@@ -61,18 +62,57 @@ export async function POST(request: Request) {
     return new Response("No registration reference", { status: 200 });
   }
 
-  const { error: updateError } = await admin
+  // .select() the row back rather than a separate query -- this is the
+  // moment the registration actually becomes confirmed (payment_status
+  // 'unpaid' -> 'paid'), so the real "you're registered" email/notification
+  // belong here, not at registration time (see registerForEvent, which
+  // sends a "complete your payment" email instead for a paid ticket --
+  // sending "you're registered" before money moved was a real bug a user
+  // hit).
+  const { data: updatedRows, error: updateError } = await admin
     .from("form_responses")
     .update({
       payment_status: "paid",
       razorpay_payment_id: paymentEntity?.id ?? null,
     })
     .eq("id", registrationId)
-    .eq("owner_type", "event");
+    .eq("owner_type", "event")
+    .select("owner_id, respondent_id, response_data, event_ticket_types(name)");
 
   if (updateError) {
     console.error("Failed to mark registration paid:", updateError.message);
     return new Response("Internal error", { status: 500 });
+  }
+
+  const registration = updatedRows?.[0] as unknown as
+    | { owner_id: string; respondent_id: string | null; response_data: { name?: string; email?: string }; event_ticket_types: { name: string } | null }
+    | undefined;
+
+  if (registration) {
+    const eventId = registration.owner_id;
+    const email = registration.response_data?.email;
+    if (email) {
+      try {
+        await sendRegistrationConfirmationEmail(admin, {
+          email,
+          eventId,
+          registrantName: registration.response_data?.name ?? "there",
+        });
+      } catch (e) {
+        console.error("Failed to send post-payment confirmation email:", e);
+      }
+    }
+
+    if (registration.respondent_id) {
+      const { error: notifyError } = await admin.from("notifications").insert({
+        user_id: registration.respondent_id,
+        type: "event_registered",
+        title: "You're registered!",
+        body: registration.event_ticket_types?.name ?? "Your ticket",
+        link: `/events/${eventId}`,
+      });
+      if (notifyError) console.error("Failed to insert post-payment notification:", notifyError.message);
+    }
   }
 
   return new Response("OK", { status: 200 });
