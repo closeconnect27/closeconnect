@@ -41,10 +41,6 @@ export const createEventSchema = z
     ticket_types: z.array(ticketTypeSchema).min(1, "At least one ticket type is required").max(10),
     form_fields: formFieldsSchema.default([]),
   })
-  .refine((e) => e.ticket_types.every((t) => t.price === 0 || !!t.payment_link), {
-    message: "Paid ticket types need a payment link",
-    path: ["ticket_types"],
-  })
   .refine((e) => !e.city || !e.extra_cities.includes(e.city), {
     message: "Extra cities can't repeat the primary city",
     path: ["extra_cities"],
@@ -85,15 +81,10 @@ export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 // the action, not just a UI toggle) -- a separate schema keeps that
 // narrower, riskier write path from ever being reachable through the
 // regular details-only update.
-export const updateEventTicketsAndFormSchema = z
-  .object({
-    ticket_types: z.array(ticketTypeSchema).min(1, "At least one ticket type is required").max(10),
-    form_fields: formFieldsSchema.default([]),
-  })
-  .refine((e) => e.ticket_types.every((t) => t.price === 0 || !!t.payment_link), {
-    message: "Paid ticket types need a payment link",
-    path: ["ticket_types"],
-  });
+export const updateEventTicketsAndFormSchema = z.object({
+  ticket_types: z.array(ticketTypeSchema).min(1, "At least one ticket type is required").max(10),
+  form_fields: formFieldsSchema.default([]),
+});
 
 export type UpdateEventTicketsAndFormInput = z.infer<typeof updateEventTicketsAndFormSchema>;
 
