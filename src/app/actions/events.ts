@@ -464,6 +464,34 @@ export async function cancelEvent(eventId: string) {
   return { error: null };
 }
 
+// CloseConnect runs one platform-wide Razorpay account (src/lib/razorpay.ts)
+// -- every payment lands there regardless of host, and forwarding a host
+// their share happens entirely outside the app (bank transfer/UPI, by
+// hand). This just records that it happened, so the payout summary stops
+// showing it as owed -- it does not move any money itself. Bulk, not
+// per-registration, since a host settles a whole event's proceeds at
+// once in practice.
+export async function markEventPayoutPaidOut(eventId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
+  if (!auth.ok) return { error: auth.error };
+
+  const { error } = await supabase
+    .from("form_responses")
+    .update({ payout_status: "paid_out", payout_marked_at: new Date().toISOString() })
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .eq("payment_status", "paid")
+    .eq("payout_status", "pending");
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/events/${eventId}/manage`);
+  return { error: null };
+}
+
 // Scoped to drafts only (event_date is null) -- a real, published event
 // with actual registrants should be cancelled (cancelEvent), not deleted
 // outright. form_fields/form_responses are polymorphic (owner_type/

@@ -9,6 +9,7 @@ import { getEventReminders } from "@/lib/queries/reminders";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
 import { EventFunnel } from "@/components/events/EventFunnel";
+import { PayoutSummary } from "@/components/events/PayoutSummary";
 import { MessageAttendeesSection } from "@/components/events/MessageAttendeesSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
@@ -53,6 +54,20 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   const eventHasPassed = event.event_date !== null && event.event_date < todayIso();
   const noShowCount = totalTickets - checkedInCount;
   const paidCount = registrations.filter((r) => r.payment_status === "paid").reduce((sum, r) => sum + r.quantity, 0);
+
+  // Only a $0 ticket type never actually moved money through Razorpay --
+  // payment_status is set to 'paid' for those too (0041, for the funnel's
+  // sake), but nothing was ever collected, so it can't be "owed".
+  const priceByTicketTypeId = new Map(ticketTypes.map((t) => [t.id, t.price]));
+  let payoutOwed = 0;
+  let payoutPaidOut = 0;
+  for (const r of registrations) {
+    if (r.payment_status !== "paid" || !r.ticket_type_id) continue;
+    const price = priceByTicketTypeId.get(r.ticket_type_id) ?? 0;
+    if (price <= 0) continue;
+    if (r.payout_status === "pending") payoutOwed += price * r.quantity;
+    else payoutPaidOut += price * r.quantity;
+  }
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -116,6 +131,10 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
               );
             })}
           </div>
+        )}
+
+        {(payoutOwed > 0 || payoutPaidOut > 0) && (
+          <PayoutSummary eventId={id} owedAmount={payoutOwed} paidOutAmount={payoutPaidOut} />
         )}
 
         <MessageAttendeesSection eventId={id} reminders={reminders} />
