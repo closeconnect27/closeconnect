@@ -542,35 +542,6 @@ export async function cancelEvent(eventId: string) {
   return { error: null };
 }
 
-// Predates the manual UPI flow (registrants now pay a host's own UPI ID
-// directly, confirmPayment in this file), from when every paid-ticket
-// payment landed in one platform-wide account regardless of host and had
-// to be forwarded on manually (bank transfer/by hand). Left in place for
-// any registration that still needs settling from that era -- this just
-// records that a forward happened, it does not move any money itself.
-// Bulk, not per-registration, since a host settles a whole event's
-// proceeds at once in practice.
-export async function markEventPayoutPaidOut(eventId: string) {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
-  if (!auth.ok) return { error: auth.error };
-
-  const { error } = await supabase
-    .from("form_responses")
-    .update({ payout_status: "paid_out", payout_marked_at: new Date().toISOString() })
-    .eq("owner_type", "event")
-    .eq("owner_id", eventId)
-    .eq("payment_status", "paid")
-    .eq("payout_status", "pending");
-
-  if (error) return { error: error.message };
-
-  revalidatePath(`/events/${eventId}/manage`);
-  return { error: null };
-}
-
 // Scoped to drafts only (event_date is null) -- a real, published event
 // with actual registrants should be cancelled (cancelEvent), not deleted
 // outright. form_fields/form_responses are polymorphic (owner_type/
