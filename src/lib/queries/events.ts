@@ -7,7 +7,6 @@ export type EventTicketType = {
   event_id: string;
   name: string;
   price: number;
-  payment_link: string | null;
   quantity_available: number | null;
   sort_order: number;
 };

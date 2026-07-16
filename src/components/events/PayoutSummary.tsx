@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { IconCash } from "@tabler/icons-react";
 import { markEventPayoutPaidOut } from "@/app/actions/events";
 
-// CloseConnect runs one platform-wide Razorpay account -- every payment
-// lands there regardless of host, and forwarding a host their share
-// happens entirely outside the app (bank transfer/UPI, by hand). This is
+// Predates the manual UPI flow (registrants now pay a host's own UPI ID
+// directly, confirmPayment in app/actions/events.ts) -- this section only
+// still shows for older registrations that went through the platform's
+// one-time-central payment account, where forwarding a host their share
+// happened entirely outside the app (bank transfer/UPI, by hand). This is
 // a ledger, not a payment rail: "Mark as paid out" only records that the
 // transfer already happened elsewhere, it doesn't move any money itself.
 export function PayoutSummary({

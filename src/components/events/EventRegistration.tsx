@@ -16,8 +16,8 @@ import type { EventTicketType } from "@/lib/queries/events";
 // under a different name than their account's. Paid tickets show the
 // host's own UPI QR/ID and collect a payment reference for the host to
 // manually confirm (registerForEvent/submitPaymentReference in
-// app/actions/events.ts) -- not a Razorpay checkout link; the platform's
-// Razorpay account was rejected.
+// app/actions/events.ts) -- there's no checkout link at all, the
+// registrant pays the host directly.
 export function EventRegistration({
   eventId,
   ticketTypes,

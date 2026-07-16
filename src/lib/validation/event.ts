@@ -2,7 +2,6 @@ import { z } from "zod";
 import { isCategorySlug } from "@/lib/categories";
 import { isCity } from "@/lib/cities";
 import { formFieldsSchema, formAnswersSchema } from "@/lib/validation/forms";
-import { isValidPaymentLink } from "@/lib/validators/links";
 import { descriptionContentField } from "@/lib/validation/richText";
 
 // See lib/validation/community.ts's cityField for why this is a direct
@@ -10,14 +9,14 @@ import { descriptionContentField } from "@/lib/validation/richText";
 const cityField = z.string().trim().refine(isCity, "Choose a valid city").optional();
 const extraCitiesField = z.array(z.string().refine(isCity)).max(5).default([]);
 
+// No payment_link field -- a paid ticket type doesn't collect a per-ticket
+// checkout link at all anymore. Registrants pay the host directly by UPI,
+// using whichever UPI ID/QR code that host has set (host_payment_details,
+// PaymentDetailsForm) -- one set of payment details per host, not one per
+// ticket type.
 const ticketTypeSchema = z.object({
   name: z.string().trim().min(1, "Ticket name is required").max(60),
   price: z.number().min(0).max(1_000_000),
-  payment_link: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || isValidPaymentLink(v), "Payment link must be a valid https:// link"),
   quantity_available: z.number().int().min(1).max(100_000).optional(),
 });
 

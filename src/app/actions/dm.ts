@@ -20,8 +20,11 @@ async function insertDmMessage(supabase: SupabaseClient, threadId: string, sende
 /** The member's side of "Reach out to admin" -- finds their existing
  * thread with this community's owner or creates it on the first message.
  * RLS (community_dm_messages_insert, 0067) is the real gate on who can
- * post into it; this also blocks the owner DMing themselves and blocks
- * external communities outright (no owner-facing inbox exists for one). */
+ * post into it; this also blocks staff (owner AND moderators -- neither
+ * should be able to DM "the admin", since they already are one) and
+ * blocks external communities outright (no owner-facing inbox exists for
+ * one). The UI (ReachOutButton) already hides this from staff, but a
+ * direct action call needs the same check server-side. */
 export async function sendCommunityDm(communityId: string, content: string) {
   const user = await requireUser();
   const text = content.trim();
@@ -38,6 +41,14 @@ export async function sendCommunityDm(communityId: string, content: string) {
   if (communityError || !community) return { error: "Community not found" };
   if (community.kind !== "native") return { error: "Direct messages aren't available for this community" };
   if (community.owner_id === user.id) return { error: "You're the owner of this community" };
+
+  const { data: membership } = await supabase
+    .from("community_members")
+    .select("role")
+    .eq("community_id", communityId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (membership?.role === "moderator") return { error: "You're a moderator of this community" };
 
   const { data: existing } = await supabase
     .from("community_dm_threads")

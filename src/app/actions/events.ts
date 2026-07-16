@@ -91,7 +91,6 @@ export async function createEvent(
       event_id: event.id,
       name: t.name,
       price: t.price,
-      payment_link: t.price > 0 ? t.payment_link : null,
       quantity_available: t.quantity_available ?? null,
       sort_order: i,
     })),
@@ -157,12 +156,11 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   if (!ticketType) return { error: "That ticket type no longer exists" };
   const isPaid = ticketType.price > 0;
 
-  // The host's own UPI QR/ID (host/dashboard's PaymentDetailsForm), not a
-  // Razorpay Payment Link -- the platform's Razorpay account was rejected,
-  // so a paid registration now hands off to manual UPI payment instead
-  // (see submitPaymentReference below for the registrant's side of that,
-  // and confirmPayment for the host's). razorpay.ts/the webhook route are
-  // left in place, just unreached from this flow now.
+  // The host's own UPI QR/ID, set inline while creating/editing the event
+  // (PaymentDetailsForm, shown once a ticket has a price) -- a paid
+  // registration hands off to manual UPI payment (see
+  // submitPaymentReference below for the registrant's side of that, and
+  // confirmPayment for the host's).
   let hostUpi: { upiId: string | null; qrImageUrl: string | null } | null = null;
   if (isPaid) {
     const { data: eventRow } = await supabase.from("events").select("host_id").eq("id", eventId).single();
@@ -294,11 +292,11 @@ export async function submitPaymentReference(eventId: string, registrationId: st
 
 /** Host-side confirmation for the manual UPI flow -- the host checks their
  * own UPI app history for this reference number and either confirms it
- * (payment_status -> 'paid', same terminal state the Razorpay webhook
- * would have set) or rejects it (back to 'unpaid' so the registrant can
- * correct and resubmit). Confirming is the one place that still needs an
- * explicit "you're registered" email sent from here -- the notify trigger
- * (0066) only ever handles the in-app notification, not email. */
+ * (payment_status -> 'paid') or rejects it (back to 'unpaid' so the
+ * registrant can correct and resubmit). Confirming is the one place that
+ * still needs an explicit "you're registered" email sent from here -- the
+ * notify trigger (0066) only ever handles the in-app notification, not
+ * email. */
 export async function confirmPayment(eventId: string, registrationId: string, decision: "confirm" | "reject") {
   const user = await requireUser();
   const supabase = await createClient();
@@ -487,7 +485,6 @@ export async function updateEventTicketsAndForm(eventId: string, input: UpdateEv
       event_id: eventId,
       name: t.name,
       price: t.price,
-      payment_link: t.price > 0 ? t.payment_link : null,
       quantity_available: t.quantity_available ?? null,
       sort_order: i,
     })),
@@ -545,13 +542,14 @@ export async function cancelEvent(eventId: string) {
   return { error: null };
 }
 
-// CloseConnect runs one platform-wide Razorpay account (src/lib/razorpay.ts)
-// -- every payment lands there regardless of host, and forwarding a host
-// their share happens entirely outside the app (bank transfer/UPI, by
-// hand). This just records that it happened, so the payout summary stops
-// showing it as owed -- it does not move any money itself. Bulk, not
-// per-registration, since a host settles a whole event's proceeds at
-// once in practice.
+// Predates the manual UPI flow (registrants now pay a host's own UPI ID
+// directly, confirmPayment in this file), from when every paid-ticket
+// payment landed in one platform-wide account regardless of host and had
+// to be forwarded on manually (bank transfer/by hand). Left in place for
+// any registration that still needs settling from that era -- this just
+// records that a forward happened, it does not move any money itself.
+// Bulk, not per-registration, since a host settles a whole event's
+// proceeds at once in practice.
 export async function markEventPayoutPaidOut(eventId: string) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -656,7 +654,6 @@ export async function duplicateEvent(eventId: string) {
         event_id: copy.id,
         name: t.name,
         price: t.price,
-        payment_link: t.payment_link,
         quantity_available: t.quantity_available,
         sort_order: t.sort_order,
       })),

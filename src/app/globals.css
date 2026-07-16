@@ -143,6 +143,20 @@ textarea:focus-visible,
 }
 
 @layer components {
+  /* Homepage-only scroll lock (SiteChrome.tsx toggles this on html+body for
+     the "/" route only) -- html already has h-full from layout.tsx's own
+     className, so this only needs to pin body's height to the viewport
+     and clip both, rather than redefine height on html too. dvh over vh:
+     accounts for mobile browser chrome collapsing/expanding, so the hero
+     never sits a few px taller than the real visible viewport. */
+  html.home-no-scroll,
+  body.home-no-scroll {
+    overflow: hidden;
+  }
+  body.home-no-scroll {
+    height: 100dvh;
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -337,28 +351,53 @@ textarea:focus-visible,
   cursor: default;
 }
 
-/* Homepage hero -- floating category photography, replacing the old flat
-   4-image grid. Plain CSS keyframes, not a new animation dependency (same
-   "justify a new dependency first" reasoning as PercentageBar) -- a
-   handful of drifting photo tiles doesn't need Framer Motion. Decorative
-   only, so it backs off entirely for prefers-reduced-motion rather than
-   just slowing down. */
-.hero-float {
-  animation: hero-float var(--float-duration, 7s) ease-in-out infinite;
-  animation-delay: var(--float-delay, 0s);
+/* Homepage hero -- a single non-scrolling screen: 3 rows of category
+   photography drifting right-to-left at different speeds behind the
+   headline (replacing the earlier floating-tiles version). Plain CSS
+   keyframes, not a new animation dependency (same "justify a new
+   dependency first" reasoning as PercentageBar). Each row's own image
+   list is duplicated once by the component and this translates exactly
+   -50% -- since the second half is identical to the first, the loop
+   point is invisible. Decorative only, so it backs off entirely for
+   prefers-reduced-motion (a static frame) rather than just slowing down. */
+.hero-marquee-row {
+  animation: hero-marquee-scroll var(--marquee-duration, 40s) linear infinite;
 }
-@keyframes hero-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(var(--float-rotate, 0deg));
+@keyframes hero-marquee-scroll {
+  from {
+    transform: translateX(0);
   }
-  50% {
-    transform: translateY(-16px) rotate(calc(var(--float-rotate, 0deg) * -1));
+  to {
+    transform: translateX(-50%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-float {
+  .hero-marquee-row {
     animation: none;
+  }
+}
+
+/* One-shot fade-in for the hero's foreground content on load -- no
+   scroll-trigger needed since the whole page is a single fixed screen.
+   Reduced-motion gets the final state immediately, no fade. */
+.hero-fade-in {
+  animation: hero-fade-in 0.9s ease-out both;
+}
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 }

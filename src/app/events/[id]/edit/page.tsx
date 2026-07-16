@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
+import { getHostPaymentDetails } from "@/lib/queries/paymentDetails";
 import { EditEventForm } from "@/components/events/EditEventForm";
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,10 +27,20 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
     redirect(`/events/${id}`);
   }
 
-  const [ticketTypes, formFields, { count: registrationCount }] = await Promise.all([
+  // Payment details are only ever shown/editable when the viewer IS the
+  // host -- PaymentDetailsForm's save action always writes to the acting
+  // user's own row (requireUser()'s id), so an admin editing someone
+  // else's event could never actually manage that host's payment details
+  // through this form anyway (their upload/save would silently target
+  // their own account instead). isHost=false just hides the section
+  // rather than showing a form that can't work correctly for that case.
+  const isHost = event.host_id === user.id;
+
+  const [ticketTypes, formFields, { count: registrationCount }, paymentDetails] = await Promise.all([
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
     supabase.from("form_responses").select("*", { count: "exact", head: true }).eq("owner_type", "event").eq("owner_id", id),
+    isHost ? getHostPaymentDetails(supabase, user.id) : Promise.resolve(null),
   ]);
 
   return (
@@ -49,6 +60,8 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
           ticketTypes={ticketTypes}
           formFields={formFields}
           hasRegistrations={(registrationCount ?? 0) > 0}
+          userId={isHost ? user.id : null}
+          paymentDetails={paymentDetails}
         />
       </div>
     </div>

@@ -5,7 +5,6 @@ import { IconTrash, IconPlus } from "@tabler/icons-react";
 export type TicketTypeDraft = {
   name: string;
   price: number;
-  payment_link: string;
   quantity_available: string; // kept as text in the form, parsed to number|undefined on submit
 };
 
@@ -14,9 +13,10 @@ const inputClass =
 
 /**
  * Editor for an event's ticket types (SPEC.md Section 8: free + paid +
- * early-bird tiers, optional quantity cap). Paid tickets no longer collect
- * a host-pasted payment link -- registerForEvent generates a fresh
- * per-registration Razorpay Payment Link automatically (Branch 4 part 2).
+ * early-bird tiers, optional quantity cap). Paid tickets don't collect a
+ * host-pasted payment link here -- registrants pay the host directly by
+ * UPI, using whatever UPI ID/QR code the host sets in the payment details
+ * section below (only shown once a ticket here has a price).
  * Mirrors FormBuilder's list-editor shape but for a different field set --
  * kept separate rather than generalizing FormBuilder further since ticket
  * types aren't part of the unified form-field system.
@@ -29,7 +29,7 @@ export function TicketTypeBuilder({
   onChange: (tickets: TicketTypeDraft[]) => void;
 }) {
   function addTicket() {
-    onChange([...tickets, { name: tickets.length === 0 ? "General" : "", price: 0, payment_link: "", quantity_available: "" }]);
+    onChange([...tickets, { name: tickets.length === 0 ? "General" : "", price: 0, quantity_available: "" }]);
   }
 
   function updateTicket(i: number, patch: Partial<TicketTypeDraft>) {
@@ -89,7 +89,7 @@ export function TicketTypeBuilder({
 
           {t.price > 0 && (
             <p className="mt-3 text-[11px] text-text3">
-              A Razorpay payment link is generated automatically for each registrant -- no link to paste here.
+              Registrants pay you directly by UPI -- add your UPI ID/QR code below, no link to paste here.
             </p>
           )}
         </div>

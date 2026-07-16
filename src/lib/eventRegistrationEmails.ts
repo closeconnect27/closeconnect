@@ -21,9 +21,9 @@ async function getEventEmailFields(supabase: SupabaseClient, eventId: string) {
 
 /** The real "you're in" email -- only ever sent once a spot is actually
  * confirmed: immediately for a free ticket (nothing left to do), or from
- * the Razorpay webhook once payment_status flips to 'paid' for a paid
- * one. Never sent at registration time for a paid ticket -- see
- * sendPaymentPendingEmail for that moment instead. */
+ * confirmPayment once the host manually confirms a paid one. Never sent
+ * at registration time for a paid ticket -- see sendPaymentPendingEmail
+ * for that moment instead. */
 export async function sendRegistrationConfirmationEmail(
   supabase: SupabaseClient,
   { email, eventId, registrantName }: { email: string; eventId: string; registrantName: string },
@@ -47,10 +47,9 @@ export async function sendRegistrationConfirmationEmail(
  * already ran), but not actually confirmed until the host manually
  * confirms the UPI payment (confirmPayment in app/actions/events.ts). Says
  * so plainly rather than implying "you're in" before money has moved.
- * Shows the host's own UPI QR/ID (host/dashboard's PaymentDetailsForm)
- * rather than a Razorpay Payment Link -- the platform's Razorpay account
- * was rejected, so this is now a manual pay-then-tell-us-the-reference
- * flow instead of an automated checkout link. */
+ * Shows the host's own UPI QR/ID (set inline while creating/editing the
+ * event, PaymentDetailsForm) -- registrants pay the host directly and
+ * tell us the reference number back, there's no checkout link at all. */
 export async function sendPaymentPendingEmail(
   supabase: SupabaseClient,
   {

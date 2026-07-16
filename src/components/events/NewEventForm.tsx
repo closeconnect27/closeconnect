@@ -14,7 +14,9 @@ import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { PaymentDetailsForm } from "@/components/host/PaymentDetailsForm";
 import { CITY_OPTIONS } from "@/lib/cities";
+import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 
 function todayIso() {
   const d = new Date();
@@ -23,7 +25,15 @@ function todayIso() {
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
-export function NewEventForm({ hostableCommunities }: { hostableCommunities: { id: string; name: string }[] }) {
+export function NewEventForm({
+  hostableCommunities,
+  userId,
+  paymentDetails,
+}: {
+  hostableCommunities: { id: string; name: string }[];
+  userId: string;
+  paymentDetails: HostPaymentDetails | null;
+}) {
   const router = useRouter();
   // Generated once, up front -- same reasoning as NewCommunityForm's
   // communityId: the rich editor needs a stable id to upload inline
@@ -41,7 +51,7 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
   const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
   const [communityId, setCommunityId] = useState("");
   const [tickets, setTickets] = useState<TicketTypeDraft[]>([
-    { name: "General", price: 0, payment_link: "", quantity_available: "" },
+    { name: "General", price: 0, quantity_available: "" },
   ]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
   const [error, setError] = useState("");
@@ -66,7 +76,6 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
       ticket_types: tickets.map((t) => ({
         name: t.name,
         price: t.price,
-        payment_link: t.payment_link || undefined,
         quantity_available: t.quantity_available ? Number(t.quantity_available) : undefined,
       })),
       form_fields: formFields,
@@ -163,6 +172,10 @@ export function NewEventForm({ hostableCommunities }: { hostableCommunities: { i
           <Field label="Ticket types">
             <TicketTypeBuilder tickets={tickets} onChange={setTickets} />
           </Field>
+
+          {tickets.some((t) => t.price > 0) && (
+            <PaymentDetailsForm userId={userId} details={paymentDetails} />
+          )}
 
           <Field label="Registration questions (optional)">
             <FormBuilder fields={formFields} onChange={setFormFields} />

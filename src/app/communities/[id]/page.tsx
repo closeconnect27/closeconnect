@@ -127,8 +127,8 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   // "Reach out to admin": a member's own thread (ReachOutButton), or --
   // for the owner/moderators -- every member thread that's ever been
   // opened (DmInboxSection). Never both for the same viewer: isStaff and
-  // "isMember && !isOwner" are mutually exclusive by construction.
-  const myDm = isNative && isMember && !isOwner && user ? await getMyDmThread(supabase, id, user.id) : null;
+  // "isMember && !isStaff" are mutually exclusive by construction.
+  const myDm = isNative && isMember && !isStaff && user ? await getMyDmThread(supabase, id, user.id) : null;
   const dmThreads = isNative && isStaff ? await getCommunityDmThreads(supabase, id) : [];
   const dmMessagesByThread =
     dmThreads.length > 0
@@ -231,7 +231,17 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               Analytics
             </Link>
           )}
-          {isMember && !isOwner && (
+          {/* Staff (owner OR moderator) never gets "reach out to admin" --
+              they already are the admin -- and get the inbox instead. */}
+          {isNative && isStaff && (
+            <DmInboxSection
+              communityId={community.id}
+              threads={dmThreads}
+              messagesByThread={dmMessagesByThread}
+              currentUserId={user!.id}
+            />
+          )}
+          {isMember && !isStaff && (
             <ReachOutButton
               communityId={community.id}
               communityName={community.name}
@@ -347,15 +357,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                           formFields={formFields}
                         />
                       </div>
-                    )}
-
-                    {isStaff && dmThreads.length > 0 && (
-                      <DmInboxSection
-                        communityId={community.id}
-                        threads={dmThreads}
-                        messagesByThread={dmMessagesByThread}
-                        currentUserId={user!.id}
-                      />
                     )}
                   </section>
                 }

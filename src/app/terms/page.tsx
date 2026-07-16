@@ -41,8 +41,9 @@ export default function TermsOfServicePage() {
         <Section title="4. Payments">
           <ul className="list-disc pl-5">
             <li>
-              Payments made through the Service (for paid event registrations and ticket purchases) are processed via our
-              third-party payment partner (Razorpay).
+              Payments made through the Service (for paid event registrations and ticket purchases) go directly to the
+              event organizer via UPI -- the Service itself does not process, hold, or route payments through any
+              third-party payment processor.
             </li>
             <li>All prices are displayed in Indian Rupees (INR) unless stated otherwise.</li>
             <li>

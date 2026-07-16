@@ -55,9 +55,9 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   const noShowCount = totalTickets - checkedInCount;
   const paidCount = registrations.filter((r) => r.payment_status === "paid").reduce((sum, r) => sum + r.quantity, 0);
 
-  // Only a $0 ticket type never actually moved money through Razorpay --
-  // payment_status is set to 'paid' for those too (0041, for the funnel's
-  // sake), but nothing was ever collected, so it can't be "owed".
+  // Only a $0 ticket type never actually moved any money -- payment_status
+  // is set to 'paid' for those too (0041, for the funnel's sake), but
+  // nothing was ever collected, so it can't be "owed".
   const priceByTicketTypeId = new Map(ticketTypes.map((t) => [t.id, t.price]));
   let payoutOwed = 0;
   let payoutPaidOut = 0;

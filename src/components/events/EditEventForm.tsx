@@ -13,9 +13,11 @@ import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CategoryPicker } from "@/components/ui/CategoryPicker";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { PaymentDetailsForm } from "@/components/host/PaymentDetailsForm";
 import { CITY_OPTIONS } from "@/lib/cities";
 import type { EventDetail, EventTicketType } from "@/lib/queries/events";
 import type { FormField } from "@/lib/queries/membership";
+import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -34,11 +36,19 @@ export function EditEventForm({
   ticketTypes,
   formFields,
   hasRegistrations,
+  userId,
+  paymentDetails,
 }: {
   event: EventDetail;
   ticketTypes: EventTicketType[];
   formFields: FormField[];
   hasRegistrations: boolean;
+  // null when the viewer isn't the actual host (e.g. an admin editing on
+  // someone else's behalf) -- hides the payment details section entirely
+  // rather than showing a form that would silently save against the
+  // wrong account (see events/[id]/edit/page.tsx's isHost comment).
+  userId: string | null;
+  paymentDetails: HostPaymentDetails | null;
 }) {
   const [eventName, setEventName] = useState(event.event_name);
   const [description, setDescription] = useState({
@@ -59,10 +69,9 @@ export function EditEventForm({
       ? ticketTypes.map((t) => ({
           name: t.name,
           price: t.price,
-          payment_link: t.payment_link ?? "",
           quantity_available: t.quantity_available != null ? String(t.quantity_available) : "",
         }))
-      : [{ name: "General", price: 0, payment_link: "", quantity_available: "" }],
+      : [{ name: "General", price: 0, quantity_available: "" }],
   );
   const [draftFormFields, setDraftFormFields] = useState<FormFieldDraft[]>(
     formFields.map((f) => ({
@@ -119,7 +128,6 @@ export function EditEventForm({
       ticket_types: tickets.map((t) => ({
         name: t.name,
         price: t.price,
-        payment_link: t.payment_link || undefined,
         quantity_available: t.quantity_available ? Number(t.quantity_available) : undefined,
       })),
       form_fields: draftFormFields,
@@ -202,6 +210,10 @@ export function EditEventForm({
             <Field label="Ticket types">
               <TicketTypeBuilder tickets={tickets} onChange={setTickets} />
             </Field>
+
+            {userId && tickets.some((t) => t.price > 0) && (
+              <PaymentDetailsForm userId={userId} details={paymentDetails} />
+            )}
 
             <Field label="Registration questions (optional)">
               <FormBuilder fields={draftFormFields} onChange={setDraftFormFields} />

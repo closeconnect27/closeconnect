@@ -7,12 +7,15 @@ import { updateHostPaymentDetails } from "@/app/actions/paymentDetails";
 import { uploadPaymentQr } from "@/lib/uploadPaymentQr";
 import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 
-// Replaces the old per-registration Razorpay Payment Link as the paid-ticket
-// flow (the platform's Razorpay account was rejected) -- a host sets this
-// once here and it's reused for every event they host, shown to a
-// registrant at checkout (EventRegistration.tsx) so they can pay by hand
-// via their own UPI app and type back whatever reference number it gave
-// them (registerForEvent/submitPaymentReference in app/actions/events.ts).
+// Shown inline while creating/editing an event, once a ticket type has a
+// price -- not on the host dashboard (moved there originally, relocated
+// here since a host thinks about payment details in the moment they're
+// pricing a ticket, not as a standalone settings page). Saved against the
+// host's account, though, not the event -- reused across every event they
+// go on to host. Shown to a registrant at checkout (EventRegistration.tsx)
+// so they can pay by hand via their own UPI app and type back whatever
+// reference number it gave them (registerForEvent/submitPaymentReference
+// in app/actions/events.ts).
 export function PaymentDetailsForm({ userId, details }: { userId: string; details: HostPaymentDetails | null }) {
   const router = useRouter();
   const [upiId, setUpiId] = useState(details?.upi_id ?? "");
