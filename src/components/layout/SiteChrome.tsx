@@ -87,7 +87,7 @@ function SiteChromeInner({
           Only needed when BottomNav is actually rendered. */}
       <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-dvh overflow-hidden" : "pb-16 sm:pb-0"}`}>
         {children}
-        <Footer />
+        <Footer dark={isHome} />
       </div>
       {!isHome && <BottomNav isLoggedIn={isLoggedIn} />}
     </>
