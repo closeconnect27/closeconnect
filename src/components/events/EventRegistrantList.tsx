@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconSearch, IconMinus, IconPlus } from "@tabler/icons-react";
-import { setCheckInCount } from "@/app/actions/events";
+import { IconSearch, IconMinus, IconPlus, IconClock } from "@tabler/icons-react";
+import { setCheckInCount, confirmPayment } from "@/app/actions/events";
 import type { EventRegistration } from "@/lib/queries/events";
 import type { FormField } from "@/lib/queries/membership";
 
@@ -42,6 +42,15 @@ export function EventRegistrantList({
     setPendingId(r.id);
     startTransition(async () => {
       const result = await setCheckInCount(eventId, r.id, next);
+      setPendingId(null);
+      if (!result.error) router.refresh();
+    });
+  }
+
+  function decidePayment(r: EventRegistration, decision: "confirm" | "reject") {
+    setPendingId(r.id);
+    startTransition(async () => {
+      const result = await confirmPayment(eventId, r.id, decision);
       setPendingId(null);
       if (!result.error) router.refresh();
     });
@@ -117,6 +126,31 @@ export function EventRegistrantList({
                   </div>
                 )}
               </div>
+
+              {r.payment_status === "pending_verification" && (
+                <div className="flex flex-col gap-2 rounded-card-sm border border-border2 bg-bg3 px-3 py-2.5">
+                  <p className="flex items-center gap-1.5 text-[12px] font-medium text-text2">
+                    <IconClock size={13} className="text-text3" />
+                    Says they paid -- ref. <span className="font-mono text-text">{r.payment_reference}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => decidePayment(r, "confirm")}
+                      disabled={pendingId === r.id}
+                      className="rounded-full border border-green bg-green-tint px-3 py-1.5 text-[12px] font-bold text-green transition disabled:opacity-50"
+                    >
+                      Confirm paid
+                    </button>
+                    <button
+                      onClick={() => decidePayment(r, "reject")}
+                      disabled={pendingId === r.id}
+                      className="rounded-full border border-border2 px-3 py-1.5 text-[12px] font-medium text-text2 transition hover:border-pink hover:text-pink disabled:opacity-50"
+                    >
+                      Not received
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {formFields.length > 0 && (
                 <div className="flex flex-col gap-1 rounded-card-sm bg-bg3 px-3 py-2">

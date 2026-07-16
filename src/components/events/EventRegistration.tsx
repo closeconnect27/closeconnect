@@ -4,19 +4,20 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconCircleCheck } from "@tabler/icons-react";
 import { DynamicForm } from "@/components/forms/DynamicForm";
-import { registerForEvent } from "@/app/actions/events";
+import { registerForEvent, submitPaymentReference } from "@/app/actions/events";
 import type { FormField } from "@/lib/queries/membership";
 import type { EventTicketType } from "@/lib/queries/events";
-import { safePaymentHref } from "@/lib/validators/links";
 
 // Registration requires a real account (SPEC.md's earlier guest-friendly
 // decision is deliberately reversed -- see Section 9 of the redesign brief):
 // legitimacy/security won out over convenience. Email now comes from the
 // signed-in session server-side, never a client-editable field -- name
 // stays editable since a registrant may reasonably check someone else in
-// under a different name than their account's. Paid tickets hand off to
-// the ticket's own payment link rather than collecting payment here -- real
-// checkout/webhook handling is a later phase (SPEC.md Section 8).
+// under a different name than their account's. Paid tickets show the
+// host's own UPI QR/ID and collect a payment reference for the host to
+// manually confirm (registerForEvent/submitPaymentReference in
+// app/actions/events.ts) -- not a Razorpay checkout link; the platform's
+// Razorpay account was rejected.
 export function EventRegistration({
   eventId,
   ticketTypes,
@@ -44,9 +45,13 @@ export function EventRegistration({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [hostUpi, setHostUpi] = useState<{ upiId: string | null; qrImageUrl: string | null } | null>(null);
+  const [reference, setReference] = useState("");
+  const [referenceSubmitted, setReferenceSubmitted] = useState(false);
   const [confirmingReRegister, setConfirmingReRegister] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [referencePending, startReferenceTransition] = useTransition();
 
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
   const isSoldOut = (t: EventTicketType) =>
@@ -78,9 +83,21 @@ export function EventRegistration({
         setError(result.error);
         setConfirmingReRegister(false);
       } else {
-        setPaymentLinkUrl(result.paymentLinkUrl ?? null);
+        setRegistrationId(result.registrationId ?? null);
+        setHostUpi(result.hostUpi ?? null);
         setDone(true);
       }
+    });
+  }
+
+  function submitReference(e: React.FormEvent) {
+    e.preventDefault();
+    if (!registrationId || !reference.trim()) return;
+    setError("");
+    startReferenceTransition(async () => {
+      const result = await submitPaymentReference(eventId, registrationId, reference);
+      if (result?.error) setError(result.error);
+      else setReferenceSubmitted(true);
     });
   }
 
@@ -99,28 +116,84 @@ export function EventRegistration({
   }
 
   if (done) {
+    // Narrows selectedTicket to non-undefined/price>0 for everything below
+    // -- isPaidTicket as a plain boolean (the previous shape here) doesn't
+    // carry that narrowing through to selectedTicket.price at JSX-build
+    // time, so this stays an early-return guard rather than a derived flag.
+    if (!selectedTicket || selectedTicket.price === 0) {
+      return (
+        <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
+          <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
+          <p className="text-[15px] font-bold text-text">You&apos;re registered!</p>
+          <p className="mt-1 text-[13px] text-text2">A confirmation has been sent to your email.</p>
+        </div>
+      );
+    }
+
+    if (!hostUpi?.upiId && !hostUpi?.qrImageUrl) {
+      return (
+        <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
+          <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
+          <p className="text-[15px] font-bold text-text">Your spot is reserved</p>
+          <p className="mt-1 text-[13px] text-text2">
+            The organizer hasn&apos;t set up payment details yet -- contact them directly to complete payment.
+          </p>
+        </div>
+      );
+    }
+
+    if (!referenceSubmitted) {
+      return (
+        <div className="card-elevated flex flex-col gap-4 rounded-card bg-bg2 p-6 text-center">
+          <div>
+            <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
+            <p className="text-[15px] font-bold text-text">Your spot is reserved</p>
+            <p className="mt-1 text-[13px] text-text2">
+              Pay ₹{selectedTicket.price * quantity} by UPI, then tell us the reference number below to confirm it.
+            </p>
+          </div>
+
+          {hostUpi?.qrImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- storage public URL, not a static remote pattern next/image can optimize
+            <img
+              src={hostUpi.qrImageUrl}
+              alt="Payment QR code"
+              className="mx-auto h-44 w-44 rounded-card-sm border border-border2 object-contain"
+            />
+          )}
+          {hostUpi?.upiId && (
+            <p className="text-[14px] text-text2">
+              UPI ID: <span className="font-bold text-text">{hostUpi.upiId}</span>
+            </p>
+          )}
+
+          <form onSubmit={submitReference} className="flex flex-col gap-2 text-left">
+            <label className="flex flex-col gap-2">
+              <span className="text-[13px] font-medium text-text">Payment reference / UTR number</span>
+              <input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="e.g. 123456789012"
+                required
+                className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
+              />
+            </label>
+            {error && <p className="text-[13px] text-pink">{error}</p>}
+            <button type="submit" disabled={referencePending} className="btn-primary py-3 text-[14px]">
+              {referencePending ? "Submitting…" : "I've paid -- submit reference"}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
     return (
       <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
         <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
-        <p className="text-[15px] font-bold text-text">You&apos;re registered!</p>
+        <p className="text-[15px] font-bold text-text">Payment submitted</p>
         <p className="mt-1 text-[13px] text-text2">
-          {selectedTicket && selectedTicket.price > 0
-            ? paymentLinkUrl
-              ? "Finish payment via the link below to confirm your spot."
-              : "Payment setup ran into an issue -- contact the organizer to complete payment."
-            : "A confirmation has been sent to your email."}
+          The organizer will confirm your payment shortly -- you&apos;ll get an email once it&apos;s done.
         </p>
-        {selectedTicket && selectedTicket.price > 0 && paymentLinkUrl && (
-          <a
-            href={safePaymentHref(paymentLinkUrl)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-primary mt-4 px-6 py-2.5 text-[13px]"
-          >
-            Pay ₹{selectedTicket.price * quantity} for {quantity > 1 ? `${quantity}x ` : ""}
-            {selectedTicket.name}
-          </a>
-        )}
       </div>
     );
   }

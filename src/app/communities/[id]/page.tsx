@@ -32,6 +32,10 @@ import { MemberCountVisibilityToggle } from "@/components/communities/MemberCoun
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
 import { ClaimSection } from "@/components/communities/ClaimSection";
+import { GoNativeButton } from "@/components/communities/GoNativeButton";
+import { ReachOutButton } from "@/components/communities/ReachOutButton";
+import { DmInboxSection } from "@/components/communities/DmInboxSection";
+import { getMyDmThread, getCommunityDmThreads, getDmThreadMessages } from "@/lib/queries/dm";
 import { CommunityTabs } from "@/components/communities/CommunityTabs";
 import { EventCard } from "@/components/events/EventCard";
 import { RichTextView } from "@/components/ui/RichTextView";
@@ -120,6 +124,17 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   // getEvents already excludes drafts (null event_date) unconditionally.
   const hostedEvents = isMember ? await getEvents(supabase, { communityId: id, includePast: true }) : [];
 
+  // "Reach out to admin": a member's own thread (ReachOutButton), or --
+  // for the owner/moderators -- every member thread that's ever been
+  // opened (DmInboxSection). Never both for the same viewer: isStaff and
+  // "isMember && !isOwner" are mutually exclusive by construction.
+  const myDm = isNative && isMember && !isOwner && user ? await getMyDmThread(supabase, id, user.id) : null;
+  const dmThreads = isNative && isStaff ? await getCommunityDmThreads(supabase, id) : [];
+  const dmMessagesByThread =
+    dmThreads.length > 0
+      ? Object.fromEntries(await Promise.all(dmThreads.map(async (t) => [t.id, await getDmThreadMessages(supabase, t.id)] as const)))
+      : {};
+
   return (
     <div className="flex-1 pb-10">
       <PageViewTracker targetType="community" targetId={community.id} viewerId={user?.id ?? null} />
@@ -202,6 +217,9 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               Edit
             </Link>
           )}
+          {isOwner && !isNative && community.claim_status === "approved" && (
+            <GoNativeButton communityId={community.id} />
+          )}
           {/* Native only -- every stat on the analytics page (join
               requests, member growth, active members) is a native
               community_members/join_mode concept that never populates
@@ -212,6 +230,15 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               <IconChartBar size={14} />
               Analytics
             </Link>
+          )}
+          {isMember && !isOwner && (
+            <ReachOutButton
+              communityId={community.id}
+              communityName={community.name}
+              threadId={myDm?.threadId ?? null}
+              initialMessages={myDm?.messages ?? []}
+              currentUserId={user!.id}
+            />
           )}
           {isMember && <CopyLinkButton path={`/communities/${community.id}`} />}
         </div>
@@ -321,6 +348,15 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                         />
                       </div>
                     )}
+
+                    {isStaff && dmThreads.length > 0 && (
+                      <DmInboxSection
+                        communityId={community.id}
+                        threads={dmThreads}
+                        messagesByThread={dmMessagesByThread}
+                        currentUserId={user!.id}
+                      />
+                    )}
                   </section>
                 }
                 events={
@@ -353,7 +389,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
         <CommunityDetailActions
           communityId={community.id}
-          kind={community.kind}
           externalLink={community.external_link}
           isLoggedIn={!!user}
         />

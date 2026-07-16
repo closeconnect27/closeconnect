@@ -7,8 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformStats } from "@/lib/queries/stats";
-import { CATEGORIES } from "@/lib/categories";
-import { CategoryImage } from "@/components/ui/CategoryImage";
+import { FloatingCategoryTiles } from "@/components/home/FloatingCategoryTiles";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -16,21 +15,18 @@ export default async function Home() {
 
   return (
     <div className="flex-1">
-      {/* HERO -- real category photography behind the headline (Meetup/
-          AllEvents both lead with photography, not plain text on a flat
-          background), using the same verified Unsplash set every card
-          already draws from rather than any new/fabricated imagery. */}
-      <section className="relative overflow-hidden border-b border-border">
-        <div className="pointer-events-none absolute inset-0 grid grid-cols-4 gap-0.5 opacity-50 sm:opacity-70">
-          {CATEGORIES.slice(0, 4).map((c) => (
-            <div key={c.slug} className="relative" style={{ background: c.bg }}>
-              <CategoryImage slug={c.slug} seed={2} alt="" fill sizes="25vw" className="object-cover" />
-            </div>
-          ))}
-        </div>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/30 via-bg/85 to-bg" />
+      {/* HERO -- real category photography, drifting as loose scattered
+          tiles rather than a flat grid (Meetup/AllEvents lead with
+          photography, not plain text on a flat background), using the
+          same verified Unsplash set every card already draws from rather
+          than any new/fabricated imagery. Explicit min-height gives the
+          tiles' percentage-based positions real room to spread across;
+          the center column stays clear for the headline. */}
+      <section className="relative min-h-[520px] overflow-hidden border-b border-border sm:min-h-[600px]">
+        <FloatingCategoryTiles />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/50 via-bg/80 to-bg" />
 
-        <div className="relative flex flex-col items-center gap-6 px-6 pb-16 pt-16 text-center sm:pt-24">
+        <div className="relative flex min-h-[520px] flex-col items-center justify-center gap-6 px-6 py-16 text-center sm:min-h-[600px]">
           <h1 className="font-heading text-[28px] font-black leading-none min-[480px]:text-[36px] sm:text-[44px] lg:text-[56px]">
             Close<span className="text-green">connect</span>
           </h1>

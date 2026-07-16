@@ -44,18 +44,30 @@ export async function sendRegistrationConfirmationEmail(
 
 /** Sent at registration time for a PAID ticket instead of the
  * confirmation above -- the spot is reserved (capacity/rate-limit checks
- * already ran), but not actually confirmed until Razorpay reports the
- * payment captured. Says so plainly rather than implying "you're in"
- * before money has moved. */
+ * already ran), but not actually confirmed until the host manually
+ * confirms the UPI payment (confirmPayment in app/actions/events.ts). Says
+ * so plainly rather than implying "you're in" before money has moved.
+ * Shows the host's own UPI QR/ID (host/dashboard's PaymentDetailsForm)
+ * rather than a Razorpay Payment Link -- the platform's Razorpay account
+ * was rejected, so this is now a manual pay-then-tell-us-the-reference
+ * flow instead of an automated checkout link. */
 export async function sendPaymentPendingEmail(
   supabase: SupabaseClient,
   {
     email,
     eventId,
     registrantName,
-    paymentLinkUrl,
+    upiId,
+    qrImageUrl,
     amountRupees,
-  }: { email: string; eventId: string; registrantName: string; paymentLinkUrl: string | null; amountRupees: number },
+  }: {
+    email: string;
+    eventId: string;
+    registrantName: string;
+    upiId: string | null;
+    qrImageUrl: string | null;
+    amountRupees: number;
+  },
 ) {
   const fields = await getEventEmailFields(supabase, eventId);
   if (!fields) return;
@@ -65,11 +77,15 @@ export async function sendPaymentPendingEmail(
     subject: `Complete your payment: ${fields.eventName}`,
     html: `
       <p>Hi ${registrantName},</p>
-      <p>Your spot for <strong>${fields.eventName}</strong> is reserved, but not confirmed yet -- complete payment to lock it in.</p>
+      <p>Your spot for <strong>${fields.eventName}</strong> is reserved, but not confirmed yet -- pay &#8377;${amountRupees} by UPI to lock it in, then tell us the reference number back on the event page.</p>
       <p>${fields.dateLabel}${fields.place ? ` &middot; ${fields.place}` : ""}</p>
       ${
-        paymentLinkUrl
-          ? `<p><a href="${paymentLinkUrl}">Pay &#8377;${amountRupees}</a></p>`
+        upiId || qrImageUrl
+          ? `
+        ${qrImageUrl ? `<p><img src="${qrImageUrl}" alt="Payment QR code" width="180" height="180" style="border:1px solid #ddd;border-radius:8px" /></p>` : ""}
+        ${upiId ? `<p>UPI ID: <strong>${upiId}</strong></p>` : ""}
+        <p><a href="${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/events/${eventId}">Go to the event page to enter your payment reference</a></p>
+      `
           : `<p>Payment setup ran into an issue -- contact the organizer to complete payment.</p>`
       }
     `,

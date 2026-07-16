@@ -390,6 +390,49 @@ async function notifyAdminOfPendingClaim(claimId: string, communityName: string)
   });
 }
 
+// "Go Native" -- a claimed external community's owner can opt into the
+// full native feature set (groups, chat, member list, join settings,
+// analytics) while keeping the original WhatsApp/Instagram link visible
+// (CommunityDetailActions/CommunityCard key off external_link's presence,
+// not kind, for that button). No new rows to seed here: on_community_created
+// already made this community's General/Announcements groups at insert
+// time, and review_community_claim already gave the claimant an owner
+// community_members + community_group_members row when the claim was
+// approved (0024) -- flipping kind is the entire switch. join_mode and
+// community_type already have real values from submission/approval too
+// (column defaults, never null), so every isNative-gated feature on the
+// detail page lights up immediately with no follow-up write.
+export async function switchCommunityToNative(communityId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("communities")
+    .select("owner_id, kind, claim_status")
+    .eq("id", communityId)
+    .single();
+  if (fetchError || !existing) return { error: "Community not found" };
+  if (existing.owner_id !== user.id) return { error: "Only the owner can do this" };
+  if (existing.kind !== "external") return { error: "This community is already native" };
+  if (existing.claim_status !== "approved") return { error: "Only a claimed community can switch" };
+
+  const { error } = await supabase.from("communities").update({ kind: "native" }).eq("id", communityId);
+  if (error) {
+    // 23505 = unique_violation -- communities_unique_name_per_category_native
+    // (0043): a native community with this exact name+category already
+    // exists, so this one can't become native without a rename first.
+    if (error.code === "23505") {
+      return { error: "A native community with this name already exists in this category — rename it first, then try again." };
+    }
+    return { error: error.message };
+  }
+
+  trackServerEvent("community_switched_native", user.id, { community_id: communityId });
+  revalidatePath(`/communities/${communityId}`);
+  revalidatePath(`/communities/${communityId}/edit`);
+  return { error: null };
+}
+
 export async function reviewCommunityClaim(claimId: string, decision: "approved" | "rejected") {
   const user = await requireUser();
   const supabase = await createClient();

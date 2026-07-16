@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendRegistrationConfirmationEmail, sendPaymentPendingEmail } from "@/lib/eventRegistrationEmails";
-import { createPaymentLink } from "@/lib/razorpay";
 import { trackServerEvent } from "@/lib/mixpanel/server";
 import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
 import {
@@ -23,6 +22,7 @@ import {
   getHostableCommunities,
   getEventTicketTypes,
 } from "@/lib/queries/events";
+import { getHostPaymentDetails } from "@/lib/queries/paymentDetails";
 import { deserializeDescriptionContent } from "@/lib/validation/richText";
 
 export async function createEvent(
@@ -157,6 +157,21 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   if (!ticketType) return { error: "That ticket type no longer exists" };
   const isPaid = ticketType.price > 0;
 
+  // The host's own UPI QR/ID (host/dashboard's PaymentDetailsForm), not a
+  // Razorpay Payment Link -- the platform's Razorpay account was rejected,
+  // so a paid registration now hands off to manual UPI payment instead
+  // (see submitPaymentReference below for the registrant's side of that,
+  // and confirmPayment for the host's). razorpay.ts/the webhook route are
+  // left in place, just unreached from this flow now.
+  let hostUpi: { upiId: string | null; qrImageUrl: string | null } | null = null;
+  if (isPaid) {
+    const { data: eventRow } = await supabase.from("events").select("host_id").eq("id", eventId).single();
+    if (eventRow) {
+      const details = await getHostPaymentDetails(supabase, eventRow.host_id);
+      hostUpi = { upiId: details?.upi_id ?? null, qrImageUrl: details?.qr_image_url ?? null };
+    }
+  }
+
   const { data: registration, error } = await supabase
     .from("form_responses")
     .insert({
@@ -181,27 +196,6 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     return { error: error?.message ?? "Could not complete registration" };
   }
 
-  // A per-registration Razorpay Payment Link, not the ticket type's own
-  // static link -- reference_id = this registration's id is what the
-  // webhook (app/api/webhooks/razorpay) matches back to later. The
-  // registration itself is already confirmed at this point regardless of
-  // payment outcome (matching the pre-existing "approved on submit, pay
-  // after" flow) -- a failed link creation here doesn't undo it, it just
-  // means no payment link to show; the registrant/host can be pointed at
-  // support rather than losing the registration entirely.
-  let paymentLinkUrl: string | null = null;
-  if (isPaid) {
-    const linkResult = await createPaymentLink({
-      registrationId: registration.id,
-      amountRupees: ticketType.price * parsed.data.quantity,
-      description: `${ticketType.name} ticket${parsed.data.quantity > 1 ? ` x${parsed.data.quantity}` : ""}`,
-      customerName: parsed.data.name,
-      customerEmail: user.email ?? "",
-    });
-    if ("url" in linkResult) paymentLinkUrl = linkResult.url;
-    else console.error("Payment link creation failed for registration", registration.id, linkResult.error);
-  }
-
   revalidatePath(`/events/${eventId}`);
   // The UI's "A confirmation has been sent to your email" line pre-dates
   // this -- it was display text with no actual send behind it (found while
@@ -211,11 +205,11 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   // failure here still doesn't fail the registration itself (only logs).
   //
   // Paid tickets get a "complete your payment" email/notification here,
-  // never the real "you're registered" one -- that's only true once
-  // Razorpay actually reports the payment captured (the webhook sends it
-  // instead, see app/api/webhooks/razorpay/route.ts). Sending "you're
-  // registered" before any money has moved is exactly the bug a real user
-  // hit: an email confirming a spot that wasn't actually confirmed yet.
+  // never the real "you're registered" one -- that's only true once the
+  // host manually confirms the UPI payment (confirmPayment below sends
+  // it). Sending "you're registered" before any money has moved is
+  // exactly the bug a real user hit: an email confirming a spot that
+  // wasn't actually confirmed yet.
   if (isPaid) {
     if (user.email) {
       try {
@@ -223,7 +217,8 @@ export async function registerForEvent(eventId: string, input: EventRegistration
           email: user.email,
           eventId,
           registrantName: parsed.data.name,
-          paymentLinkUrl,
+          upiId: hostUpi?.upiId ?? null,
+          qrImageUrl: hostUpi?.qrImageUrl ?? null,
           amountRupees: ticketType.price * parsed.data.quantity,
         });
       } catch (e) {
@@ -257,7 +252,94 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     ticket_type_id: parsed.data.ticket_type_id,
     is_paid: isPaid,
   });
-  return { error: null, paymentLinkUrl };
+  return { error: null, registrationId: registration.id, isPaid, hostUpi };
+}
+
+/** The registrant's side of the manual UPI flow -- they paid by hand via
+ * their own UPI app and are typing back whatever reference/UTR number it
+ * gave them. This is never verified programmatically (there's no API into
+ * a personal UPI account); it just moves the registration into a
+ * host-reviewable queue (confirmPayment below) instead of leaving it
+ * silently 'unpaid' forever. A security definer trigger (0066) notifies
+ * the host in-app the moment this lands. */
+export async function submitPaymentReference(eventId: string, registrationId: string, reference: string) {
+  const user = await requireUser();
+
+  const trimmed = reference.trim();
+  if (!trimmed) return { error: "Enter the reference number your UPI app gave you" };
+  if (trimmed.length > 100) return { error: "That reference looks too long -- double-check what you pasted" };
+
+  const supabase = await createClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("form_responses")
+    .select("respondent_id, payment_status")
+    .eq("id", registrationId)
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .single();
+  if (fetchError || !existing) return { error: "Registration not found" };
+  if (existing.respondent_id !== user.id) return { error: "Not allowed to update this registration" };
+  if (existing.payment_status !== "unpaid") return { error: "This registration isn't awaiting payment" };
+
+  const { error } = await supabase
+    .from("form_responses")
+    .update({ payment_status: "pending_verification", payment_reference: trimmed })
+    .eq("id", registrationId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/events/${eventId}`);
+  return { error: null };
+}
+
+/** Host-side confirmation for the manual UPI flow -- the host checks their
+ * own UPI app history for this reference number and either confirms it
+ * (payment_status -> 'paid', same terminal state the Razorpay webhook
+ * would have set) or rejects it (back to 'unpaid' so the registrant can
+ * correct and resubmit). Confirming is the one place that still needs an
+ * explicit "you're registered" email sent from here -- the notify trigger
+ * (0066) only ever handles the in-app notification, not email. */
+export async function confirmPayment(eventId: string, registrationId: string, decision: "confirm" | "reject") {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
+  if (!auth.ok) return { error: auth.error };
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("form_responses")
+    .select("payment_status, response_data")
+    .eq("id", registrationId)
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .single();
+  if (fetchError || !existing) return { error: "Registration not found" };
+  if (existing.payment_status !== "pending_verification") return { error: "Nothing awaiting confirmation here" };
+
+  // Confirming keeps payment_reference as an audit trail; rejecting clears
+  // it so the registrant sees a clean slate to correct and resubmit.
+  const update =
+    decision === "confirm"
+      ? { payment_status: "paid" as const }
+      : { payment_status: "unpaid" as const, payment_reference: null };
+  const { error } = await supabase.from("form_responses").update(update).eq("id", registrationId);
+  if (error) return { error: error.message };
+
+  if (decision === "confirm") {
+    const responseData = existing.response_data as unknown as { name?: string; email?: string } | null;
+    const email = responseData?.email;
+    const name = responseData?.name ?? "there";
+    if (email) {
+      try {
+        await sendRegistrationConfirmationEmail(supabase, { email, eventId, registrantName: name });
+      } catch (e) {
+        console.error("Failed to send post-payment confirmation email:", e);
+      }
+    }
+  }
+
+  revalidatePath(`/events/${eventId}/manage`);
+  return { error: null };
 }
 
 // Partial check-in: `count` is how many of THIS registration's `quantity`

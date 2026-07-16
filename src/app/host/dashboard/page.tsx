@@ -4,11 +4,13 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
 import { getPendingJoinRequests, getCommunityFormFields } from "@/lib/queries/membership";
+import { getHostPaymentDetails } from "@/lib/queries/paymentDetails";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HostCommunityRow } from "@/components/host/HostCommunityRow";
 import { HostEventRow } from "@/components/host/HostEventRow";
 import { PendingRequests } from "@/components/communities/PendingRequests";
+import { PaymentDetailsForm } from "@/components/host/PaymentDetailsForm";
 
 function todayIso() {
   const d = new Date();
@@ -22,9 +24,10 @@ export default async function HostDashboardPage() {
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
   const isAdmin = !!profile?.is_admin;
 
-  const [communities, events] = await Promise.all([
+  const [communities, events, paymentDetails] = await Promise.all([
     getMyCommunities(supabase, user.id),
     getMyEvents(supabase, user.id),
+    getHostPaymentDetails(supabase, user.id),
   ]);
 
   const requestModeCommunities = communities.filter((c) => c.kind === "native" && c.join_mode === "request");
@@ -74,6 +77,10 @@ export default async function HostDashboardPage() {
           <StatCard icon={IconInbox} label="Pending requests" value={totalPending} />
           <StatCard icon={IconTicket} label="Total registrants" value={totalRegistrants} />
         </div>
+
+        <section className="mt-8">
+          <PaymentDetailsForm userId={user.id} details={paymentDetails} />
+        </section>
 
         {needsAttention.length > 0 && (
           <section className="mt-8">

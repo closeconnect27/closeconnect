@@ -66,7 +66,11 @@ export type EventRegistration = {
    * "checked in at all". */
   checked_in_count: number;
   quantity: number;
-  payment_status: "unpaid" | "paid" | "failed";
+  payment_status: "unpaid" | "pending_verification" | "paid" | "failed";
+  /** What the registrant typed back as their UPI reference/UTR number
+   * (0066) -- purely informational, never verified programmatically. Only
+   * meaningful once payment_status has moved past 'unpaid'. */
+  payment_reference: string | null;
   payout_status: "pending" | "paid_out";
   created_at: string;
   ticket_type_id: string | null;
@@ -219,7 +223,7 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
   const { data, error } = await supabase
     .from("form_responses")
     .select(
-      "id, respondent_id, response_data, status, checked_in_at, checked_in_count, quantity, payment_status, payout_status, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
+      "id, respondent_id, response_data, status, checked_in_at, checked_in_count, quantity, payment_status, payment_reference, payout_status, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
     )
     .eq("owner_type", "event")
     .eq("owner_id", eventId)

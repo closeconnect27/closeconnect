@@ -336,4 +336,29 @@ textarea:focus-visible,
 .rich-text-view .ProseMirror {
   cursor: default;
 }
+
+/* Homepage hero -- floating category photography, replacing the old flat
+   4-image grid. Plain CSS keyframes, not a new animation dependency (same
+   "justify a new dependency first" reasoning as PercentageBar) -- a
+   handful of drifting photo tiles doesn't need Framer Motion. Decorative
+   only, so it backs off entirely for prefers-reduced-motion rather than
+   just slowing down. */
+.hero-float {
+  animation: hero-float var(--float-duration, 7s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+}
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--float-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-16px) rotate(calc(var(--float-rotate, 0deg) * -1));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-float {
+    animation: none;
+  }
+}
 }

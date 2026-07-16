@@ -2,9 +2,11 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { canReadGroup, canPostToGroup, getGroupMessages, getGroupById } from "@/lib/queries/chat";
+import { canReadGroup, canPostToGroup, getGroupMessages, getGroupById, getGroupMediaAndLinks } from "@/lib/queries/chat";
 import { markGroupRead } from "@/app/actions/chat";
 import { GroupChat } from "@/components/communities/GroupChat";
+import { GroupChatTabs } from "@/components/communities/GroupChatTabs";
+import { GroupMediaLinks } from "@/components/communities/GroupMediaLinks";
 
 export default async function GroupChatPage({
   params,
@@ -31,6 +33,7 @@ export default async function GroupChatPage({
 
   const canPost = await canPostToGroup(supabase, group, user.id);
   const messages = await getGroupMessages(supabase, groupId);
+  const { media, links } = await getGroupMediaAndLinks(supabase, groupId);
 
   // Fire-and-forget-adjacent: awaited so it's committed before the badge
   // could plausibly be re-fetched by a nav elsewhere, but never awaited by
@@ -49,7 +52,10 @@ export default async function GroupChatPage({
           ← Back to community
         </Link>
         <h1 className="mb-4 font-heading text-[18px] font-bold">#{group.name}</h1>
-        <GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} canPost={canPost} />
+        <GroupChatTabs
+          chat={<GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} canPost={canPost} />}
+          media={<GroupMediaLinks media={media} links={links} />}
+        />
       </div>
     </div>
   );

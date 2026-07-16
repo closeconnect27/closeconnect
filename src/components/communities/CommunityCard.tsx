@@ -94,7 +94,10 @@ export function CommunityCard({ community: c }: { community: Community }) {
           ) : (
             <span />
           )}
-          {c.kind === "external" && c.external_link && <JoinBadge link={c.external_link} communityId={c.id} />}
+          {/* Keyed off external_link's presence, not kind -- a "Go
+              Native"-switched community keeps showing this even though
+              kind is now 'native' (explicit product requirement). */}
+          {c.external_link && <JoinBadge link={c.external_link} communityId={c.id} />}
         </div>
       </div>
     </ClickableCard>

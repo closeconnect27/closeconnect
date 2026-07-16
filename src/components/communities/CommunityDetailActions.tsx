@@ -7,12 +7,10 @@ import { ReportModal } from "@/components/communities/ReportModal";
 
 export function CommunityDetailActions({
   communityId,
-  kind,
   externalLink,
   isLoggedIn,
 }: {
   communityId: string;
-  kind: "native" | "external";
   externalLink: string | null;
   isLoggedIn: boolean;
 }) {
@@ -21,7 +19,11 @@ export function CommunityDetailActions({
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      {kind === "external" && externalLink && (
+      {/* Keyed off externalLink's presence, not kind -- a community that
+          went through "Go Native" keeps its original WhatsApp/Instagram
+          link visible here even though kind is now 'native' (explicit
+          product requirement for that switch). */}
+      {externalLink && (
         <a
           href={safeJoinHref(externalLink)}
           target="_blank"

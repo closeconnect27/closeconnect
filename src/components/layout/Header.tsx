@@ -49,9 +49,15 @@ export function Header({
           Close<span className="text-green">connect</span>
         </Link>
 
-        <div className="flex min-w-0 flex-1 justify-center">
+        {/* Below sm, a slot (the search bar) moves to its own full-width
+            row underneath instead of sharing this row -- squeezed between
+            the logo and profile/bell/theme (all shrink-0, all
+            always-visible on mobile by design), it had almost no width
+            left on a narrow phone and was effectively unusable. Desktop
+            keeps the original inline placement, where there's room. */}
+        <div className="hidden min-w-0 flex-1 justify-center sm:flex">
           {slot ?? (
-            <nav className="hidden items-center gap-7 text-[15px] font-medium text-text2 sm:flex">
+            <nav className="flex items-center gap-7 text-[15px] font-medium text-text2">
               {NAV_LINKS.map((link) => (
                 <Link key={link.href} href={link.href} className="transition hover:text-text">
                   {link.label}
@@ -61,7 +67,7 @@ export function Header({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:ml-0 sm:gap-3">
           {slot && contextualLink && (
             <Link href={contextualLink.href} className="btn-secondary hidden px-4 py-2.5 text-[14px] sm:inline-flex">
               <contextualLink.icon size={15} />
@@ -82,6 +88,8 @@ export function Header({
           <ThemeToggle />
         </div>
       </div>
+
+      {slot && <div className="mt-3 sm:hidden">{slot}</div>}
     </header>
   );
 }

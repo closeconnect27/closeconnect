@@ -102,6 +102,84 @@ export async function getUnreadCounts(supabase: SupabaseClient, groupIds: string
   return Object.fromEntries(counts);
 }
 
+// URL portion only of Linkify's own LINK_PATTERN (components/ui/Linkify.tsx)
+// -- kept as its own constant here rather than importing that "use client"
+// component's regex into this server-side query file. @handle mentions
+// don't count as a "link" for this tab, just bare URLs -- same rule
+// Linkify itself uses to decide what's clickable.
+const URL_PATTERN = /https?:\/\/[^\s<>"]+/;
+
+export type ChatMediaItem = {
+  id: string;
+  user_id: string;
+  created_at: string;
+  attachment_type: "image" | "video" | "file";
+  attachment_name: string | null;
+  attachment_url: string | null;
+  profiles: { display_name: string } | null;
+};
+
+export type ChatLinkItem = {
+  id: string;
+  user_id: string;
+  created_at: string;
+  url: string;
+  profiles: { display_name: string } | null;
+};
+
+// Most-recent-first, capped at 200 -- a "media & links" tab is a recency
+// scan (same shape as WhatsApp's own), not a full-history export; the cap
+// keeps this one query bounded rather than scanning a group's entire
+// message history. `content.ilike.%http%` is a coarse server-side
+// pre-filter (cheap, catches every real link plus some false positives
+// like a message that just says "no http here"), then URL_PATTERN does
+// the precise check in JS below.
+const MEDIA_AND_LINKS_LIMIT = 200;
+
+export async function getGroupMediaAndLinks(supabase: SupabaseClient, groupId: string) {
+  const { data, error } = await supabase
+    .from("community_messages")
+    .select("id, user_id, content, created_at, attachment_path, attachment_type, attachment_name, profiles(display_name)")
+    .eq("group_id", groupId)
+    .or("attachment_path.not.is.null,content.ilike.%http%")
+    .order("created_at", { ascending: false })
+    .limit(MEDIA_AND_LINKS_LIMIT);
+  if (error) throw error;
+
+  const rows = (data ?? []) as unknown as {
+    id: string;
+    user_id: string;
+    content: string | null;
+    created_at: string;
+    attachment_path: string | null;
+    attachment_type: "image" | "video" | "file" | null;
+    attachment_name: string | null;
+    profiles: { display_name: string } | null;
+  }[];
+
+  const mediaRows = rows.filter((r) => r.attachment_path && r.attachment_type);
+  const media = await Promise.all(
+    mediaRows.map(async (r) => ({
+      id: r.id,
+      user_id: r.user_id,
+      created_at: r.created_at,
+      attachment_type: r.attachment_type as "image" | "video" | "file",
+      attachment_name: r.attachment_name,
+      attachment_url: await resolveAttachmentUrl(supabase, r.attachment_path as string),
+      profiles: r.profiles,
+    })),
+  );
+
+  const links: ChatLinkItem[] = [];
+  for (const r of rows) {
+    if (!r.content) continue;
+    const match = r.content.match(URL_PATTERN);
+    if (match) links.push({ id: r.id, user_id: r.user_id, created_at: r.created_at, url: match[0], profiles: r.profiles });
+  }
+
+  return { media, links };
+}
+
 export async function getGroupById(supabase: SupabaseClient, groupId: string) {
   const { data, error } = await supabase
     .from("community_groups")
