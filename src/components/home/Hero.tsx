@@ -61,15 +61,32 @@ export function Hero() {
       {/* Background: rotated field of 3 marquee rows. inset-[-15%] + the
           rotation's own overscan (~15% again below) guarantees full corner
           coverage at a -4deg tilt on any viewport aspect ratio -- a plain
-          inset-0 would leave visible gaps at the corners once rotated. */}
+          inset-0 would leave visible gaps at the corners once rotated.
+          Rows are positioned at fixed top percentages of this container
+          (not flex-col + justify-center, which stacked all 3 rows into one
+          small cluster sized by their own content height -- correct on a
+          short wide desktop viewport, but on a tall narrow phone that
+          cluster covered only a band in the middle, black above and
+          below). Percentages spread them across the full height on any
+          aspect ratio, tall or short. */}
       <div
-        className="pointer-events-none absolute inset-[-15%] flex flex-col justify-center gap-4 sm:gap-5"
+        className="pointer-events-none absolute inset-[-15%]"
         style={{ transform: "rotate(-4deg) scale(1.15)" }}
         aria-hidden="true"
       >
-        <MarqueeRow cards={ROW_TOP} duration={42} />
-        <MarqueeRow cards={ROW_MID} duration={32} />
-        <MarqueeRow cards={ROW_BOTTOM} duration={60} className="hidden sm:flex" />
+        {/* `top` is a % of THIS container (which spans -15% to 115% of the
+            real hero, a 130%-wide range starting 15 points early) -- so it
+            is not the same number as where the row actually lands on
+            screen. To land a row's top edge at real fraction F of the
+            visible hero, top = (F + 15) / 1.3. Solved for F ~= 2% / 37% /
+            72% here (top row just past the visible top edge, bottom row
+            with enough of its own height left before the visible bottom
+            edge that it doesn't clip off-screen like an earlier attempt
+            at top="82%" did -- that solves to F ~= 92%, almost entirely
+            below the fold). */}
+        <MarqueeRow cards={ROW_TOP} duration={42} top="13%" />
+        <MarqueeRow cards={ROW_MID} duration={32} top="40%" />
+        <MarqueeRow cards={ROW_BOTTOM} duration={60} top="67%" />
       </div>
 
       {/* Scrim: a radial vignette concentrated behind the text block, not a
@@ -124,29 +141,34 @@ export function Hero() {
   );
 }
 
-function MarqueeRow({ cards, duration, className = "" }: { cards: Card[]; duration: number; className?: string }) {
+function MarqueeRow({ cards, duration, top }: { cards: Card[]; duration: number; top: string }) {
   // Duplicated once, not looped programmatically -- translating exactly
   // -50% (globals.css's .hero-marquee-row) lands on an identical copy of
   // the starting frame, so the loop restart is invisible.
   const track = [...cards, ...cards];
   return (
-    <div
-      className={`hero-marquee-row flex w-max shrink-0 gap-3 sm:gap-4 ${className}`}
-      style={{ "--marquee-duration": `${duration}s` } as React.CSSProperties}
-    >
-      {track.map((card, i) => (
-        <div
-          key={`${card.slug}-${i}`}
-          className="relative h-[100px] w-[150px] shrink-0 overflow-hidden rounded-2xl shadow-card sm:h-[150px] sm:w-[220px]"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- external Unsplash CDN URL, not a static remote pattern next/image is configured for */}
-          <img src={card.url} alt="" className="h-full w-full object-cover" loading="eager" />
-          <div className="absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-black/70 to-transparent" />
-          <span className="absolute bottom-1.5 left-2.5 font-mono text-[9px] font-bold uppercase tracking-wide text-white sm:text-[10px]">
-            {card.caption}
-          </span>
-        </div>
-      ))}
+    // Positioned by `top` (a % of the rotated field above), not a normal
+    // flow item -- overflow-hidden here (not just on the Hero root) clips
+    // each row's own horizontal scroll independently of the others.
+    <div className="absolute inset-x-0 overflow-hidden" style={{ top }}>
+      <div
+        className="hero-marquee-row flex w-max shrink-0 gap-3 sm:gap-4"
+        style={{ "--marquee-duration": `${duration}s` } as React.CSSProperties}
+      >
+        {track.map((card, i) => (
+          <div
+            key={`${card.slug}-${i}`}
+            className="relative h-[130px] w-[180px] shrink-0 overflow-hidden rounded-2xl shadow-card sm:h-[150px] sm:w-[220px]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- external Unsplash CDN URL, not a static remote pattern next/image is configured for */}
+            <img src={card.url} alt="" className="h-full w-full object-cover" loading="eager" />
+            <div className="absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-black/70 to-transparent" />
+            <span className="absolute bottom-1.5 left-2.5 font-mono text-[9px] font-bold uppercase tracking-wide text-white sm:text-[10px]">
+              {card.caption}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
