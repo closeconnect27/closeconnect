@@ -10,10 +10,15 @@ const linkedinField = z.string().trim().refine(isValidLinkedInUrl, "Must be a li
 const githubField = z.string().trim().refine(isValidGithubUrl, "Must be a github.com profile URL").optional();
 const instagramField = z.string().trim().refine(isValidInstagramUrl, "Must be an instagram.com profile URL").optional();
 
-// display_name/avatar_url deliberately excluded -- out of scope for this
-// pass (display_name has never had an edit path at all; adding one is a
-// separate concern from the new profile-detail fields this schema covers).
+// avatar_url still deliberately excluded (no avatar upload flow exists in
+// this app -- every profile shows a category-style placeholder instead,
+// same as communities/events).
 export const updateProfileSchema = z.object({
+  // The one name shown everywhere a profile appears (community member
+  // lists, event registrant/host names, chat, follow lists) -- there's no
+  // separate "display name" vs. "real name" concept in this schema, just
+  // this single column.
+  display_name: z.string().trim().min(2, "Name must be at least 2 characters").max(60),
   bio: z.string().trim().max(500).optional(),
   bio_content: bioContentField,
   occupation: z.string().trim().max(100).optional(),

@@ -37,6 +37,7 @@ export async function updateProfile(
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
+      display_name: data.display_name,
       bio: data.bio || null,
       bio_content: data.bio_content ?? null,
       profile_visibility: data.profile_visibility,

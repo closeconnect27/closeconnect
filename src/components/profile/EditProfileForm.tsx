@@ -44,6 +44,7 @@ export function EditProfileForm({
   details: ProfileDetails;
 }) {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState(basic.display_name);
   const [bio, setBio] = useState({ json: basic.bio_content, text: basic.bio ?? "" });
   const [occupation, setOccupation] = useState(details.occupation ?? "");
   const [company, setCompany] = useState(details.company ?? "");
@@ -73,6 +74,7 @@ export function EditProfileForm({
     setError("");
 
     const input = {
+      display_name: displayName,
       bio: bio.text || undefined,
       bio_content: bio.json,
       occupation: occupation || undefined,
@@ -122,6 +124,18 @@ export function EditProfileForm({
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <Field label="Name">
+        <input
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          required
+          minLength={2}
+          maxLength={60}
+          className={inputClass}
+        />
+        <p className="text-[11px] text-text3">Shown everywhere your profile appears -- communities, events, chat.</p>
+      </Field>
+
       <Field label="Bio (up to 500 characters)">
         <RichTextEditor content={bio.json} onChange={setBio} placeholder="Tell people a bit about yourself" allowImages={false} />
       </Field>
