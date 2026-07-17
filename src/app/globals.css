@@ -154,6 +154,20 @@ textarea:focus-visible,
     overflow: hidden;
   }
   body.home-no-scroll {
+    /* vh first as the fallback for a browser that doesn't parse dvh at
+       all -- it just skips that whole declaration line and keeps this
+       one, rather than resolving height to 0/auto. A browser that
+       understands dvh applies it after, overriding vh as intended. */
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Same vh-then-dvh fallback, exposed as a class since Tailwind's own
+     h-dvh utility has no such fallback baked in -- used by SiteChrome's
+     isHome wrapper (Hero + Footer together must sum to exactly one
+     screen, never taller). */
+  .h-viewport-safe {
+    height: 100vh;
     height: 100dvh;
   }
 

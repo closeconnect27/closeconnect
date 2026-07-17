@@ -85,7 +85,7 @@ function SiteChromeInner({
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
           Only needed when BottomNav is actually rendered. */}
-      <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-dvh overflow-hidden" : "pb-16 sm:pb-0"}`}>
+      <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : "pb-16 sm:pb-0"}`}>
         {children}
         <Footer dark={isHome} />
       </div>

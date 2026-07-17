@@ -48,7 +48,16 @@ export function Hero() {
     // legible. This is a full-bleed photo hero like CommunityCard/EventCard
     // (both already use fixed black-based gradients + white text over a
     // photo, not theme tokens), not the page chrome.
-    <div className="relative h-full w-full flex-1 overflow-hidden bg-[#08080a]">
+    //
+    // flex-1 alone sizes this against the parent flex column (SiteChrome's
+    // isHome wrapper) -- no h-full here. h-full needs the *parent* to
+    // already have a resolved height to resolve its own 100% against, and
+    // on real mobile browsers that chain (body -> wrapper -> this) doesn't
+    // always resolve before paint, collapsing this to its content's
+    // natural height instead (the bug: hero shrank to a thin strip). A
+    // flex item's size comes from flex-grow regardless, so h-full was
+    // redundant on top of being the fragile part.
+    <div className="relative w-full flex-1 overflow-hidden bg-[#08080a]">
       {/* Background: rotated field of 3 marquee rows. inset-[-15%] + the
           rotation's own overscan (~15% again below) guarantees full corner
           coverage at a -4deg tilt on any viewport aspect ratio -- a plain
