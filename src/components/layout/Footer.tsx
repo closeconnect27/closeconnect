@@ -42,9 +42,9 @@ export function Footer({ dark = false }: { dark?: boolean } = {}) {
           <Link href="/privacy" className={`transition ${dark ? "hover:text-white/80" : "hover:text-text2"}`}>
             Privacy Policy
           </Link>
-          {/* Cancellation & Refund Policy link goes here once that page
-              exists -- holding it back for now so the footer never links
-              to a 404 in production. */}
+          <Link href="/cancellation-refund" className={`transition ${dark ? "hover:text-white/80" : "hover:text-text2"}`}>
+            Cancellation &amp; Refund Policy
+          </Link>
           <span>© {new Date().getFullYear()} Close.Connect</span>
         </div>
       </div>

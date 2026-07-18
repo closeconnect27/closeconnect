@@ -51,7 +51,8 @@ export default function PrivacyPolicyPage() {
             We do <strong>not</strong> sell your personal information. We share information only:
           </p>
           <ul className="list-disc pl-5">
-            <li>With event organizers you interact with, limited to what&apos;s needed to fulfill your event registration -- for a paid ticket, that includes the payment reference number you submit so the organizer can confirm it</li>
+            <li>With our payment gateway partner, to complete transactions</li>
+            <li>With event organizers you interact with, limited to what&apos;s needed to fulfill your event registration</li>
             <li>With service providers who help us operate the Service (e.g., cloud hosting), under confidentiality obligations</li>
             <li>When required by law, regulation, or valid legal process</li>
           </ul>
