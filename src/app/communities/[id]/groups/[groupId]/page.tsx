@@ -43,19 +43,28 @@ export default async function GroupChatPage({
   markGroupRead(groupId).catch((e) => console.error("Failed to mark group read:", e));
 
   return (
-    <div className="flex-1 px-4 pb-10 pt-6 sm:px-6">
-      <div className="mx-auto max-w-2xl">
-        <Link
-          href={`/communities/${id}`}
-          className="mb-4 inline-block text-[13px] text-text3 transition hover:text-text2"
-        >
-          ← Back to community
-        </Link>
-        <h1 className="mb-4 font-heading text-[18px] font-bold">#{group.name}</h1>
-        <GroupChatTabs
-          chat={<GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} canPost={canPost} />}
-          media={<GroupMediaLinks media={media} links={links} />}
-        />
+    // flex-1, not h-full -- this div's parent (SiteChrome's wrapper) sizes
+    // it via flex-grow already; a percentage height here would need that
+    // parent to have already resolved its own height by paint time, which
+    // doesn't reliably hold on every mobile browser (the exact bug fixed
+    // on the homepage hero -- see Hero.tsx's own comment on this).
+    <div className="flex flex-1 flex-col overflow-hidden px-4 pt-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col">
+        <div className="shrink-0 pb-3">
+          <Link
+            href={`/communities/${id}`}
+            className="mb-2 inline-block text-[13px] text-text3 transition hover:text-text2"
+          >
+            ← Back to community
+          </Link>
+          <h1 className="font-heading text-[18px] font-bold">#{group.name}</h1>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col pb-4">
+          <GroupChatTabs
+            chat={<GroupChat groupId={groupId} initialMessages={messages} currentUserId={user.id} canPost={canPost} />}
+            media={<GroupMediaLinks media={media} links={links} />}
+          />
+        </div>
       </div>
     </div>
   );

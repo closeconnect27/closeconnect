@@ -41,24 +41,32 @@ export default async function ProfilePage() {
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        <div className="card-elevated flex items-center gap-4 rounded-card bg-bg2 p-6">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-green-tint text-[20px] font-bold text-green">
-            {initial}
+        <div className="card-elevated flex flex-col gap-4 rounded-card bg-bg2 p-6 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-green-tint text-[20px] font-bold text-green">
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate font-heading text-[14px] font-bold">
+                {profile?.display_name ?? "Your profile"}
+              </h1>
+              <p className="truncate text-[13px] text-text3">{user.email}</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-heading text-[14px] font-bold">
-              {profile?.display_name ?? "Your profile"}
-            </h1>
-            <p className="truncate text-[13px] text-text3">{user.email}</p>
-          </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Link href={`/profile/${user.id}`} className="btn-secondary px-4 py-2 text-[13px]">
+          {/* Its own full-width row below the avatar on mobile (not squeezed
+              to the right of the name/email in a single row) -- that
+              layout only had room to show the icons, not the labels
+              ("View public profile"/"Host dashboard" were hidden below sm
+              entirely), which read as two unlabeled logos. Shorter labels
+              here so they fit comfortably in a half-width mobile button. */}
+          <div className="flex gap-2 sm:shrink-0">
+            <Link href={`/profile/${user.id}`} className="btn-secondary flex-1 px-4 py-2 text-[13px] sm:flex-none">
               <IconUserCircle size={14} />
-              <span className="hidden sm:inline">View public profile</span>
+              View profile
             </Link>
-            <Link href="/host/dashboard" className="btn-secondary px-4 py-2 text-[13px]">
+            <Link href="/host/dashboard" className="btn-secondary flex-1 px-4 py-2 text-[13px] sm:flex-none">
               <IconLayoutDashboard size={14} />
-              <span className="hidden sm:inline">Host dashboard</span>
+              Dashboard
             </Link>
           </div>
         </div>

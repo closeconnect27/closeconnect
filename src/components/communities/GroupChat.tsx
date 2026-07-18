@@ -143,7 +143,11 @@ export function GroupChat({
   }
 
   return (
-    <div className="card-elevated flex h-[70vh] flex-col overflow-hidden rounded-card bg-bg2">
+    // flex-1 (filling the page's own flex-1 chain down from SiteChrome),
+    // not a fixed h-[70vh] -- that left dead space below the chat box on
+    // most screens and didn't actually use the full page the way a native
+    // chat thread view does.
+    <div className="card-elevated flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-bg2">
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-bg p-4">
         {messages.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">

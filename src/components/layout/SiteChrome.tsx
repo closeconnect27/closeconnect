@@ -45,6 +45,14 @@ function SiteChromeInner({
 }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  // A group's chat is a full-screen, in-the-moment view (like a native
+  // chat app's own thread screen) -- the Footer (support/legal links)
+  // never belongs competing for space at the bottom of that, and the
+  // page itself stretches to fill what's left after Header/BottomNav
+  // instead of scrolling past a small fixed-height chat box. Header and
+  // BottomNav still show here (unlike isHome) -- this is a page within
+  // the app you're already inside of, not a first-touch marketing screen.
+  const isChatPage = /^\/communities\/[^/]+\/groups\/[^/]+$/.test(pathname);
   const slotContent = useHeaderSlotContent();
 
   useEffect(() => {
@@ -87,7 +95,7 @@ function SiteChromeInner({
           Only needed when BottomNav is actually rendered. */}
       <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : "pb-16 sm:pb-0"}`}>
         {children}
-        <Footer dark={isHome} />
+        {!isChatPage && <Footer dark={isHome} />}
       </div>
       {!isHome && <BottomNav isLoggedIn={isLoggedIn} />}
     </>
