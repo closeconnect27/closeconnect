@@ -20,13 +20,21 @@ export function Footer({ dark = false }: { dark?: boolean } = {}) {
       <div
         className={`mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 text-[13px] ${dark ? "text-white/50" : "text-text3"}`}
       >
-        <a
-          href="mailto:closeconnect27@gmail.com"
-          className={`flex items-center gap-1.5 font-medium transition hover:text-green ${dark ? "text-white/70" : "text-text2"}`}
-        >
-          <IconLifebuoy size={16} />
-          Support
-        </a>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <a
+            href="mailto:closeconnect27@gmail.com"
+            className={`flex items-center gap-1.5 font-medium transition hover:text-green ${dark ? "text-white/70" : "text-text2"}`}
+          >
+            <IconLifebuoy size={16} />
+            Support
+          </a>
+          <a
+            href="tel:+918310109935"
+            className={`font-medium transition hover:text-green ${dark ? "text-white/70" : "text-text2"}`}
+          >
+            +91 83101 09935
+          </a>
+        </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Link href="/terms" className={`transition ${dark ? "hover:text-white/80" : "hover:text-text2"}`}>
             Terms of Service
@@ -34,6 +42,9 @@ export function Footer({ dark = false }: { dark?: boolean } = {}) {
           <Link href="/privacy" className={`transition ${dark ? "hover:text-white/80" : "hover:text-text2"}`}>
             Privacy Policy
           </Link>
+          {/* Cancellation & Refund Policy link goes here once that page
+              exists -- holding it back for now so the footer never links
+              to a 404 in production. */}
           <span>© {new Date().getFullYear()} Close.Connect</span>
         </div>
       </div>

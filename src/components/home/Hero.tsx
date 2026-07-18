@@ -122,8 +122,8 @@ export function Hero() {
           Host what you love.
         </h1>
         <p className="max-w-md text-[15px] text-white/85 sm:text-[16px]">
-          Discover communities and events near you, or start your own -- native chat groups, ticketed events, all in
-          one place.
+          Discover local events near you, or host your own -- free or ticketed. Join interest-based communities to
+          stay in the loop.
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-3">
           <Link href="/communities" className="btn-primary px-6 py-3 text-[14px]">

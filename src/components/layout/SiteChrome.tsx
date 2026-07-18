@@ -46,12 +46,11 @@ function SiteChromeInner({
   const pathname = usePathname();
   const isHome = pathname === "/";
   // A group's chat is a full-screen, in-the-moment view (like a native
-  // chat app's own thread screen) -- the Footer (support/legal links)
-  // never belongs competing for space at the bottom of that, and the
-  // page itself stretches to fill what's left after Header/BottomNav
-  // instead of scrolling past a small fixed-height chat box. Header and
-  // BottomNav still show here (unlike isHome) -- this is a page within
-  // the app you're already inside of, not a first-touch marketing screen.
+  // chat app's own thread screen) -- Header, BottomNav (Events/
+  // Communities/Create/Profile), and Footer all give up their space to it
+  // rather than competing for room around a small fixed-height chat box.
+  // The page's own "← Back to community" link already covers what Header
+  // would have (a way back out).
   const isChatPage = /^\/communities\/[^/]+\/groups\/[^/]+$/.test(pathname);
   const slotContent = useHeaderSlotContent();
 
@@ -89,15 +88,18 @@ function SiteChromeInner({
 
   return (
     <>
-      {!isHome && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
+      {!isHome && !isChatPage && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
-          Only needed when BottomNav is actually rendered. */}
-      <div className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : "pb-16 sm:pb-0"}`}>
+          Only needed when BottomNav is actually rendered (not isHome,
+          not isChatPage). */}
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : isChatPage ? "" : "pb-16 sm:pb-0"}`}
+      >
         {children}
         {!isChatPage && <Footer dark={isHome} />}
       </div>
-      {!isHome && <BottomNav isLoggedIn={isLoggedIn} />}
+      {!isHome && !isChatPage && <BottomNav isLoggedIn={isLoggedIn} />}
     </>
   );
 }
