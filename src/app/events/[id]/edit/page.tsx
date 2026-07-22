@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getEventById, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
+import { getEventById, getEventTicketTypes, getEventFormFields, getEventMeetingLink } from "@/lib/queries/events";
 import { getHostPaymentDetails } from "@/lib/queries/paymentDetails";
 import { EditEventForm } from "@/components/events/EditEventForm";
 
@@ -36,11 +36,12 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   // rather than showing a form that can't work correctly for that case.
   const isHost = event.host_id === user.id;
 
-  const [ticketTypes, formFields, { count: registrationCount }, paymentDetails] = await Promise.all([
+  const [ticketTypes, formFields, { count: registrationCount }, paymentDetails, meetingLink] = await Promise.all([
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
     supabase.from("form_responses").select("*", { count: "exact", head: true }).eq("owner_type", "event").eq("owner_id", id),
     isHost ? getHostPaymentDetails(supabase, user.id) : Promise.resolve(null),
+    isHost ? getEventMeetingLink(supabase, id) : Promise.resolve(null),
   ]);
 
   return (
@@ -62,6 +63,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
           hasRegistrations={(registrationCount ?? 0) > 0}
           userId={isHost ? user.id : null}
           paymentDetails={paymentDetails}
+          initialMeetingLink={meetingLink}
         />
       </div>
     </div>

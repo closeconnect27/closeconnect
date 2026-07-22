@@ -18,7 +18,6 @@ export type Community = {
   extra_categories: string[] | null;
   city: string | null;
   extra_cities: string[] | null;
-  community_type: "online" | "offline" | "both";
   kind: "native" | "external";
   external_link: string | null;
   join_mode: "open" | "request";
@@ -60,7 +59,6 @@ export type CommunityFilters = {
    * (as its primary city or in extra_cities) is included. */
   cities?: string[];
   kind?: "native" | "external";
-  communityType?: "online" | "offline" | "both";
   search?: string;
 };
 
@@ -100,7 +98,6 @@ export async function getCommunities(supabase: SupabaseClient, filters: Communit
     query = query.or(validCities.map((c) => `city.eq.${c},extra_cities.cs.{${c}}`).join(","));
   }
   if (filters.kind) query = query.eq("kind", filters.kind);
-  if (filters.communityType) query = query.eq("community_type", filters.communityType);
   if (filters.search) query = query.ilike("name", `%${filters.search}%`);
 
   query = query.order("member_count", { ascending: false });

@@ -12,17 +12,16 @@ type SearchParams = Promise<{
   category?: string;
   city?: string;
   kind?: string;
-  type?: string;
   q?: string;
 }>;
 
 // One always-shown grid, filtered via the sidebar (category) + top filter
-// bar (type/city/kind) + inline search -- replacing the old default view
-// of horizontal per-category rows (CategoryRows/CommunityRow, removed).
+// bar (city/kind) + inline search -- replacing the old default view of
+// horizontal per-category rows (CategoryRows/CommunityRow, removed).
 // Nothing about *what* can be filtered changed, only that it's now one
 // grid instead of a conditional row-view/grid-view split.
 export default async function CommunitiesPage({ searchParams }: { searchParams: SearchParams }) {
-  const { category, city, kind, type, q } = await searchParams;
+  const { category, city, kind, q } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,11 +31,10 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
     category,
     cities: city ? city.split(",").filter(Boolean) : undefined,
     kind: kind === "native" || kind === "external" ? kind : undefined,
-    communityType: type === "online" || type === "offline" || type === "both" ? type : undefined,
     search: q,
   });
 
-  const hasFilters = !!(category || city || kind || type || q);
+  const hasFilters = !!(category || city || kind || q);
 
   return (
     <div className="flex-1 pb-16">
@@ -51,7 +49,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
               Wherever You Are
             </h1>
             <p className="mt-2 max-w-md text-[14px] text-text3">
-              Discover communities that match your vibe. Online or offline — join in one tap.
+              Discover communities that match your vibe — join in one tap.
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -84,7 +82,7 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
                 title={hasFilters ? "No communities match these filters" : "No communities yet"}
                 description={
                   hasFilters
-                    ? "Try a different category, city, or type, or clear your filters to browse everything."
+                    ? "Try a different category or city, or clear your filters to browse everything."
                     : "Be the first to start one -- it takes less than a minute."
                 }
                 action={

@@ -7,14 +7,10 @@ import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CITY_OPTIONS } from "@/lib/cities";
 
 // Category moved to CategorySidebar -- this is now just the top filter row:
-// Type (community_type: online/offline/both), City (multi-select, matches
-// primary-or-extra same as the sidebar's category logic), and native/external
-// (kept -- it isn't in the reference layout, but nothing gets dropped here).
-const TYPE_OPTIONS = [
-  { value: "online", label: "Online" },
-  { value: "offline", label: "Offline" },
-  { value: "both", label: "Both" },
-];
+// City (multi-select, matches primary-or-extra same as the sidebar's
+// category logic) and native/external (kept -- it isn't in the reference
+// layout, but nothing gets dropped here). Online/offline "Type" filter
+// removed entirely -- it never drove any real behavior for a community.
 const KIND_OPTIONS = [
   { value: "native", label: "Native only" },
   { value: "external", label: "External only" },
@@ -23,7 +19,6 @@ const KIND_OPTIONS = [
 export function CommunityFilterBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeType = searchParams.get("type") ?? "";
   const activeKind = searchParams.get("kind") ?? "";
 
   // Local state for the multi-select, not read from searchParams on every
@@ -69,7 +64,6 @@ export function CommunityFilterBar() {
 
   return (
     <div className="flex flex-wrap gap-2 px-4 sm:px-6">
-      <Combobox value={activeType} onChange={(v) => setParam("type", v)} options={TYPE_OPTIONS} placeholder="Online + offline" />
       <MultiCombobox values={cities} onChange={updateCities} options={CITY_OPTIONS} placeholder="All cities" />
       <Combobox value={activeKind} onChange={(v) => setParam("kind", v)} options={KIND_OPTIONS} placeholder="Native + external" />
     </div>

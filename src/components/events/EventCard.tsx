@@ -1,4 +1,4 @@
-import { IconMapPin } from "@tabler/icons-react";
+import { IconMapPin, IconVideo } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import type { EventListItem } from "@/lib/queries/events";
@@ -72,11 +72,18 @@ export function EventCard({ event: e }: { event: EventListItem }) {
           )}
         </div>
 
-        {(e.venue || e.city) && (
+        {e.event_mode === "online" ? (
           <span className="flex items-center gap-1 text-[13px] text-text3">
-            <IconMapPin size={13} />
-            {[e.venue, e.city].filter(Boolean).join(", ")}
+            <IconVideo size={13} />
+            Online{e.city ? ` · ${e.city}` : ""}
           </span>
+        ) : (
+          (e.venue || e.city) && (
+            <span className="flex items-center gap-1 text-[13px] text-text3">
+              <IconMapPin size={13} />
+              {[e.venue, e.city].filter(Boolean).join(", ")}
+            </span>
+          )
         )}
       </div>
     </ClickableCard>

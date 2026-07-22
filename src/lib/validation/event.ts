@@ -20,6 +20,15 @@ const ticketTypeSchema = z.object({
   quantity_available: z.number().int().min(1).max(100_000).optional(),
 });
 
+// meeting_link isn't a column on events at all (it lives on its own
+// event_meeting_links table with its own restrictive RLS -- see 0069's
+// comment for why a plain column on the publicly-readable events table
+// isn't safe for this). It's still validated here alongside event_mode so
+// the create/edit forms get one schema to check against; the actions
+// split it into the two separate writes it actually needs.
+const eventModeField = z.enum(["online", "offline"]).default("offline");
+const meetingLinkField = z.string().trim().url("Meeting link must be a valid URL").optional();
+
 export const createEventSchema = z
   .object({
     // Generated client-side (crypto.randomUUID()) before the form even
@@ -32,7 +41,9 @@ export const createEventSchema = z
     description_content: descriptionContentField,
     event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
     event_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    event_mode: eventModeField,
     venue: z.string().trim().max(160).optional(),
+    meeting_link: meetingLinkField,
     city: cityField,
     extra_cities: extraCitiesField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
@@ -43,6 +54,10 @@ export const createEventSchema = z
   .refine((e) => !e.city || !e.extra_cities.includes(e.city), {
     message: "Extra cities can't repeat the primary city",
     path: ["extra_cities"],
+  })
+  .refine((e) => e.event_mode !== "online" || !!e.meeting_link, {
+    message: "Meeting link is required for an online event",
+    path: ["meeting_link"],
   });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
@@ -63,7 +78,9 @@ export const updateEventSchema = z
     description_content: descriptionContentField,
     event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date"),
     event_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    event_mode: eventModeField,
     venue: z.string().trim().max(160).optional(),
+    meeting_link: meetingLinkField,
     city: cityField,
     extra_cities: extraCitiesField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
@@ -71,6 +88,10 @@ export const updateEventSchema = z
   .refine((e) => !e.city || !e.extra_cities.includes(e.city), {
     message: "Extra cities can't repeat the primary city",
     path: ["extra_cities"],
+  })
+  .refine((e) => e.event_mode !== "online" || !!e.meeting_link, {
+    message: "Meeting link is required for an online event",
+    path: ["meeting_link"],
   });
 
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;

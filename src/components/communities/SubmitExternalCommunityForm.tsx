@@ -24,7 +24,6 @@ export function SubmitExternalCommunityForm() {
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [extraCities, setExtraCities] = useState<string[]>([]);
-  const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [externalLink, setExternalLink] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -40,7 +39,6 @@ export function SubmitExternalCommunityForm() {
       extra_categories: extraCategories,
       city: city || undefined,
       extra_cities: extraCities,
-      community_type: communityType,
       external_link: externalLink,
     };
 
@@ -55,7 +53,7 @@ export function SubmitExternalCommunityForm() {
     // to run a "success" branch. Errors returning { error } are the only
     // case that resumes here, matching the old site's own fire-on-submit
     // (not fire-on-confirmed-success) semantics for this event.
-    track("community_submitted", { category, city: city || "none", community_type: communityType });
+    track("community_submitted", { category, city: city || "none" });
 
     startTransition(async () => {
       const result = await submitExternalCommunity(parsed.data);
@@ -127,25 +125,6 @@ export function SubmitExternalCommunityForm() {
           options={CITY_OPTIONS.filter((o) => o.value !== city)}
           placeholder="Add more cities"
         />
-      </Field>
-
-      <Field label="Type">
-        <div className="flex gap-2">
-          {(["online", "offline", "both"] as const).map((t) => (
-            <button
-              type="button"
-              key={t}
-              onClick={() => setCommunityType(t)}
-              className={
-                communityType === t
-                  ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
-                  : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
-              }
-            >
-              {t}
-            </button>
-          ))}
-        </div>
       </Field>
 
       {error && <p className="text-[13px] text-pink">{error}</p>}

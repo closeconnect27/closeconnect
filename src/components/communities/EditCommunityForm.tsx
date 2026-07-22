@@ -24,10 +24,9 @@ const inputClass =
 // always shows a category Unsplash placeholder instead now.
 // Deliberately not here: owner_id, claim_status, join_mode (changing
 // join_mode once members exist under the old mode is a real product risk,
-// not an oversight -- flagged separately, not just left off silently) and
-// community_type (not named in the editable-fields list this was scoped
-// against). Both the Server Action and RLS (0017) enforce this
-// independently of what this form does or doesn't show.
+// not an oversight -- flagged separately, not just left off silently).
+// Both the Server Action and RLS (0017) enforce this independently of
+// what this form does or doesn't show.
 export function EditCommunityForm({
   community,
   verificationStatus,

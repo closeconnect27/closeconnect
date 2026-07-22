@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IconCalendar, IconClock, IconMapPin, IconStar, IconSettings, IconPencil } from "@tabler/icons-react";
+import { IconCalendar, IconClock, IconMapPin, IconVideo, IconStar, IconSettings, IconPencil } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getEventById,
@@ -10,6 +10,7 @@ import {
   getTicketAvailability,
   getMyEventCheckIn,
   getMyRegistrationCount,
+  getEventMeetingLink,
 } from "@/lib/queries/events";
 import { getMyInterestStatus } from "@/lib/queries/interests";
 import { getMyEventFeedback, getEventFeedbackList } from "@/lib/queries/eventFeedback";
@@ -30,12 +31,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const supabase = await createClient();
   const { data: event } = await supabase
     .from("events")
-    .select("event_name, description, event_date, venue, city")
+    .select("event_name, description, event_date, event_mode, venue, city")
     .eq("id", id)
     .single();
   if (!event) return {};
 
-  const place = [event.venue, event.city].filter(Boolean).join(", ");
+  const place = event.event_mode === "online" ? ["Online", event.city].filter(Boolean).join(", ") : [event.venue, event.city].filter(Boolean).join(", ");
   const dateLabel = formatEventDate(event.event_date);
   const description = event.description ? event.description.slice(0, 120) : `${dateLabel}${place ? ` · ${place}` : ""}`;
   return {
@@ -70,7 +71,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList, myRegistrationCount] =
+  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList, myRegistrationCount, meetingLink] =
     await Promise.all([
       getEventTicketTypes(supabase, id),
       getEventFormFields(supabase, id),
@@ -80,6 +81,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
       getEventFeedbackList(supabase, id),
       user ? getMyRegistrationCount(supabase, id, user.id) : Promise.resolve(0),
+      // event_meeting_links' own RLS (0069) is the real gate -- host or a
+      // confirmed/paid registrant gets the real link back, anyone else
+      // (including a logged-out visitor) gets null, same as "no link set
+      // yet." Only worth asking for at all when the event is online.
+      user && event.event_mode === "online" ? getEventMeetingLink(supabase, id) : Promise.resolve(null),
     ]);
 
   const dateLabel = formatEventDate(event.event_date);
@@ -152,13 +158,41 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               {formatEventTime(event.event_time)}
             </span>
           )}
-          {(event.venue || event.city) && (
+          {event.event_mode === "online" ? (
             <span className="flex items-center gap-2">
-              <IconMapPin size={16} className="text-text3" />
-              {[event.venue, event.city].filter(Boolean).join(", ")}
+              <IconVideo size={16} className="text-text3" />
+              Online{event.city ? ` · ${event.city}` : ""}
             </span>
+          ) : (
+            (event.venue || event.city) && (
+              <span className="flex items-center gap-2">
+                <IconMapPin size={16} className="text-text3" />
+                {[event.venue, event.city].filter(Boolean).join(", ")}
+              </span>
+            )
           )}
         </div>
+
+        {/* Meeting link: never rendered from event.* directly (there is no
+            such column -- see event_meeting_links/0069) and never shown
+            just because event_mode is 'online'. meetingLink is only
+            non-null here when this exact viewer's RLS-scoped query was
+            actually authorized to read it (host, or a confirmed/paid
+            registrant) -- anyone else, this block simply doesn't render. */}
+        {meetingLink && (
+          <div className="mt-3 flex flex-col gap-1 rounded-card-sm border border-green/30 bg-green-tint px-4 py-3 text-[13px]">
+            <span className="flex items-center gap-1.5 font-bold text-text">
+              <IconVideo size={14} className="text-green" />
+              Meeting link
+            </span>
+            <a href={meetingLink} target="_blank" rel="noopener noreferrer" className="break-all text-green hover:underline">
+              {meetingLink}
+            </a>
+          </div>
+        )}
+        {event.event_mode === "online" && !meetingLink && !isHost && (
+          <p className="mt-3 text-[12px] text-text3">The meeting link is shared once you register.</p>
+        )}
 
         {event.host && (
           <Link

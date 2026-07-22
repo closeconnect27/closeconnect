@@ -70,7 +70,8 @@ export async function createEvent(
       description_content: data.description_content ?? null,
       event_date: data.event_date,
       event_time: data.event_time || null,
-      venue: data.venue || null,
+      event_mode: data.event_mode,
+      venue: data.event_mode === "online" ? null : data.venue || null,
       city: data.city || null,
       extra_cities: data.extra_cities,
       category: data.category,
@@ -113,6 +114,15 @@ export async function createEvent(
     );
     if (fieldsError) {
       return { error: `Event created, but the registration form failed to save: ${fieldsError.message}` };
+    }
+  }
+
+  if (data.event_mode === "online" && data.meeting_link) {
+    const { error: linkError } = await supabase
+      .from("event_meeting_links")
+      .upsert({ event_id: event.id, meeting_link: data.meeting_link, updated_at: new Date().toISOString() });
+    if (linkError) {
+      return { error: `Event created, but the meeting link failed to save: ${linkError.message}` };
     }
   }
 
@@ -235,8 +245,9 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     // under this request's own RLS-scoped client, allowed by
     // notifications_insert_self (0061), unlike every other notification
     // type which goes through a security definer trigger instead. Paid
-    // tickets get their "You're registered!" notification from the
-    // webhook once payment actually completes, not here.
+    // tickets get their "You're registered!" notification from the DB
+    // trigger (0066) once confirmPayment flips payment_status to 'paid',
+    // not here.
     await supabase.from("notifications").insert({
       user_id: user.id,
       type: "event_registered",
@@ -431,7 +442,8 @@ export async function updateEvent(
       description_content: data.description_content ?? null,
       event_date: data.event_date,
       event_time: data.event_time || null,
-      venue: data.venue || null,
+      event_mode: data.event_mode,
+      venue: data.event_mode === "online" ? null : data.venue || null,
       city: data.city || null,
       extra_cities: data.extra_cities,
       category: data.category,
@@ -439,6 +451,20 @@ export async function updateEvent(
     .eq("id", eventId);
 
   if (error) return { error: error.message };
+
+  // Same table either way -- upsert covers both "never had a link" and
+  // "updating an existing one." Switching to offline leaves a stale link
+  // row behind rather than deleting it (harmless -- the event detail page
+  // and confirmation emails only ever look it up when event_mode is
+  // currently 'online', so a leftover row for a now-offline event is just
+  // unused data, never surfaced anywhere) -- simpler than a delete path no
+  // UI actually needs today.
+  if (data.event_mode === "online" && data.meeting_link) {
+    const { error: linkError } = await supabase
+      .from("event_meeting_links")
+      .upsert({ event_id: eventId, meeting_link: data.meeting_link, updated_at: new Date().toISOString() });
+    if (linkError) return { error: `Event saved, but the meeting link failed to save: ${linkError.message}` };
+  }
 
   revalidatePath(`/events/${eventId}`);
   redirect(`/events/${eventId}`);

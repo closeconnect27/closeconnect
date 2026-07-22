@@ -313,7 +313,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                   <section className="flex flex-col gap-4">
                     <RichTextView content={community.description_content} plainFallback={community.description} />
                     <div className="flex flex-col gap-2 rounded-card border border-border bg-bg2 p-4 text-[13px] text-text2">
-                      <DetailRow label="Type" value={communityTypeLabel(community.community_type)} />
                       <DetailRow label="Who can join" value={community.join_mode === "open" ? "Open" : "Request to join"} />
                       {community.city && <DetailRow label="City" value={community.city} />}
                       {community.member_limit != null && (
@@ -400,11 +399,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
       </div>
     </div>
   );
-}
-
-function communityTypeLabel(type: string) {
-  if (type === "both") return "Offline+Online";
-  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

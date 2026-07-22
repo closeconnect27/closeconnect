@@ -26,6 +26,7 @@ export type EventListItem = {
   // queries exclude these; the detail page 404s them for non-hosts.
   event_date: string | null;
   event_time: string | null;
+  event_mode: "online" | "offline";
   venue: string | null;
   city: string | null;
   extra_cities: string[] | null;
@@ -285,6 +286,20 @@ export async function getMyRegistrationCount(supabase: SupabaseClient, eventId: 
     .eq("owner_id", eventId)
     .eq("respondent_id", userId);
   return count ?? 0;
+}
+
+/** Returns null for anyone RLS doesn't consider authorized (not the host,
+ * no confirmed/paid registration for this event) -- event_meeting_links'
+ * own RLS (0069) is the real gate here, not this function; this just
+ * turns "no row visible" into a plain null instead of every caller having
+ * to think about PostgREST's zero-rows-vs-error distinction. Never call
+ * this to *decide* whether to show a "register to see the link" prompt --
+ * a null here can mean either "not authorized" or "host hasn't set one
+ * yet," which look identical from here (by design: revealing which one
+ * it is would leak whether a link exists to someone not entitled to it). */
+export async function getEventMeetingLink(supabase: SupabaseClient, eventId: string) {
+  const { data } = await supabase.from("event_meeting_links").select("meeting_link").eq("event_id", eventId).maybeSingle();
+  return data?.meeting_link as string | null | undefined;
 }
 
 export async function getEventRegistrationById(supabase: SupabaseClient, eventId: string, responseId: string) {

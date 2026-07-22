@@ -22,9 +22,10 @@ import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
 
-// Editable: name, description, date, time, venue, city, category. Cover
-// image upload was removed (the app always shows a category Unsplash
-// placeholder now). Not here, deliberately: host_id, community_id (excluded per spec),
+// Editable: name, description, date, time, format (online/offline) with
+// venue or meeting link to match, city, category. Cover image upload was
+// removed (the app always shows a category Unsplash placeholder now). Not
+// here, deliberately: host_id, community_id (excluded per spec),
 // status (cancelling is its own action). ticket_types/form_fields are a
 // separate form below, gated on hasRegistrations -- editing those after
 // registrants exist is the real, unsolved risk (e.g. changing a paid
@@ -38,6 +39,7 @@ export function EditEventForm({
   hasRegistrations,
   userId,
   paymentDetails,
+  initialMeetingLink,
 }: {
   event: EventDetail;
   ticketTypes: EventTicketType[];
@@ -49,6 +51,11 @@ export function EditEventForm({
   // wrong account (see events/[id]/edit/page.tsx's isHost comment).
   userId: string | null;
   paymentDetails: HostPaymentDetails | null;
+  // null/undefined when there's no link yet, or (per getEventMeetingLink's
+  // own comment) when the viewer isn't authorized to see one -- this page
+  // is host/admin-gated already, so in practice a null here just means
+  // "not set yet."
+  initialMeetingLink: string | null | undefined;
 }) {
   const [eventName, setEventName] = useState(event.event_name);
   const [description, setDescription] = useState({
@@ -57,7 +64,9 @@ export function EditEventForm({
   });
   const [eventDate, setEventDate] = useState(event.event_date ?? "");
   const [eventTime, setEventTime] = useState(event.event_time ?? "");
+  const [eventMode, setEventMode] = useState<"online" | "offline">(event.event_mode);
   const [venue, setVenue] = useState(event.venue ?? "");
+  const [meetingLink, setMeetingLink] = useState(initialMeetingLink ?? "");
   const [city, setCity] = useState(event.city ?? "");
   const [extraCities, setExtraCities] = useState<string[]>(event.extra_cities ?? []);
   const [category, setCategory] = useState<CategorySlug>((event.category ?? CATEGORIES[0].slug) as CategorySlug);
@@ -95,7 +104,9 @@ export function EditEventForm({
       description_content: description.json,
       event_date: eventDate,
       event_time: eventTime || undefined,
-      venue: venue || undefined,
+      event_mode: eventMode,
+      venue: eventMode === "offline" ? venue || undefined : undefined,
+      meeting_link: eventMode === "online" ? meetingLink || undefined : undefined,
       city: city || undefined,
       extra_cities: extraCities,
       category,
@@ -171,9 +182,43 @@ export function EditEventForm({
           </Field>
         </div>
 
-        <Field label="Venue (optional)">
-          <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+        <Field label="Format">
+          <div className="flex gap-2">
+            {(["offline", "online"] as const).map((m) => (
+              <button
+                type="button"
+                key={m}
+                onClick={() => setEventMode(m)}
+                className={
+                  eventMode === m
+                    ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
+                    : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
+                }
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </Field>
+
+        {eventMode === "offline" ? (
+          <Field label="Venue (optional)">
+            <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+          </Field>
+        ) : (
+          <Field label="Meeting link">
+            <input
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              placeholder="https://meet.google.com/…"
+              required
+              className={inputClass}
+            />
+            <p className="text-[11px] text-text3">
+              Only shown to people who register -- never on the public event page.
+            </p>
+          </Field>
+        )}
 
         <Field label="City (optional)">
           <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />

@@ -10,13 +10,32 @@ function formatEventDateForEmail(isoDate: string | null) {
 }
 
 async function getEventEmailFields(supabase: SupabaseClient, eventId: string) {
-  const { data: event } = await supabase.from("events").select("event_name, event_date, venue, city").eq("id", eventId).single();
+  const { data: event } = await supabase
+    .from("events")
+    .select("event_name, event_date, event_mode, venue, city")
+    .eq("id", eventId)
+    .single();
   if (!event) return null;
   return {
     eventName: event.event_name as string,
     dateLabel: formatEventDateForEmail(event.event_date),
-    place: [event.venue, event.city].filter(Boolean).join(", "),
+    isOnline: event.event_mode === "online",
+    place: event.event_mode === "online" ? [event.city].filter(Boolean).join(", ") : [event.venue, event.city].filter(Boolean).join(", "),
   };
+}
+
+/** meeting_link lives on its own RLS-scoped table (event_meeting_links,
+ * 0069), not a column on events -- selected through the SAME caller-scoped
+ * `supabase` client passed in here, not an admin client, so this only ever
+ * returns a value when the acting user is actually authorized to see it
+ * (the event's host, or -- since this is only ever called right after that
+ * exact registration's payment_status flips to 'paid', both at the
+ * registerForEvent free-ticket path and confirmPayment's confirm path --
+ * the registrant themself). Never fetched/sent for a still-unpaid
+ * registration (see sendPaymentPendingEmail, which never calls this). */
+async function getMeetingLinkForEmail(supabase: SupabaseClient, eventId: string) {
+  const { data } = await supabase.from("event_meeting_links").select("meeting_link").eq("event_id", eventId).maybeSingle();
+  return (data?.meeting_link as string | undefined) ?? null;
 }
 
 /** The real "you're in" email -- only ever sent once a spot is actually
@@ -31,6 +50,11 @@ export async function sendRegistrationConfirmationEmail(
   const fields = await getEventEmailFields(supabase, eventId);
   if (!fields) return;
 
+  // Only ever fetched for an online event, and only once this registration
+  // is actually confirmed (this function's own doc comment) -- "only
+  // registered users should receive the meeting link" from the request.
+  const meetingLink = fields.isOnline ? await getMeetingLinkForEmail(supabase, eventId) : null;
+
   await sendEmail({
     to: email,
     subject: `You're registered: ${fields.eventName}`,
@@ -38,6 +62,13 @@ export async function sendRegistrationConfirmationEmail(
       <p>Hi ${registrantName},</p>
       <p>You're registered for <strong>${fields.eventName}</strong>.</p>
       <p>${fields.dateLabel}${fields.place ? ` &middot; ${fields.place}` : ""}</p>
+      ${
+        fields.isOnline
+          ? meetingLink
+            ? `<p>Join here: <a href="${meetingLink}">${meetingLink}</a></p>`
+            : `<p>This is an online event -- the host hasn't shared a meeting link yet. Check the event page closer to the date.</p>`
+          : ""
+      }
     `,
   });
 }

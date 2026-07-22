@@ -29,7 +29,6 @@ export const createCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
-    community_type: z.enum(["online", "offline", "both"]),
     join_mode: z.enum(["open", "request"]),
     join_form_fields: formFieldsSchema.default([]),
     // Omitted/undefined means unlimited -- matches the DB column default
@@ -51,8 +50,7 @@ export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
 // Deliberately excludes owner_id, claim_status, and join_mode -- not just a
 // smaller form, the Server Action only ever writes these specific columns,
 // so a field missing here can never reach the database no matter what a
-// caller sends. community_type also isn't included: it wasn't named in the
-// edit spec's editable-fields list, unlike everything below.
+// caller sends.
 export const updateCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
@@ -88,7 +86,6 @@ export const submitExternalCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
-    community_type: z.enum(["online", "offline", "both"]),
     external_link: z.string().trim().refine(isValidExternalLink, "Must be a WhatsApp or Instagram link"),
   })
   .refine((c) => !c.extra_categories.includes(c.category), {

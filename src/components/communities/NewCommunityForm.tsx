@@ -31,7 +31,6 @@ export function NewCommunityForm() {
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [extraCities, setExtraCities] = useState<string[]>([]);
-  const [communityType, setCommunityType] = useState<"online" | "offline" | "both">("both");
   const [joinMode, setJoinMode] = useState<"open" | "request">("open");
   const [joinFormFields, setJoinFormFields] = useState<FormFieldDraft[]>([]);
   const [memberLimit, setMemberLimit] = useState("");
@@ -57,7 +56,6 @@ export function NewCommunityForm() {
       extra_categories: extraCategories,
       city: city || undefined,
       extra_cities: extraCities,
-      community_type: communityType,
       join_mode: joinMode,
       join_form_fields: joinMode === "request" ? joinFormFields : [],
       member_limit: memberLimit ? Number(memberLimit) : undefined,
@@ -141,25 +139,6 @@ export function NewCommunityForm() {
               options={CITY_OPTIONS.filter((o) => o.value !== city)}
               placeholder="Add more cities"
             />
-          </Field>
-
-          <Field label="Type">
-            <div className="flex gap-2">
-              {(["online", "offline", "both"] as const).map((t) => (
-                <button
-                  type="button"
-                  key={t}
-                  onClick={() => setCommunityType(t)}
-                  className={
-                    communityType === t
-                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
-                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
-                  }
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
           </Field>
 
           <Field label="Who can join">

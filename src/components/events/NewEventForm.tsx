@@ -45,7 +45,9 @@ export function NewEventForm({
   const [description, setDescription] = useState({ json: null as object | null, text: "" });
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [eventMode, setEventMode] = useState<"online" | "offline">("offline");
   const [venue, setVenue] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
   const [city, setCity] = useState("");
   const [extraCities, setExtraCities] = useState<string[]>([]);
   const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
@@ -68,7 +70,9 @@ export function NewEventForm({
       description_content: description.json,
       event_date: eventDate,
       event_time: eventTime || undefined,
-      venue: venue || undefined,
+      event_mode: eventMode,
+      venue: eventMode === "offline" ? venue || undefined : undefined,
+      meeting_link: eventMode === "online" ? meetingLink || undefined : undefined,
       city: city || undefined,
       extra_cities: extraCities,
       category,
@@ -137,9 +141,43 @@ export function NewEventForm({
             </Field>
           </div>
 
-          <Field label="Venue (optional)">
-            <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+          <Field label="Format">
+            <div className="flex gap-2">
+              {(["offline", "online"] as const).map((m) => (
+                <button
+                  type="button"
+                  key={m}
+                  onClick={() => setEventMode(m)}
+                  className={
+                    eventMode === m
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium capitalize text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium capitalize text-text2 transition hover:border-green hover:text-green"
+                  }
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </Field>
+
+          {eventMode === "offline" ? (
+            <Field label="Venue (optional)">
+              <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+            </Field>
+          ) : (
+            <Field label="Meeting link">
+              <input
+                value={meetingLink}
+                onChange={(e) => setMeetingLink(e.target.value)}
+                placeholder="https://meet.google.com/…"
+                required
+                className={inputClass}
+              />
+              <p className="text-[11px] text-text3">
+                Only shown to people who register -- never on the public event page.
+              </p>
+            </Field>
+          )}
 
           <Field label="City (optional)">
             <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />

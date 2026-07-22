@@ -62,7 +62,6 @@ export async function createCommunity(
       extra_categories: data.extra_categories,
       city: data.city || null,
       extra_cities: data.extra_cities,
-      community_type: data.community_type,
       kind: "native",
       join_mode: data.join_mode,
       member_limit: data.member_limit ?? null,
@@ -261,7 +260,6 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
       extra_categories: data.extra_categories,
       city: data.city || null,
       extra_cities: data.extra_cities,
-      community_type: data.community_type,
       external_link: data.external_link,
       kind: "external",
       owner_id: null,
@@ -399,9 +397,9 @@ async function notifyAdminOfPendingClaim(claimId: string, communityName: string)
 // time, and review_community_claim already gave the claimant an owner
 // community_members + community_group_members row when the claim was
 // approved (0024) -- flipping kind is the entire switch. join_mode and
-// community_type already have real values from submission/approval too
-// (column defaults, never null), so every isNative-gated feature on the
-// detail page lights up immediately with no follow-up write.
+// join_mode already has a real value from submission/approval too (column
+// default, never null), so every isNative-gated feature on the detail
+// page lights up immediately with no follow-up write.
 export async function switchCommunityToNative(communityId: string) {
   const user = await requireUser();
   const supabase = await createClient();
