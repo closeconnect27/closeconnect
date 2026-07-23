@@ -29,7 +29,11 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
       exact: true,
     },
     {
-      href: isLoggedIn ? "/profile" : "/login",
+      // ?redirect=<current path> -- signing in from here (rather than one
+      // of the feature-specific "sign in to do X" CTAs, which already do
+      // this) used to always land back on / regardless of which tab this
+      // was clicked from, same bug as Header's Sign in button.
+      href: isLoggedIn ? "/profile" : `/login?redirect=${encodeURIComponent(pathname)}`,
       label: isLoggedIn ? "Profile" : "Sign in",
       icon: IconUserCircle,
       exact: true,
