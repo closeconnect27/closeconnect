@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { IconMessageCircle2, IconInbox } from "@tabler/icons-react";
+import { IconMessageCircle2, IconInbox, IconSearch, IconTrash } from "@tabler/icons-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getOtherParticipant } from "@/lib/queries/profileDm";
 import { isThreadUnread } from "@/lib/queries/dmReads";
+import { deleteProfileDmChat } from "@/app/actions/profileDm";
 import type { ProfileDmThreadSummary } from "@/lib/queries/profileDm";
 
 type Tab = "primary" | "requests";
@@ -25,19 +26,47 @@ export function MessagesInbox({
   readTimestamps: Map<string, string>;
 }) {
   const [tab, setTab] = useState<Tab>("primary");
+  const [search, setSearch] = useState("");
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const [, startTransition] = useTransition();
 
-  const requests = threads.filter((t) => t.status === "pending" && t.recipient_id === currentUserId);
-  const primary = threads.filter((t) => t.status === "accepted" || t.requester_id === currentUserId);
+  function handleDeleteChat(e: React.MouseEvent, threadId: string, otherName: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Delete your copy of the conversation with ${otherName}? It comes back if they message you again.`)) return;
+    setHiddenIds((prev) => new Set(prev).add(threadId));
+    startTransition(async () => {
+      await deleteProfileDmChat(threadId);
+    });
+  }
+
+  const requests = threads.filter((t) => t.status === "pending" && t.recipient_id === currentUserId && !hiddenIds.has(t.id));
+  const primary = threads.filter((t) => (t.status === "accepted" || t.requester_id === currentUserId) && !hiddenIds.has(t.id));
 
   const requestsUnread = requests.length; // every incoming request is, by definition, awaiting this viewer
   const primaryUnread = primary.filter((t) =>
     isThreadUnread(t.last_message_at, t.last_message_sender_id, currentUserId, readTimestamps.get(t.id)),
   ).length;
 
-  const list = tab === "primary" ? primary : requests;
+  const query = search.trim().toLowerCase();
+  const list = (tab === "primary" ? primary : requests).filter((t) => {
+    if (!query) return true;
+    const other = getOtherParticipant(t, currentUserId);
+    return other.display_name.toLowerCase().includes(query) || (t.last_message_content ?? "").toLowerCase().includes(query);
+  });
 
   return (
     <div>
+      <div className="relative mb-3">
+        <IconSearch size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text3" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search people or chats…"
+          className="w-full rounded-full border border-border2 bg-bg3 py-2 pl-9 pr-4 text-[13px] text-text outline-none transition focus:border-green"
+        />
+      </div>
+
       <div role="tablist" className="mb-4 flex gap-1 rounded-full border border-border2 bg-bg3 p-1">
         <TabButton label="Messages" active={tab === "primary"} count={primaryUnread} onClick={() => setTab("primary")} />
         <TabButton label="Requests" active={tab === "requests"} count={requestsUnread} onClick={() => setTab("requests")} />
@@ -57,25 +86,31 @@ export function MessagesInbox({
               const unread = isThreadUnread(t.last_message_at, t.last_message_sender_id, currentUserId, readTimestamps.get(t.id));
               const isRequester = t.requester_id === currentUserId;
               return (
-                <Link
-                  key={t.id}
-                  href={`/messages/${t.id}`}
-                  className="flex items-center gap-3 px-4 py-4 transition hover:bg-bg3"
-                >
-                  <ThreadAvatar name={other.display_name} avatarUrl={other.avatar_url} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green" />}
-                      <span className="truncate text-[14px] font-semibold text-text">{other.display_name}</span>
+                <div key={t.id} className="group relative flex items-center">
+                  <Link href={`/messages/${t.id}`} className="flex flex-1 items-center gap-3 py-4 pl-4 pr-10 transition hover:bg-bg3">
+                    <ThreadAvatar name={other.display_name} avatarUrl={other.avatar_url} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green" />}
+                        <span className="truncate text-[14px] font-semibold text-text">{other.display_name}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[12px] text-text3">
+                        {t.status === "pending" && isRequester
+                          ? "Request sent"
+                          : (t.last_message_content ?? "Say hello!")}
+                      </p>
                     </div>
-                    <p className="mt-0.5 truncate text-[12px] text-text3">
-                      {t.status === "pending" && isRequester
-                        ? "Request sent"
-                        : (t.last_message_content ?? "Say hello!")}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-text3">{formatRelativeTime(t.last_message_at)}</span>
-                </Link>
+                    <span className="shrink-0 text-[11px] text-text3">{formatRelativeTime(t.last_message_at)}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteChat(e, t.id, other.display_name)}
+                    aria-label="Delete chat"
+                    className="absolute right-3 shrink-0 rounded-full p-1.5 text-text3 opacity-0 transition hover:text-pink group-hover:opacity-100"
+                  >
+                    <IconTrash size={15} />
+                  </button>
+                </div>
               );
             })}
           </div>

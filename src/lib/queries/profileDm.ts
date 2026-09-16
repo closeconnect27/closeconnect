@@ -86,7 +86,19 @@ export async function getProfileDmThreads(supabase: SupabaseClient, userId: stri
   if (error) throw error;
   if (!threads || threads.length === 0) return [];
 
-  const threadIds = threads.map((t) => t.id as string);
+  // "Delete chat" (per-user, not shared) -- a thread stays out of this
+  // list only while no message has arrived since it was hidden; a new
+  // message after hiding brings it back automatically (mirrors mobile's
+  // own inbox.tsx filter).
+  const { data: hides } = await supabase.from("profile_dm_thread_hides").select("thread_id, hidden_at").eq("user_id", userId);
+  const hiddenAt = new Map((hides ?? []).map((h) => [h.thread_id as string, h.hidden_at as string]));
+  const visibleThreads = (threads as unknown as ProfileDmThread[]).filter((t) => {
+    const at = hiddenAt.get(t.id);
+    return !at || t.last_message_at > at;
+  });
+  if (visibleThreads.length === 0) return [];
+
+  const threadIds = visibleThreads.map((t) => t.id);
   // Most-recent-message-per-thread, same pattern as getCommunityDmThreads:
   // one query across every thread ordered newest-first, then keep only the
   // first row seen per thread_id, rather than N per-thread queries.
@@ -105,7 +117,7 @@ export async function getProfileDmThreads(supabase: SupabaseClient, userId: stri
     }
   }
 
-  return (threads as unknown as ProfileDmThread[]).map((t) => {
+  return visibleThreads.map((t) => {
     const last = lastByThread.get(t.id);
     return {
       ...t,

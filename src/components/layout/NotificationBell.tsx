@@ -7,14 +7,19 @@ import { createClient } from "@/lib/supabase/client";
 import { markAllNotificationsRead, markNotificationRead } from "@/app/actions/notifications";
 import type { Notification } from "@/lib/queries/notifications";
 
+const RETENTION_DAYS = 7;
+
 // Client-side, RLS-scoped reads (notifications_select_own) -- same pattern
 // as GroupChat's realtime subscription, just for one user's own feed
 // instead of one group's messages. Unread count stays live via realtime
 // INSERT events rather than polling; the list itself only loads when the
-// panel opens, not on every mount.
+// panel opens, not on every mount. Scoped to the last 7 days (a query
+// filter, not a DB purge -- older rows aren't deleted, just never shown
+// here), matching mobile's own NotificationBell.
 export function NotificationBell({ userId }: { userId: string }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const [sinceIso] = useState(() => new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString());
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
@@ -27,8 +32,9 @@ export function NotificationBell({ userId }: { userId: string }) {
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .is("read_at", null)
+      .gte("created_at", sinceIso)
       .then(({ count }) => setUnreadCount(count ?? 0));
-  }, [supabase, userId]);
+  }, [supabase, userId, sinceIso]);
 
   useEffect(() => {
     const channel = supabase
@@ -64,6 +70,7 @@ export function NotificationBell({ userId }: { userId: string }) {
         .from("notifications")
         .select("*")
         .eq("user_id", userId)
+        .gte("created_at", sinceIso)
         .order("created_at", { ascending: false })
         .limit(20);
       setNotifications((data as Notification[]) ?? []);

@@ -154,3 +154,20 @@ export async function deleteProfileDmMessage(messageId: string) {
   if (!count) return { error: "You can only delete your own messages" };
   return { error: null };
 }
+
+// "Delete chat" -- per-user (RLS-backed via profile_dm_thread_hides_insert/
+// update_own, 0136), not a shared hard delete: removes the thread from the
+// caller's own inbox without touching the other participant's copy or the
+// messages themselves. A new message after this brings it back into view.
+export async function deleteProfileDmChat(threadId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("profile_dm_thread_hides")
+    .upsert({ thread_id: threadId, user_id: user.id, hidden_at: new Date().toISOString() }, { onConflict: "thread_id,user_id" });
+  if (error) return { error: error.message };
+
+  revalidatePath("/messages");
+  return { error: null };
+}
