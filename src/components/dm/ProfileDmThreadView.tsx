@@ -14,6 +14,7 @@ import {
   IconArrowBackUp,
   IconGif,
   IconMicrophone,
+  IconShare2,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -28,6 +29,7 @@ import { resolveDmAttachmentUrl } from "@/lib/queries/profileDm";
 import { useTypingIndicator } from "@/lib/typingIndicator";
 import { useVoiceRecorder, formatDuration } from "@/lib/voiceRecording";
 import { GifPicker } from "@/components/dm/GifPicker";
+import { ForwardMessageModal } from "@/components/dm/ForwardMessageModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Linkify } from "@/components/ui/Linkify";
 import type { ProfileDmMessage, ProfileDmAttachmentType } from "@/lib/queries/profileDm";
@@ -67,6 +69,7 @@ export function ProfileDmThreadView({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [replyTo, setReplyTo] = useState<ProfileDmMessage | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [forwardingContent, setForwardingContent] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
   const [decisionPending, startDecisionTransition] = useTransition();
@@ -326,6 +329,16 @@ export function ProfileDmThreadView({
                     >
                       <IconArrowBackUp size={14} />
                     </button>
+                    {m.content && (
+                      <button
+                        type="button"
+                        onClick={() => setForwardingContent(m.content)}
+                        aria-label="Share message"
+                        className="p-1 text-text3 hover:text-green"
+                      >
+                        <IconShare2 size={14} />
+                      </button>
+                    )}
                     {isMine && (
                       <button
                         type="button"
@@ -506,6 +519,14 @@ export function ProfileDmThreadView({
         </form>
       )}
       {error && <p className="border-t border-border px-4 py-2 text-[12px] text-pink">{error}</p>}
+      {forwardingContent !== null && (
+        <ForwardMessageModal
+          content={forwardingContent}
+          currentThreadId={threadId}
+          currentUserId={currentUserId}
+          onClose={() => setForwardingContent(null)}
+        />
+      )}
     </div>
   );
 }
