@@ -147,7 +147,7 @@ export default async function ProfilePage() {
             native app's own Settings screen would put it. */}
         <div className="mt-8 flex flex-col items-center gap-3 border-t border-border pt-6 text-[12px] text-text3">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <a href="mailto:closeconnect27@gmail.com" className="transition hover:text-text2">
+            <a href="mailto:support@closeconnect.in" className="transition hover:text-text2">
               Support
             </a>
             <Link href="/terms" className="transition hover:text-text2">

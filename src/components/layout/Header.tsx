@@ -41,11 +41,13 @@ export function Header({
   userId,
   pathname,
   slot,
+  hasUnreadMessages,
 }: {
   isLoggedIn: boolean;
   userId: string | null;
   pathname?: string;
   slot?: React.ReactNode;
+  hasUnreadMessages: boolean;
 }) {
   // When a page's slot (search bar) replaces the plain nav row, the other
   // two main sections stay reachable as compact icon+label links here --
@@ -101,7 +103,7 @@ export function Header({
             <IconPlus size={15} />
             Create
           </Link>
-          {isLoggedIn && userId && <MessagesBell userId={userId} />}
+          {isLoggedIn && userId && <MessagesBell hasUnread={hasUnreadMessages} />}
           {isLoggedIn && userId && <NotificationBell userId={userId} />}
           <MoreMenu />
           {/* Relocated to the Profile page in the app -- a native app's

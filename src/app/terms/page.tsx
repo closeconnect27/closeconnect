@@ -154,8 +154,8 @@ export default function TermsOfServicePage() {
           <p>For questions about these Terms, contact us at:</p>
           <p>
             <strong>Email:</strong>{" "}
-            <a href="mailto:closeconnect27@gmail.com" className="text-green hover:underline">
-              closeconnect27@gmail.com
+            <a href="mailto:support@closeconnect.in" className="text-green hover:underline">
+              support@closeconnect.in
             </a>
           </p>
         </Section>

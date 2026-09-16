@@ -1,16 +1,15 @@
-"use client";
-
 import Link from "next/link";
 import { IconMessageCircle } from "@tabler/icons-react";
-import { useProfileDmBadge } from "@/lib/useProfileDmBadge";
 
 // Header counterpart to NotificationBell -- simpler than it though: just a
-// boolean red dot (useProfileDmBadge), not an unread count, and a plain
-// link to /messages rather than its own dropdown panel (the inbox itself,
-// with its Primary/Requests tabs, is the panel).
-export function MessagesBell({ userId }: { userId: string }) {
-  const hasUnread = useProfileDmBadge(userId);
-
+// boolean red dot, not an unread count, and a plain link to /messages
+// rather than its own dropdown panel (the inbox itself, with its Primary/
+// Requests tabs, is the panel). `hasUnread` comes from SiteChromeInner's
+// single shared useProfileDmBadge call (see BottomNav.tsx's comment) --
+// this component doesn't call the hook itself, since BottomNav renders
+// alongside it on every non-home page and a second independent hook
+// instance opening a same-named Realtime channel crashed the whole page.
+export function MessagesBell({ hasUnread }: { hasUnread: boolean }) {
   return (
     <Link
       href="/messages"

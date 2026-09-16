@@ -30,7 +30,7 @@ export default async function ProfileDmThreadPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden px-4 pt-4 sm:px-6">
-      <div className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col">
         <div className="shrink-0 pb-3">
           <Link href="/messages" className="mb-2 inline-block text-[13px] text-text3 transition hover:text-text2">
             ← Back to messages

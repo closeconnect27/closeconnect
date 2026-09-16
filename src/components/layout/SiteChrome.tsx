@@ -9,6 +9,7 @@ import { Footer } from "@/components/layout/Footer";
 import { HeaderSlotProvider, useHeaderSlotContent } from "@/components/layout/HeaderSlotContext";
 import { track, identify } from "@/lib/mixpanel/client";
 import { initGoogleAnalytics, trackPageview } from "@/lib/ga/client";
+import { useProfileDmBadge } from "@/lib/useProfileDmBadge";
 
 // The landing page (/) is a standalone full-bleed hero -- the header/bottom
 // nav are chrome for navigating an app you're already inside of, not for a
@@ -62,6 +63,13 @@ function SiteChromeInner({
   const isLoginPage = pathname === "/login";
   const isImmersivePage = isChatPage || isLoginPage;
   const slotContent = useHeaderSlotContent();
+  // One shared subscription for both Header's MessagesBell and BottomNav --
+  // each calling useProfileDmBadge itself independently opened a Realtime
+  // channel with the identical name (`profile-dm-badge-${userId}`, the
+  // browser Supabase client being a singleton), and the second `.on()` call
+  // threw synchronously since the channel was already joining, crashing
+  // every page that rendered both at once (every page except home).
+  const hasUnreadMessages = useProfileDmBadge(userId);
 
   useEffect(() => {
     track("page_view", { path: pathname });
@@ -99,7 +107,9 @@ function SiteChromeInner({
 
   return (
     <>
-      {!isHome && !isImmersivePage && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
+      {!isHome && !isImmersivePage && (
+        <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} hasUnreadMessages={hasUnreadMessages} />
+      )}
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
           Only needed when BottomNav is actually rendered (not isHome,
@@ -115,7 +125,7 @@ function SiteChromeInner({
             would put them. */}
         {!isImmersivePage && !Capacitor.isNativePlatform() && <Footer dark={isHome} />}
       </div>
-      {!isHome && !isImmersivePage && <BottomNav isLoggedIn={isLoggedIn} userId={userId} />}
+      {!isHome && !isImmersivePage && <BottomNav isLoggedIn={isLoggedIn} hasUnreadMessages={hasUnreadMessages} />}
     </>
   );
 }

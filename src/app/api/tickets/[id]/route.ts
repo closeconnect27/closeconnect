@@ -161,7 +161,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   page.drawText(shortCode, { x: (396 - codeWidth) / 2, y, size: 18, font: bold, color: dark });
 
   y -= 30;
-  const footer = "Present this ticket (or the code above) at the event. Questions? closeconnect27@gmail.com";
+  const footer = "Present this ticket (or the code above) at the event. Questions? support@closeconnect.in";
   for (const line of wrapText(footer, font, 8, 396 - 48)) {
     const w = font.widthOfTextAtSize(line, 8);
     page.drawText(line, { x: (396 - w) / 2, y, size: 8, font, color: gray });

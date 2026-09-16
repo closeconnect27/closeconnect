@@ -58,11 +58,17 @@ export async function uploadVoiceNote(blob: Blob, folderPrefix: string, duration
   if (blob.size > VOICE_NOTE_LIMIT) return { attachment: null, error: "That recording is larger than the 25MB limit." };
 
   const supabase = createClient();
-  const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+  // MediaRecorder's blob.type carries a codec parameter (e.g.
+  // "audio/webm;codecs=opus") that the storage bucket's allowed_mime_types
+  // allowlist matches exactly against -- stripped here so a real recording
+  // doesn't get rejected over a suffix the allowlist was never going to
+  // enumerate every variant of.
+  const mimeType = (blob.type || "audio/webm").split(";")[0].trim();
+  const ext = mimeType.includes("mp4") ? "m4a" : "webm";
   const path = `${folderPrefix}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage.from("chat-attachments").upload(path, blob, {
-    contentType: blob.type || "audio/webm",
+    contentType: mimeType,
     cacheControl: "3600",
   });
   if (error) return { attachment: null, error: error.message };

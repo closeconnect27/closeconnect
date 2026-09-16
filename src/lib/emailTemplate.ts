@@ -80,7 +80,7 @@ export function renderEmailShell({ preheader, bodyHtml }: { preheader: string; b
           <tr>
             <td style="padding:24px 8px 0;font-family:${SANS};font-size:12px;color:${MUTED};">
               <p style="margin:0 0 6px;">
-                <a href="mailto:closeconnect27@gmail.com" style="color:${MUTED};text-decoration:underline;">Support</a>
+                <a href="mailto:support@closeconnect.in" style="color:${MUTED};text-decoration:underline;">Support</a>
                 &nbsp;&middot;&nbsp;
                 <a href="tel:+918310109935" style="color:${MUTED};text-decoration:underline;">+91 83101 09935</a>
                 &nbsp;&middot;&nbsp;

@@ -119,8 +119,8 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             <strong>Email:</strong>{" "}
-            <a href="mailto:closeconnect27@gmail.com" className="text-green hover:underline">
-              closeconnect27@gmail.com
+            <a href="mailto:support@closeconnect.in" className="text-green hover:underline">
+              support@closeconnect.in
             </a>
           </p>
           <p>We aim to acknowledge requests within 48 hours and resolve them within 30 days.</p>

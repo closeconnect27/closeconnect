@@ -114,8 +114,8 @@ export default function AboutPage() {
             <p className="text-[14px] font-bold text-text">Get in touch</p>
             <p className="mt-1 text-[13px] leading-relaxed text-text2">
               Questions, feedback, or an idea for what CloseConnect should build next? We read every message at{" "}
-              <a href="mailto:closeconnect27@gmail.com" className="font-medium text-green hover:underline">
-                closeconnect27@gmail.com
+              <a href="mailto:support@closeconnect.in" className="font-medium text-green hover:underline">
+                support@closeconnect.in
               </a>
               .
             </p>

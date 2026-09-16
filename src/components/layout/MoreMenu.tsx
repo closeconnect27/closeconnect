@@ -51,7 +51,7 @@ export function MoreMenu({ dark = false }: { dark?: boolean } = {}) {
             About
           </MenuLink>
           <a
-            href="mailto:closeconnect27@gmail.com"
+            href="mailto:support@closeconnect.in"
             className={`flex items-center gap-2.5 px-4 py-2.5 text-[14px] font-medium transition ${
               dark ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-text2 hover:bg-bg3 hover:text-text"
             }`}

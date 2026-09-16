@@ -27,7 +27,7 @@ export default async function MessagesPage() {
   );
 
   return (
-    <div className="mx-auto max-w-xl flex-1 px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-2xl flex-1 px-4 py-8 sm:px-6">
       <h1 className="mb-6 font-heading text-[22px] font-bold text-text">Messages</h1>
       <MessagesInbox threads={threads} currentUserId={user.id} readTimestamps={readTimestamps} />
     </div>

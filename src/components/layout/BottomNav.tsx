@@ -9,7 +9,6 @@ import {
   IconMessageCircle,
   IconUserCircle,
 } from "@tabler/icons-react";
-import { useProfileDmBadge } from "@/lib/useProfileDmBadge";
 
 // Bottom tab bar for primary mobile destinations, replacing the old
 // hamburger-only MobileMenu. Research on real products (BookMyShow's mobile
@@ -24,10 +23,23 @@ import { useProfileDmBadge } from "@/lib/useProfileDmBadge";
 // point in its own page header, so a global Create tab was redundant; this
 // is the same trade mobile's own bottom tab bar made this session (Create
 // -> Inbox). Messages carries the same red-dot badge as the header's
-// MessagesBell (useProfileDmBadge, shared rather than duplicated).
-export function BottomNav({ isLoggedIn, userId }: { isLoggedIn: boolean; userId: string | null }) {
+// MessagesBell -- `hasUnreadMessages` is passed down from SiteChromeInner
+// (a single useProfileDmBadge call shared by both), not read from its own
+// hook call here: two independent hook instances each opened a Realtime
+// channel with the identical name (`profile-dm-badge-${userId}`), and
+// since the browser Supabase client is a singleton, the second `.on()`
+// call threw synchronously ("cannot add postgres_changes callbacks ...
+// after subscribe()") in an effect, uncaught -- crashing every page that
+// rendered both Header and BottomNav at once (i.e. every page except home,
+// which renders neither).
+export function BottomNav({
+  isLoggedIn,
+  hasUnreadMessages,
+}: {
+  isLoggedIn: boolean;
+  hasUnreadMessages: boolean;
+}) {
   const pathname = usePathname();
-  const hasUnreadMessages = useProfileDmBadge(userId);
 
   const items = [
     { href: "/feed", label: "Feed", icon: IconHome, exact: false, badge: false },
