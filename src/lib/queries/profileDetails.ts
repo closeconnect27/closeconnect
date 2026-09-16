@@ -69,6 +69,7 @@ export async function getPublicProfileBasic(supabase: SupabaseClient, profileId:
 
 export type PublicJoinedCommunity = {
   id: string;
+  slug: string;
   name: string;
   category: string;
   role: "owner" | "moderator" | "member";
@@ -84,22 +85,27 @@ export type PublicJoinedCommunity = {
 export async function getCommunitiesJoinedPublic(supabase: SupabaseClient, profileId: string) {
   const { data: memberships, error: mErr } = await supabase
     .from("community_members")
-    .select("community_id, role")
-    .eq("user_id", profileId);
+    .select("community_id, role, joined_at")
+    .eq("user_id", profileId)
+    .order("joined_at", { ascending: false });
   if (mErr) throw mErr;
   if (!memberships || memberships.length === 0) return [];
 
   const roleByCommunity = new Map(memberships.map((m) => [m.community_id as string, m.role as string]));
   const { data, error } = await supabase
     .from("communities")
-    .select("id, name, category")
+    .select("id, slug, name, category")
     .in("id", [...roleByCommunity.keys()]);
   if (error) throw error;
 
-  return (data ?? []).map((c) => ({
-    ...c,
-    role: roleByCommunity.get(c.id) as PublicJoinedCommunity["role"],
-  })) as PublicJoinedCommunity[];
+  // Order preserved from `memberships` (most-recently-joined first), not
+  // whatever order the `in()` lookup happens to return -- the profile
+  // page's "latest 5" list needs this to actually mean "latest".
+  const byId = new Map((data ?? []).map((c) => [c.id, c]));
+  return memberships
+    .map((m) => byId.get(m.community_id as string))
+    .filter((c): c is NonNullable<typeof c> => !!c)
+    .map((c) => ({ ...c, role: roleByCommunity.get(c.id) as PublicJoinedCommunity["role"] })) as PublicJoinedCommunity[];
 }
 
 export type PublicAttendedEvent = {
@@ -109,6 +115,26 @@ export type PublicAttendedEvent = {
   city: string | null;
   category: string | null;
 };
+
+/** Events this person hosts/hosted -- events_select_public (0001_init.sql)
+ * is unrestricted, so (like getCommunitiesJoinedPublic) this is a plain
+ * query rather than something gated on profile_details; the profile PAGE
+ * still only renders it when the viewer can see the profile at all, for
+ * one coherent experience. Includes upcoming events, not just past ones
+ * (unlike "attended," which is inherently retrospective) -- hosting
+ * something coming up is exactly the kind of profile content a visitor
+ * would want to see, ordered most-recent/soonest-first either way. */
+export async function getEventsHostedPublic(supabase: SupabaseClient, profileId: string): Promise<PublicAttendedEvent[]> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, event_name, event_date, city, category")
+    .eq("host_id", profileId)
+    .eq("status", "active")
+    .not("event_date", "is", null)
+    .order("event_date", { ascending: false });
+  if (error) throw error;
+  return data as PublicAttendedEvent[];
+}
 
 /** Relies entirely on form_responses_select_public_event_attendance (0033)
  * to do the actual gating -- approved responses to already-passed events,
@@ -180,6 +206,86 @@ export async function getIsFollowing(supabase: SupabaseClient, targetId: string,
   if (followError) throw followError;
   if (requestError) throw requestError;
   return !!follow || !!request;
+}
+
+export type FollowListEntry = { id: string; display_name: string; avatar_url: string | null };
+
+function dedupeById(entries: (FollowListEntry | null)[]): FollowListEntry[] {
+  const map = new Map<string, FollowListEntry>();
+  for (const e of entries) if (e) map.set(e.id, e);
+  return [...map.values()];
+}
+
+/** "Following" is the same two-mechanism concept getIsFollowing checks --
+ * an instant follow (profile_follows) or an accepted private-profile
+ * request (profile_follow_requests) -- so both feed into the combined
+ * list. Visibility itself is enforced by profile_follows_select_visible/
+ * pfr_select_own's own RLS (0113/0035), not by anything in this function --
+ * an unauthorized viewer just gets an empty array back, same "not visible"
+ * treatment as getProfileDetails. */
+export async function getFollowers(supabase: SupabaseClient, profileId: string): Promise<FollowListEntry[]> {
+  const [{ data: instant, error: e1 }, { data: accepted, error: e2 }] = await Promise.all([
+    supabase
+      .from("profile_follows")
+      .select("follower:profiles!profile_follows_follower_id_fkey(id,display_name,avatar_url)")
+      .eq("followee_id", profileId),
+    supabase
+      .from("profile_follow_requests")
+      .select("requester:profiles!profile_follow_requests_requester_id_fkey(id,display_name,avatar_url)")
+      .eq("target_id", profileId)
+      .eq("status", "accepted"),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  return dedupeById([
+    ...(instant ?? []).map((r) => r.follower as unknown as FollowListEntry),
+    ...(accepted ?? []).map((r) => r.requester as unknown as FollowListEntry),
+  ]);
+}
+
+export async function getFollowing(supabase: SupabaseClient, profileId: string): Promise<FollowListEntry[]> {
+  const [{ data: instant, error: e1 }, { data: accepted, error: e2 }] = await Promise.all([
+    supabase
+      .from("profile_follows")
+      .select("followee:profiles!profile_follows_followee_id_fkey(id,display_name,avatar_url)")
+      .eq("follower_id", profileId),
+    supabase
+      .from("profile_follow_requests")
+      .select("target:profiles!profile_follow_requests_target_id_fkey(id,display_name,avatar_url)")
+      .eq("requester_id", profileId)
+      .eq("status", "accepted"),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  return dedupeById([
+    ...(instant ?? []).map((r) => r.followee as unknown as FollowListEntry),
+    ...(accepted ?? []).map((r) => r.target as unknown as FollowListEntry),
+  ]);
+}
+
+/** Whether the viewer has blocked this profile -- only this direction is
+ * ever visible to the viewer (blocked_users_select_own, 0117); whether
+ * this profile has blocked the *viewer* is never exposed here (a block is
+ * silent, same posture as most social apps) -- that side only surfaces
+ * indirectly, as a generic failure if the viewer tries to follow/DM them. */
+export async function getIsBlocked(supabase: SupabaseClient, viewerId: string | null, targetId: string) {
+  if (!viewerId || viewerId === targetId) return false;
+  const { data } = await supabase.from("blocked_users").select("blocker_id").eq("blocker_id", viewerId).eq("blocked_id", targetId).maybeSingle();
+  return !!data;
+}
+
+/** Everyone the signed-in user has blocked -- the one place blocking is
+ * reversible from besides the blocked person's own profile page (useful
+ * when you don't remember who it was, or don't want to revisit their
+ * profile just to unblock them). */
+export async function getBlockedUsers(supabase: SupabaseClient, userId: string): Promise<FollowListEntry[]> {
+  const { data, error } = await supabase
+    .from("blocked_users")
+    .select("blocked:profiles!blocked_users_blocked_id_fkey(id,display_name,avatar_url)")
+    .eq("blocker_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => r.blocked as unknown as FollowListEntry).filter(Boolean);
 }
 
 export type IncomingFollowRequest = {

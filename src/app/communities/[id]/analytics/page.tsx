@@ -13,10 +13,12 @@ import {
   computeConversionRate,
   getNewMembersByMonth,
   getMostActiveMembers,
+  getReferrerBreakdown,
 } from "@/lib/queries/analytics";
 import { StatCard } from "@/components/ui/StatCard";
 import { DailyBarChart } from "@/components/analytics/DailyBarChart";
 import { PercentageBar } from "@/components/analytics/PercentageBar";
+import { ReferrerBreakdown } from "@/components/analytics/ReferrerBreakdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function CommunityAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,12 +49,13 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
     redirect(`/communities/${id}`);
   }
 
-  const [viewCount, viewsByDay, joinMetrics, newMembersByMonth, activeMembers] = await Promise.all([
+  const [viewCount, viewsByDay, joinMetrics, newMembersByMonth, activeMembers, referrerBreakdown] = await Promise.all([
     getViewCount(supabase, "community", id),
     getViewsByDay(supabase, "community", id),
     getJoinRequestMetrics(supabase, id),
     getNewMembersByMonth(supabase, id),
     getMostActiveMembers(supabase, id),
+    getReferrerBreakdown(supabase, "community", id),
   ]);
 
   const acceptanceRate = computeAcceptanceRate(joinMetrics.totals);
@@ -91,6 +94,13 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
           <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Views over time</h2>
           <div className="card-elevated rounded-card bg-bg2 p-4">
             <DailyBarChart data={viewsByDay} label="views" />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Where visitors come from</h2>
+          <div className="card-elevated rounded-card bg-bg2 p-4">
+            <ReferrerBreakdown data={referrerBreakdown} />
           </div>
         </section>
 

@@ -8,7 +8,7 @@ export function FoundingBadge({ size = 12, label = "Founding" }: { size?: number
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-purple/15 px-2 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wide text-purple"
-      title="One of Close.Connect's earliest communities/hosts"
+      title="One of CloseConnect's earliest communities/hosts"
     >
       <IconSeeding size={size} />
       {label}

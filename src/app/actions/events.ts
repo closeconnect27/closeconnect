@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendRegistrationConfirmationEmail, sendPaymentPendingEmail } from "@/lib/eventRegistrationEmails";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendRegistrationConfirmationEmail, sendEventUpdatedEmail } from "@/lib/eventRegistrationEmails";
+import { cancelEventForHost } from "@/lib/cancelEvent";
 import { trackServerEvent } from "@/lib/mixpanel/server";
 import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
 import {
@@ -22,8 +24,60 @@ import {
   getHostableCommunities,
   getEventTicketTypes,
 } from "@/lib/queries/events";
-import { getHostPaymentDetails } from "@/lib/queries/paymentDetails";
 import { deserializeDescriptionContent } from "@/lib/validation/richText";
+import { createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { isEventPast } from "@/lib/eventStatus";
+
+type DateEntryInput = {
+  event_date: string;
+  event_time?: string;
+  event_end_time?: string;
+  venue?: string;
+  venue_lat?: number;
+  venue_lng?: number;
+  venue_place_id?: string;
+};
+
+// A multi-day event's flat event_date/event_end_date/event_time/
+// event_end_time columns are derived from its event_dates entries (min/max
+// date, first/last entry's time) rather than collected directly -- every
+// existing consumer of those flat columns (list sort/filter, isEventPast,
+// Google Calendar link) keeps working unchanged this way. Sorted by date so
+// a host who added entries out of chronological order still gets a correct
+// summary; the event_date_entries rows themselves preserve the host's
+// original input order (see buildDateEntryRows) since that's the order
+// they're meant to be displayed in, which need not be chronological.
+function deriveDateFields(data: { event_date?: string; event_time?: string; event_end_time?: string; event_dates: DateEntryInput[] }) {
+  if (data.event_dates.length === 0) {
+    return {
+      event_date: data.event_date as string,
+      event_end_date: null as string | null,
+      event_time: data.event_time || null,
+      event_end_time: data.event_end_time || null,
+    };
+  }
+  const sorted = [...data.event_dates].sort((a, b) => a.event_date.localeCompare(b.event_date));
+  return {
+    event_date: sorted[0].event_date,
+    event_end_date: sorted[sorted.length - 1].event_date,
+    event_time: sorted[0].event_time || null,
+    event_end_time: sorted[sorted.length - 1].event_end_time || null,
+  };
+}
+
+function buildDateEntryRows(eventId: string, entries: DateEntryInput[]) {
+  return entries.map((d, i) => ({
+    event_id: eventId,
+    event_date: d.event_date,
+    event_time: d.event_time || null,
+    event_end_time: d.event_end_time || null,
+    venue: d.venue?.trim() || null,
+    venue_lat: d.venue_lat ?? null,
+    venue_lng: d.venue_lng ?? null,
+    venue_place_id: d.venue_place_id ?? null,
+    sort_order: i,
+  }));
+}
 
 export async function createEvent(
   input: Omit<CreateEventInput, "description_content"> & { description_content: string | null },
@@ -58,6 +112,7 @@ export async function createEvent(
   // exists (0053).
   const id = data.id;
   const photo = assignPhotoForEntity(data.category, id);
+  const dateFields = deriveDateFields(data);
 
   const { data: event, error } = await supabase
     .from("events")
@@ -68,13 +123,20 @@ export async function createEvent(
       event_name: data.event_name,
       description: data.description || null,
       description_content: data.description_content ?? null,
-      event_date: data.event_date,
-      event_time: data.event_time || null,
+      event_date: dateFields.event_date,
+      event_end_date: dateFields.event_end_date,
+      event_time: dateFields.event_time,
+      event_end_time: dateFields.event_end_time,
       event_mode: data.event_mode,
       venue: data.event_mode === "online" ? null : data.venue || null,
-      city: data.city || null,
-      extra_cities: data.extra_cities,
+      venue_lat: data.event_mode === "online" ? null : data.venue_lat ?? null,
+      venue_lng: data.event_mode === "online" ? null : data.venue_lng ?? null,
+      venue_place_id: data.event_mode === "online" ? null : data.venue_place_id ?? null,
+      city: data.all_cities ? null : data.city || null,
+      extra_cities: data.all_cities ? [] : data.extra_cities,
+      all_cities: data.all_cities,
       category: data.category,
+      extra_categories: data.extra_categories,
       unsplash_image_url: photo.imageUrl,
       unsplash_photo_id: photo.photoId,
     })
@@ -98,6 +160,15 @@ export async function createEvent(
   );
   if (ticketsError) {
     return { error: `Event created, but ticket types failed to save: ${ticketsError.message}` };
+  }
+
+  if (data.event_dates.length > 0) {
+    const { error: datesError } = await supabase
+      .from("event_date_entries")
+      .insert(buildDateEntryRows(event.id, data.event_dates));
+    if (datesError) {
+      return { error: `Event created, but the date list failed to save: ${datesError.message}` };
+    }
   }
 
   if (data.form_fields.length > 0) {
@@ -166,20 +237,6 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   if (!ticketType) return { error: "That ticket type no longer exists" };
   const isPaid = ticketType.price > 0;
 
-  // The host's own UPI QR/ID, set inline while creating/editing the event
-  // (PaymentDetailsForm, shown once a ticket has a price) -- a paid
-  // registration hands off to manual UPI payment (see
-  // submitPaymentReference below for the registrant's side of that, and
-  // confirmPayment for the host's).
-  let hostUpi: { upiId: string | null; qrImageUrl: string | null } | null = null;
-  if (isPaid) {
-    const { data: eventRow } = await supabase.from("events").select("host_id").eq("id", eventId).single();
-    if (eventRow) {
-      const details = await getHostPaymentDetails(supabase, eventRow.host_id);
-      hostUpi = { upiId: details?.upi_id ?? null, qrImageUrl: details?.qr_image_url ?? null };
-    }
-  }
-
   const { data: registration, error } = await supabase
     .from("form_responses")
     .insert({
@@ -212,28 +269,13 @@ export async function registerForEvent(eventId: string, input: EventRegistration
   // response is sent, killing the fetch to Resend before it completes. A
   // failure here still doesn't fail the registration itself (only logs).
   //
-  // Paid tickets get a "complete your payment" email/notification here,
-  // never the real "you're registered" one -- that's only true once the
-  // host manually confirms the UPI payment (confirmPayment below sends
-  // it). Sending "you're registered" before any money has moved is
-  // exactly the bug a real user hit: an email confirming a spot that
-  // wasn't actually confirmed yet.
-  if (isPaid) {
-    if (user.email) {
-      try {
-        await sendPaymentPendingEmail(supabase, {
-          email: user.email,
-          eventId,
-          registrantName: parsed.data.name,
-          upiId: hostUpi?.upiId ?? null,
-          qrImageUrl: hostUpi?.qrImageUrl ?? null,
-          amountRupees: ticketType.price * parsed.data.quantity,
-        });
-      } catch (e) {
-        console.error("Failed to send payment-pending email:", e);
-      }
-    }
-  } else {
+  // Paid tickets get nothing here -- Razorpay Standard Checkout opens in
+  // the very same visit right after this returns, and the real
+  // "you're registered" email/notification only fires from
+  // verifyRazorpayPayment once payment actually clears. Sending it here
+  // would be exactly the bug the old manual-UPI flow had: confirming a spot
+  // before any money had moved.
+  if (!isPaid) {
     if (user.email) {
       try {
         await sendRegistrationConfirmationEmail(supabase, { email: user.email, eventId, registrantName: parsed.data.name });
@@ -245,9 +287,8 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     // under this request's own RLS-scoped client, allowed by
     // notifications_insert_self (0061), unlike every other notification
     // type which goes through a security definer trigger instead. Paid
-    // tickets get their "You're registered!" notification from the DB
-    // trigger (0066) once confirmPayment flips payment_status to 'paid',
-    // not here.
+    // tickets get their "You're registered!" notification from
+    // verifyRazorpayPayment once the payment actually clears, not here.
     await supabase.from("notifications").insert({
       user_id: user.id,
       type: "event_registered",
@@ -261,93 +302,170 @@ export async function registerForEvent(eventId: string, input: EventRegistration
     ticket_type_id: parsed.data.ticket_type_id,
     is_paid: isPaid,
   });
-  return { error: null, registrationId: registration.id, isPaid, hostUpi };
+  return { error: null, registrationId: registration.id, isPaid };
 }
 
-/** The registrant's side of the manual UPI flow -- they paid by hand via
- * their own UPI app and are typing back whatever reference/UTR number it
- * gave them. This is never verified programmatically (there's no API into
- * a personal UPI account); it just moves the registration into a
- * host-reviewable queue (confirmPayment below) instead of leaving it
- * silently 'unpaid' forever. A security definer trigger (0066) notifies
- * the host in-app the moment this lands. */
-export async function submitPaymentReference(eventId: string, registrationId: string, reference: string) {
+/** Standard Checkout, step 1: creates the Razorpay order this registration
+ * will pay against. Amount is always recomputed here from the
+ * registration's own stored ticket_type_id/quantity -- never trusted from
+ * the client -- so a tampered request can't pay less than the real price.
+ * razorpay_order_id is stored immediately so verifyRazorpayPayment (below)
+ * has something to confirm the eventual signature against, rather than
+ * trusting whatever order_id the client hands back after checkout. */
+export async function createRazorpayOrderForRegistration(eventId: string, registrationId: string) {
   const user = await requireUser();
-
-  const trimmed = reference.trim();
-  if (!trimmed) return { error: "Enter the reference number your UPI app gave you" };
-  if (trimmed.length > 100) return { error: "That reference looks too long -- double-check what you pasted" };
-
   const supabase = await createClient();
 
-  const { data: existing, error: fetchError } = await supabase
+  const { data: reg, error: fetchError } = await supabase
     .from("form_responses")
-    .select("respondent_id, payment_status")
+    .select("respondent_id, payment_status, quantity, ticket_type_id, last_order_attempt_at")
     .eq("id", registrationId)
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
     .single();
-  if (fetchError || !existing) return { error: "Registration not found" };
-  if (existing.respondent_id !== user.id) return { error: "Not allowed to update this registration" };
-  if (existing.payment_status !== "unpaid") return { error: "This registration isn't awaiting payment" };
+  if (fetchError || !reg) return { error: "Registration not found" };
+  if (reg.respondent_id !== user.id) return { error: "Not allowed to pay for this registration" };
+  if (reg.payment_status !== "unpaid") return { error: "This registration isn't awaiting payment" };
 
-  const { error } = await supabase
-    .from("form_responses")
-    .update({ payment_status: "pending_verification", payment_reference: trimmed })
-    .eq("id", registrationId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/events/${eventId}`);
-  return { error: null };
-}
-
-/** Host-side confirmation for the manual UPI flow -- the host checks their
- * own UPI app history for this reference number and either confirms it
- * (payment_status -> 'paid') or rejects it (back to 'unpaid' so the
- * registrant can correct and resubmit). Confirming is the one place that
- * still needs an explicit "you're registered" email sent from here -- the
- * notify trigger (0066) only ever handles the in-app notification, not
- * email. */
-export async function confirmPayment(eventId: string, registrationId: string, decision: "confirm" | "reject") {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
-  if (!auth.ok) return { error: auth.error };
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("form_responses")
-    .select("payment_status, response_data")
-    .eq("id", registrationId)
-    .eq("owner_type", "event")
-    .eq("owner_id", eventId)
-    .single();
-  if (fetchError || !existing) return { error: "Registration not found" };
-  if (existing.payment_status !== "pending_verification") return { error: "Nothing awaiting confirmation here" };
-
-  // Confirming keeps payment_reference as an audit trail; rejecting clears
-  // it so the registrant sees a clean slate to correct and resubmit.
-  const update =
-    decision === "confirm"
-      ? { payment_status: "paid" as const }
-      : { payment_status: "unpaid" as const, payment_reference: null };
-  const { error } = await supabase.from("form_responses").update(update).eq("id", registrationId);
-  if (error) return { error: error.message };
-
-  if (decision === "confirm") {
-    const responseData = existing.response_data as unknown as { name?: string; email?: string } | null;
-    const email = responseData?.email;
-    const name = responseData?.name ?? "there";
-    if (email) {
-      try {
-        await sendRegistrationConfirmationEmail(supabase, { email, eventId, registrantName: name });
-      } catch (e) {
-        console.error("Failed to send post-payment confirmation email:", e);
-      }
-    }
+  // Checked (and set below) BEFORE calling Razorpay's API, not after -- this
+  // actually prevents a tight retry loop from hitting Razorpay's own API
+  // repeatedly, not just from writing to our own DB repeatedly.
+  if (reg.last_order_attempt_at && Date.now() - new Date(reg.last_order_attempt_at).getTime() < 3000) {
+    return { error: "Please wait a moment before trying again" };
   }
 
-  revalidatePath(`/events/${eventId}/manage`);
+  const ticketTypes = await getEventTicketTypes(supabase, eventId);
+  const ticketType = ticketTypes.find((t) => t.id === reg.ticket_type_id);
+  if (!ticketType || ticketType.price <= 0) return { error: "This ticket doesn't require payment" };
+
+  const amountPaise = Math.round(ticketType.price * reg.quantity * 100);
+  if (amountPaise < 100) return { error: "This amount is below Razorpay's minimum payable amount" };
+
+  const { error: throttleError } = await supabase
+    .from("form_responses")
+    .update({ last_order_attempt_at: new Date().toISOString() })
+    .eq("id", registrationId);
+  if (throttleError) return { error: throttleError.message };
+
+  let order;
+  try {
+    order = await createRazorpayOrder({ amountPaise, currency: "INR", receipt: registrationId });
+  } catch (e) {
+    console.error("Razorpay order creation failed:", e);
+    return { error: "Could not start payment -- please try again" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("form_responses")
+    .update({ razorpay_order_id: order.id })
+    .eq("id", registrationId);
+  if (updateError) return { error: updateError.message };
+
+  return {
+    error: null,
+    orderId: order.id,
+    amount: order.amount,
+    currency: order.currency,
+    keyId: process.env.RAZORPAY_KEY_ID,
+  };
+}
+
+/** Standard Checkout, step 2: verifies the signature Razorpay's modal
+ * handed back on success. The order_id match against what step 1 stored is
+ * what stops a signature computed for a *different* (e.g. cheaper, or
+ * someone else's) order from being replayed here -- HMAC validity alone
+ * only proves the triple is internally consistent, not that it belongs to
+ * THIS registration. Signature mismatch never marks the registration paid,
+ * full stop -- returns an error and leaves payment_status untouched. */
+export async function verifyRazorpayPayment(
+  eventId: string,
+  registrationId: string,
+  payload: { razorpay_order_id?: string; razorpay_payment_id?: string; razorpay_signature?: string },
+) {
+  const user = await requireUser();
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = payload;
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return { error: "Missing payment details" };
+  }
+
+  const supabase = await createClient();
+
+  const { data: reg, error: fetchError } = await supabase
+    .from("form_responses")
+    .select("respondent_id, payment_status, razorpay_order_id, response_data")
+    .eq("id", registrationId)
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .single();
+  if (fetchError || !reg) return { error: "Registration not found" };
+  if (reg.respondent_id !== user.id) return { error: "Not allowed to update this registration" };
+  // Already paid -- most likely the webhook (/api/webhooks/razorpay, a
+  // separate server-to-server delivery) won the race against this
+  // client-driven callback and marked it paid first. That's a real bug we
+  // hit: the payment this call is reporting genuinely succeeded, so this
+  // must resolve as success too, not "isn't awaiting payment" -- the
+  // registrant just paid and is looking at an error on their own screen.
+  if (reg.payment_status === "paid") return { error: null };
+  if (reg.payment_status !== "unpaid") return { error: "This registration isn't awaiting payment" };
+  if (reg.razorpay_order_id !== razorpay_order_id) return { error: "Order mismatch -- please try again" };
+
+  let valid: boolean;
+  try {
+    valid = await verifyRazorpaySignature({ orderId: razorpay_order_id, paymentId: razorpay_payment_id, signature: razorpay_signature });
+  } catch (e) {
+    console.error("Razorpay signature verification failed:", e);
+    return { error: "Could not verify payment -- please try again" };
+  }
+  if (!valid) return { error: "Payment verification failed" };
+
+  // Service-role, not the caller's own RLS-scoped client: RLS is a
+  // declarative SQL condition, and there's no way to express "only allow
+  // this write if the HMAC signature checked out" as one -- the check
+  // above IS that authorization, already done in application code, so this
+  // one write intentionally bypasses RLS rather than needing (and forever
+  // trusting) a broad "respondent can mark their own registration paid"
+  // policy that any client call could otherwise invoke unchecked.
+  // .eq("payment_status", "unpaid") makes this write atomic: if a
+  // concurrent call (e.g. a flaky-network retry, or a race against the
+  // webhook) already flipped this row to 'paid' between the read above and
+  // this write, that "unpaid" condition no longer matches and .select()
+  // returns zero rows -- caught below to skip sending a second confirmation
+  // email/notification for the same payment.
+  const admin = createAdminClient();
+  const { data: updated, error: updateError } = await admin
+    .from("form_responses")
+    .update({ payment_status: "paid", razorpay_payment_id })
+    .eq("id", registrationId)
+    .eq("payment_status", "unpaid")
+    .select("id");
+  if (updateError) return { error: updateError.message };
+  if (!updated || updated.length === 0) return { error: null };
+
+  // Same "you're registered" email/notification the free-ticket path sends
+  // at registration time (registerForEvent above) -- a Razorpay-verified
+  // signature is this path's equivalent confirmation moment, just arriving
+  // after checkout instead of immediately.
+  const responseData = reg.response_data as unknown as { name?: string; email?: string } | null;
+  if (responseData?.email) {
+    try {
+      await sendRegistrationConfirmationEmail(supabase, {
+        email: responseData.email,
+        eventId,
+        registrantName: responseData.name ?? "there",
+      });
+    } catch (e) {
+      console.error("Failed to send post-payment confirmation email:", e);
+    }
+  }
+  await supabase.from("notifications").insert({
+    user_id: user.id,
+    type: "event_registered",
+    title: "You're registered!",
+    body: "Payment confirmed",
+    link: `/events/${eventId}`,
+  });
+
+  revalidatePath(`/events/${eventId}`);
   return { error: null };
 }
 
@@ -431,6 +549,17 @@ export async function updateEvent(
   const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
   if (!auth.ok) return { error: auth.error };
 
+  // A published event that's already happened is frozen -- no detail
+  // change (date, venue, description, ticket info) makes sense for
+  // something people already attended, and it keeps the Broadcast circle's
+  // one-time "new event" post (0076) from ever describing a stale listing.
+  // Drafts (event_date still null) are unaffected -- isEventPast returns
+  // false for those.
+  const { data: currentEvent } = await supabase.from("events").select("event_date, event_end_date").eq("id", eventId).single();
+  if (currentEvent && isEventPast(currentEvent)) return { error: "This event has already happened and can no longer be edited." };
+
+  const dateFields = deriveDateFields(data);
+
   // Explicit column list, not a spread of `data` -- host_id/community_id/
   // status can never be written through this action no matter what the
   // schema looks like later (same reasoning as updateCommunity).
@@ -440,17 +569,36 @@ export async function updateEvent(
       event_name: data.event_name,
       description: data.description || null,
       description_content: data.description_content ?? null,
-      event_date: data.event_date,
-      event_time: data.event_time || null,
+      event_date: dateFields.event_date,
+      event_end_date: dateFields.event_end_date,
+      event_time: dateFields.event_time,
+      event_end_time: dateFields.event_end_time,
       event_mode: data.event_mode,
       venue: data.event_mode === "online" ? null : data.venue || null,
-      city: data.city || null,
-      extra_cities: data.extra_cities,
+      venue_lat: data.event_mode === "online" ? null : data.venue_lat ?? null,
+      venue_lng: data.event_mode === "online" ? null : data.venue_lng ?? null,
+      venue_place_id: data.event_mode === "online" ? null : data.venue_place_id ?? null,
+      city: data.all_cities ? null : data.city || null,
+      extra_cities: data.all_cities ? [] : data.extra_cities,
+      all_cities: data.all_cities,
       category: data.category,
+      extra_categories: data.extra_categories,
     })
     .eq("id", eventId);
 
   if (error) return { error: error.message };
+
+  // Replace-all, same pattern as updateEventTicketsAndForm's ticket-types
+  // rewrite below -- simpler than diffing rows, and cheap since an event
+  // has at most a handful of dates.
+  const { error: deleteDatesError } = await supabase.from("event_date_entries").delete().eq("event_id", eventId);
+  if (deleteDatesError) return { error: `Event saved, but the date list failed to update: ${deleteDatesError.message}` };
+  if (data.event_dates.length > 0) {
+    const { error: insertDatesError } = await supabase
+      .from("event_date_entries")
+      .insert(buildDateEntryRows(eventId, data.event_dates));
+    if (insertDatesError) return { error: `Event saved, but the date list failed to update: ${insertDatesError.message}` };
+  }
 
   // Same table either way -- upsert covers both "never had a link" and
   // "updating an existing one." Switching to offline leaves a stale link
@@ -464,6 +612,48 @@ export async function updateEvent(
       .from("event_meeting_links")
       .upsert({ event_id: eventId, meeting_link: data.meeting_link, updated_at: new Date().toISOString() });
     if (linkError) return { error: `Event saved, but the meeting link failed to save: ${linkError.message}` };
+  }
+
+  // Every existing registrant (deduped -- "register again" can leave more
+  // than one row for the same person) hears about this, not the host
+  // themselves and not the wider community/followers -- those audiences
+  // weren't promised anything yet and don't need an update notification
+  // for it. Notification insert goes through the admin client, not this
+  // request's own RLS-scoped one -- notifications_insert_self (0061) only
+  // permits `user_id = auth.uid()`, and this is the host writing into each
+  // registrant's own notifications, someone else's row. Awaited, not
+  // fire-and-forget, same Cloudflare Workers reasoning as every other email
+  // send in this file.
+  const { data: registrants } = await supabase
+    .from("form_responses")
+    .select("respondent_id, response_data")
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .neq("respondent_id", user.id);
+  const admin = createAdminClient();
+  const seen = new Set<string>();
+  for (const r of registrants ?? []) {
+    if (seen.has(r.respondent_id)) continue;
+    seen.add(r.respondent_id);
+    const responseData = r.response_data as unknown as { name?: string; email?: string } | null;
+    await admin.from("notifications").insert({
+      user_id: r.respondent_id,
+      type: "event_updated",
+      title: "Event updated",
+      body: data.event_name,
+      link: `/events/${eventId}`,
+    });
+    if (responseData?.email) {
+      try {
+        await sendEventUpdatedEmail(supabase, {
+          email: responseData.email,
+          eventId,
+          registrantName: responseData.name ?? "there",
+        });
+      } catch (e) {
+        console.error("Failed to send event-updated email:", e);
+      }
+    }
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -483,6 +673,10 @@ export async function updateEventTicketsAndForm(eventId: string, input: UpdateEv
 
   const auth = await requireEventHostOrAdmin(supabase, eventId, user.id);
   if (!auth.ok) return { error: auth.error };
+
+  // Same "already happened -> frozen" rule as updateEvent above.
+  const { data: currentEvent } = await supabase.from("events").select("event_date, event_end_date").eq("id", eventId).single();
+  if (currentEvent && isEventPast(currentEvent)) return { error: "This event has already happened and can no longer be edited." };
 
   // Re-checked here, not just left to the UI hiding the editor -- changing
   // ticket types/questions out from under people who already registered
@@ -544,7 +738,7 @@ export async function updateEventTicketsAndForm(eventId: string, input: UpdateEv
 }
 
 export async function cancelEvent(eventId: string) {
-  await requireUser();
+  const user = await requireUser();
   const supabase = await createClient();
 
   // RLS (events_update_host_or_admin) is the real gate -- a non-host
@@ -552,15 +746,11 @@ export async function cancelEvent(eventId: string) {
   // pattern as setCheckInCount above. Registrations (form_responses) are
   // untouched by design -- people who already registered should still see
   // they signed up for something that got cancelled, not have that record
-  // silently disappear.
-  const { data, error } = await supabase
-    .from("events")
-    .update({ status: "cancelled" })
-    .eq("id", eventId)
-    .select();
-
-  if (error) return { error: error.message };
-  if (!data || data.length === 0) return { error: "Not allowed to cancel this event" };
+  // silently disappear. Registrant notification (audit found this
+  // previously sent none at all -- /cancellation-refund Section 3 promises
+  // it) lives in cancelEventForHost, shared with the mobile route.
+  const { error } = await cancelEventForHost(supabase, eventId, user.id);
+  if (error) return { error };
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath(`/events/${eventId}/manage`);
@@ -626,10 +816,18 @@ export async function duplicateEvent(eventId: string) {
       description: original.description,
       description_content: original.description_content,
       event_date: null,
+      event_end_date: null,
       event_time: original.event_time,
+      event_end_time: original.event_end_time,
       venue: original.venue,
+      venue_lat: original.venue_lat,
+      venue_lng: original.venue_lng,
+      venue_place_id: original.venue_place_id,
       city: original.city,
+      extra_cities: original.extra_cities,
+      all_cities: original.all_cities,
       category: original.category,
+      extra_categories: original.extra_categories,
       status: "active",
       unsplash_image_url: copyPhoto.imageUrl,
       unsplash_photo_id: copyPhoto.photoId,

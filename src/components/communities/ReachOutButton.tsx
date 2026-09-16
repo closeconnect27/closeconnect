@@ -11,20 +11,23 @@ export function ReachOutButton({
   threadId,
   initialMessages,
   currentUserId,
+  hasUnread = false,
 }: {
   communityId: string;
   communityName: string;
   threadId: string | null;
   initialMessages: DmMessage[];
   currentUserId: string;
+  hasUnread?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="btn-secondary px-4 py-2 text-[13px]">
+      <button onClick={() => setOpen(true)} className="btn-secondary relative px-4 py-2 text-[13px]">
         <IconMessage2 size={14} />
         Reach out to admin
+        {hasUnread && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-pink" />}
       </button>
 
       {open && (

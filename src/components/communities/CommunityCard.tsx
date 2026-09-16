@@ -1,19 +1,23 @@
 import { IconUsers, IconStar } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
-import type { Community } from "@/lib/queries/communities";
-import { JoinBadge } from "@/components/communities/JoinBadge";
+import { type Community, communitySlugOrId } from "@/lib/queries/communities";
 import { ClickableCard } from "@/components/ui/ClickableCard";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { CardSocialLinks } from "@/components/communities/CardSocialLinks";
+import { WebOnly } from "@/components/system/PlatformGate";
 
 const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
 
-// District-scale card, matching EventCard's rebuild: the photo fills most of
-// the card and carries the title directly on the image (large white type
-// over a dark gradient), not a small thumbnail with text below it. "new" is
-// derived from real created_at, not from an absent rating -- an old,
-// unrated community isn't "new".
+// Photo is a fixed 16:9 box (aspect-video, not a fixed height) -- same
+// ratio the mobile app's own CommunityCard uses, and the same ratio the
+// upload crop tool frames photos to, so a host's photo looks the same
+// wherever it's shown instead of getting cropped differently per surface.
+// The title still sits directly on the image (large white type over a dark
+// gradient), matching the app's own card layout. "new" is derived from real
+// created_at, not from an absent rating -- an old, unrated community isn't
+// "new".
 export function CommunityCard({ community: c }: { community: Community }) {
   const visual = getCategoryVisual(c.category);
   // This is a Server Component (no "use client"): it renders once per
@@ -25,12 +29,12 @@ export function CommunityCard({ community: c }: { community: Community }) {
 
   return (
     <ClickableCard
-      href={`/communities/${c.id}`}
+      href={`/communities/${communitySlugOrId(c)}`}
       className="card-elevated block h-full w-full cursor-pointer overflow-hidden rounded-card bg-bg2"
       trackEvent="community_card_opened"
       trackProperties={{ community_id: c.id, category: c.category, kind: c.kind }}
     >
-      <div className="relative h-72" style={{ background: visual.bg }}>
+      <div className="relative aspect-video" style={{ background: visual.bg }}>
         <CategoryImage
           slug={c.category}
           seed={communitySeed(c.id)}
@@ -46,11 +50,6 @@ export function CommunityCard({ community: c }: { community: Community }) {
           {isNew && (
             <span className="rounded-full bg-green px-2.5 py-1 font-mono text-[11px] font-semibold text-green-dark">
               New
-            </span>
-          )}
-          {c.kind === "external" && (
-            <span className="rounded-full border border-white/10 bg-black/70 px-2.5 py-1 font-mono text-[11px] font-medium text-text2">
-              External
             </span>
           )}
         </div>
@@ -78,28 +77,30 @@ export function CommunityCard({ community: c }: { community: Community }) {
           </div>
         )}
 
-        <div className="mt-1 flex items-center justify-between gap-2">
-          {c.kind === "native" ? (
-            <span className="flex items-center gap-3 text-[13px] font-medium text-text2">
-              <span className="flex items-center gap-1">
-                <IconStar size={13} className={c.avg_rating > 0 ? "fill-green text-green" : "text-text3"} />
-                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings yet"}
-              </span>
-              {c.member_count_visible && (
-                <span className="flex items-center gap-1">
-                  <IconUsers size={13} />
-                  {formatCount(c.member_count)}
-                </span>
-              )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-text2">
+          <span className="flex shrink-0 items-center gap-1">
+            <IconStar size={13} className={c.avg_rating > 0 ? "fill-green text-green" : "text-text3"} />
+            {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings yet"}
+          </span>
+          {c.member_count_visible && (
+            <span className="flex shrink-0 items-center gap-1">
+              <IconUsers size={13} />
+              {formatCount(c.member_count)}
             </span>
-          ) : (
-            <span />
           )}
-          {/* Keyed off external_link's presence, not kind -- a "Go
-              Native"-switched community keeps showing this even though
-              kind is now 'native' (explicit product requirement). */}
-          {c.external_link && <JoinBadge link={c.external_link} communityId={c.id} />}
         </div>
+
+        {/* Own row, not squeezed into the rating row above -- on a narrow
+            2-up mobile card, sharing one nowrap row with "No ratings yet" +
+            "1 member" text left too little width for the icon, so the text
+            wrapped word-by-word into a tall column and pushed the icon (via
+            items-center) down past the card's own bottom edge. */}
+        {/* External (WhatsApp/Instagram-linked) communities aren't part of
+            the app's own create/browse model -- the app only deals in
+            native communities, so these links never apply there. */}
+        <WebOnly>
+          <CardSocialLinks whatsappUrl={c.whatsapp_url} instagramUrl={c.instagram_url} />
+        </WebOnly>
       </div>
     </ClickableCard>
   );

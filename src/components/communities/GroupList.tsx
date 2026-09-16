@@ -13,6 +13,7 @@ import type { CommunityGroup } from "@/lib/queries/membership";
 // cards with gaps between them.
 export function GroupList({
   communityId,
+  communityHref,
   groups,
   isMember,
   joinedGroupIds,
@@ -20,6 +21,10 @@ export function GroupList({
   currentUserId,
 }: {
   communityId: string;
+  // Slug when the community has one, otherwise communityId itself -- kept
+  // separate from communityId since joinGroup (the actual action call
+  // below) always needs the real uuid regardless of which URL got here.
+  communityHref: string;
   groups: CommunityGroup[];
   isMember: boolean;
   joinedGroupIds: Set<string>;
@@ -85,7 +90,7 @@ export function GroupList({
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-semibold text-text">{group.name}</div>
                 <div className="truncate text-[12px] text-text3">
-                  {group.description || (group.is_announcement ? "Announcements" : "Group chat")}
+                  {group.description || (group.is_announcement ? "Broadcast" : "Circle chat")}
                 </div>
               </div>
             </>
@@ -95,7 +100,7 @@ export function GroupList({
             return (
               <Link
                 key={group.id}
-                href={`/communities/${communityId}/groups/${group.id}`}
+                href={`/communities/${communityHref}/groups/${group.id}`}
                 className="flex items-center gap-3 px-4 py-4 transition hover:bg-bg3"
               >
                 {content}
@@ -127,7 +132,7 @@ export function GroupList({
       </div>
       {!isMember && (
         <p className="border-t border-border px-4 py-3 text-[12px] text-text3">
-          Join the community to browse and join its groups.
+          Join the community to browse and join its circles.
         </p>
       )}
     </div>

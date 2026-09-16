@@ -23,7 +23,6 @@ export function MemberList({
   totalCount,
   ownerId,
   isStaff,
-  isOwner,
   membersListVisible,
   currentUserId,
 }: {
@@ -32,7 +31,6 @@ export function MemberList({
   totalCount: number;
   ownerId: string | null;
   isStaff: boolean;
-  isOwner: boolean;
   membersListVisible: boolean;
   currentUserId: string | null;
 }) {
@@ -83,6 +81,13 @@ export function MemberList({
       if (result?.error) setError(result.error);
       else {
         setRemovingId(null);
+        // Update the visible rows directly instead of relying on the
+        // parent's refreshed `members` prop -- loadedMembers was seeded once
+        // via useState(members) and never re-syncs to later prop values, so
+        // without this the row stayed on screen until a full reload
+        // remounted the component. router.refresh() is kept alongside this
+        // to pick up totalCount and any other server-derived data.
+        setLoadedMembers((prev) => prev.filter((m) => m.user_id !== userId));
         router.refresh();
       }
     });
@@ -95,7 +100,10 @@ export function MemberList({
       const result = await setMemberRole(communityId, userId, role);
       setRolePendingId(null);
       if (result?.error) setError(result.error);
-      else router.refresh();
+      else {
+        setLoadedMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, role } : m)));
+        router.refresh();
+      }
     });
   }
 
@@ -122,7 +130,7 @@ export function MemberList({
       {!membersListVisible && !isStaff && hiddenCount > 0 && (
         <p className="mb-3 flex items-center gap-1.5 text-[12px] text-text3">
           <IconLock size={13} />
-          The owner has hidden the rest of the member list ({hiddenCount} more).
+          An admin has hidden the rest of the member list ({hiddenCount} more).
         </p>
       )}
 
@@ -146,7 +154,11 @@ export function MemberList({
             const rawRole = m.user_id === ownerId ? "owner" : m.role;
             const displayRole = rawRole === "moderator" ? "Admin" : rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
             const canRemove = isStaff && m.user_id !== ownerId && m.user_id !== currentUserId;
-            const canToggleAdmin = isOwner && m.user_id !== ownerId;
+            // Any admin can promote/demote any other member now (0109), not
+            // just the owner -- the owner's own row stays protected (a
+            // plain admin still can't touch it), same reasoning as
+            // "message host" needing exactly one person to point at.
+            const canToggleAdmin = isStaff && m.user_id !== ownerId;
 
             return (
               <div key={m.user_id} className="flex items-center gap-3 px-4 py-3">

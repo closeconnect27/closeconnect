@@ -22,8 +22,8 @@ export function RatingSection({
   const [open, setOpen] = useState(false);
 
   // A self-rating isn't a meaningful signal (it's not real social proof, and
-  // an owner could inflate or deflate their own average either way) --
-  // hidden here, and rejected server-side too (0013) so this isn't just a
+  // an admin could inflate or deflate their own average either way) --
+  // hidden here, and rejected server-side too (0013/0108) so this isn't just a
   // UI-only gate a direct action call could bypass. Same reasoning for
   // non-members (0029): rating something you never joined isn't a
   // meaningful signal either, also rejected server-side. Not hidden for a

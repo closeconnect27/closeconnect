@@ -6,19 +6,25 @@ export default function CancellationRefundPolicyPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <h1 className="font-heading text-[24px] font-bold leading-tight">Cancellation &amp; Refund Policy</h1>
-      <p className="mt-1 text-[13px] text-text3">Last updated: July 18, 2026</p>
+      <p className="mt-1 text-[13px] text-text3">Last updated: August 25, 2026</p>
 
       <div className="mt-6 flex flex-col gap-6 text-[15px] leading-relaxed text-text">
         <p>
           This Cancellation &amp; Refund Policy applies to event registrations and ticket purchases made through
           CloseConnect (the &quot;Service&quot;), operated as a proprietorship business (Udyam Registration Number:
-          UDYAM-KR-03-0725059).
+          UDYAM-KR-03-0741080). All amounts referenced in this policy are in Indian Rupees (INR) strictly.
         </p>
 
-        <Section title="1. Event Registrations & Ticket Purchases">
+        <Section title="1. How Payments Are Processed">
           <p>
-            When you register for or purchase a ticket to an event listed on CloseConnect, your payment is processed
-            securely through our third-party payment gateway partner.
+            When you register for a paid event, your payment is collected by CloseConnect through our third-party
+            payment gateway partner (currently Razorpay). CloseConnect receives that payment into its own account on
+            the event host&apos;s behalf, and separately pays the ticket proceeds out to the host afterwards (see our{" "}
+            <a href="/terms" className="text-green hover:underline">
+              Terms of Service
+            </a>
+            , Sections 4&ndash;5). We do not store your card, UPI, or bank details ourselves &mdash; those are handled
+            directly by the payment gateway.
           </p>
         </Section>
 
@@ -50,7 +56,7 @@ export default function CancellationRefundPolicyPage() {
             </li>
             <li>
               In case of organizer-initiated cancellation, attendees are entitled to a <strong>full refund</strong> of
-              the ticket amount.
+              the ticket amount (in INR).
             </li>
             <li>
               If an event is postponed, attendees may choose to receive a full refund or retain their registration for
@@ -61,14 +67,19 @@ export default function CancellationRefundPolicyPage() {
 
         <Section title="4. Refund Processing">
           <ul className="list-disc pl-5">
-            <li>Approved refunds are processed back to the original payment method used at checkout.</li>
+            <li>Approved refunds are processed back to the original payment method used at checkout, in INR.</li>
             <li>
-              Refunds are typically processed within <strong>5-7 business days</strong>, depending on your bank or
-              payment provider&apos;s processing time.
+              Refunds are typically processed within <strong>5-7 business days</strong> of approval, depending on your
+              bank or payment provider&apos;s processing time.
             </li>
             <li>
-              CloseConnect does not charge any additional fee for processing refunds; however, payment gateway charges
-              (if any) may be non-refundable as per our payment partner&apos;s policies.
+              CloseConnect does not charge any fee for processing refunds; however, payment gateway charges (if any)
+              may be non-refundable as per our payment partner&apos;s policies. CloseConnect does not impose a
+              cancellation charge on you unless we would bear an equivalent charge ourselves.
+            </li>
+            <li>
+              If a refund you&apos;re entitled to hasn&apos;t arrived within the timeframe above, contact us using the
+              details in Section 8.
             </li>
           </ul>
         </Section>
@@ -92,8 +103,9 @@ export default function CancellationRefundPolicyPage() {
         <Section title="7. Disputes">
           <p>
             If you believe you&apos;re entitled to a refund that hasn&apos;t been processed, or if you have a dispute
-            regarding an event, please contact us at the details below within 7 days of the event date. We will work
-            with the event organizer to resolve the issue promptly.
+            regarding an event, please contact us at the details below within 7 days of the event date. We aim to
+            acknowledge disputes within 48 hours and resolve them within 30 days, working with the event host where
+            needed.
           </p>
         </Section>
 

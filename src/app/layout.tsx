@@ -1,7 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, DM_Sans, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { SiteChrome } from "@/components/layout/SiteChrome";
+import { PushNotificationRegistrar } from "@/components/system/PushNotificationRegistrar";
+import { NativeAuthBridge } from "@/components/system/NativeAuthBridge";
+import { NativeChromeBootstrap } from "@/components/system/NativeChromeBootstrap";
 import { createClient } from "@/lib/supabase/server";
 
 // Bold editorial serif for headings -- 900 for major headings/the hero
@@ -33,15 +36,31 @@ const firaCode = Fira_Code({
 export const metadata: Metadata = {
   metadataBase: new URL("https://closeconnect.in"),
   title: {
-    default: "Close.Connect -- Find your people. Host what you love.",
-    template: "%s | Close.Connect",
+    default: "CloseConnect -- Find your people. Host what you love.",
+    template: "%s | CloseConnect",
   },
   description: "Discover communities and events near you in India. Join a group, host a meetup, or sell tickets to your next event.",
   openGraph: {
-    siteName: "Close.Connect",
+    siteName: "CloseConnect",
     locale: "en_IN",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+  },
+};
+
+// viewportFit: "cover" pairs with BottomNav's own env(safe-area-inset-bottom)
+// padding for the gesture-nav bar at the bottom. The status bar at the top
+// is handled differently (NativeStatusBar sets overlay: false so Android
+// reserves real space for it outside the WebView, rather than needing a
+// matching safe-area-inset-top hack) -- both are harmless no-ops on the
+// regular web, where no notch/inset/status-bar exists to account for.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0a0a0a",
 };
 
 // Runs before hydration to avoid a flash of the wrong theme: stored choice
@@ -69,6 +88,9 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <NativeChromeBootstrap />
+        <NativeAuthBridge />
+        {isLoggedIn && <PushNotificationRegistrar />}
         <SiteChrome isLoggedIn={isLoggedIn} userId={user?.id ?? null}>
           {children}
         </SiteChrome>

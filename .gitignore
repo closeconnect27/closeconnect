@@ -48,3 +48,15 @@ next-env.d.ts
 .wrangler
 .dev.vars*
 !.dev.vars.example
+
+# Android signing -- losing/leaking this keystore is effectively
+# irreversible (Play App Signing ties app updates to it forever), never
+# committed even to a private repo.
+/keystore/
+*.jks
+*.keystore
+google-services.json
+android/keystore.properties
+
+# Claude Code's own local session/worktree state -- never repo content.
+.claude/

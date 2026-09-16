@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { richTextExtensions } from "@/lib/tiptap/extensions";
+import { plainTextToDoc } from "@/lib/tiptap/linkify";
 
 /**
  * Read-only render of a stored Tiptap JSON doc. Client-side (a real
@@ -28,7 +29,7 @@ export function RichTextView({
 }) {
   const editor = useEditor({
     extensions: richTextExtensions(),
-    content: content ?? (plainFallback ? { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: plainFallback }] }] } : ""),
+    content: content ?? (plainFallback ? plainTextToDoc(plainFallback) : ""),
     editable: false,
     // Tried setting this true, expecting it to bake content into the
     // server HTML -- it doesn't. Confirmed directly (curled a live page

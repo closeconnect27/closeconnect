@@ -13,6 +13,7 @@ export type DmThreadSummary = {
   member_name: string;
   last_message: string | null;
   last_message_at: string;
+  last_sender_id: string | null;
 };
 
 export async function getDmThreadMessages(supabase: SupabaseClient, threadId: string) {
@@ -57,16 +58,16 @@ export async function getCommunityDmThreads(supabase: SupabaseClient, communityI
   const threadIds = threads.map((t) => t.id as string);
   const { data: messages, error: messagesError } = await supabase
     .from("community_dm_messages")
-    .select("thread_id, content, created_at")
+    .select("thread_id, content, created_at, sender_id")
     .in("thread_id", threadIds)
     .order("created_at", { ascending: false });
   if (messagesError) throw messagesError;
 
-  const lastByThread = new Map<string, { content: string; created_at: string }>();
+  const lastByThread = new Map<string, { content: string; created_at: string; sender_id: string }>();
   for (const m of messages ?? []) {
     const threadId = m.thread_id as string;
     if (!lastByThread.has(threadId)) {
-      lastByThread.set(threadId, { content: m.content as string, created_at: m.created_at as string });
+      lastByThread.set(threadId, { content: m.content as string, created_at: m.created_at as string, sender_id: m.sender_id as string });
     }
   }
 
@@ -79,6 +80,7 @@ export async function getCommunityDmThreads(supabase: SupabaseClient, communityI
         member_name: t.profiles?.display_name ?? "Member",
         last_message: last?.content ?? null,
         last_message_at: last?.created_at ?? "",
+        last_sender_id: last?.sender_id ?? null,
       };
     })
     .sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));

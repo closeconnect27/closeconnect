@@ -7,7 +7,7 @@ import type { ChatMediaItem, ChatLinkItem } from "@/lib/queries/chat";
 // not a live view, so it doesn't need GroupChat's realtime subscription.
 export function GroupMediaLinks({ media, links }: { media: ChatMediaItem[]; links: ChatLinkItem[] }) {
   if (media.length === 0 && links.length === 0) {
-    return <EmptyState icon={IconPhoto} title="Nothing shared yet" description="Images, files, and links posted in this group show up here." compact />;
+    return <EmptyState icon={IconPhoto} title="Nothing shared yet" description="Images, files, and links posted in this circle show up here." compact />;
   }
 
   return (

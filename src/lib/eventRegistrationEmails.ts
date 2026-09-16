@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
+import { renderEmailShell, emailButton, emailCallout, escapeHtml } from "@/lib/emailTemplate";
+import { buildGoogleCalendarLink } from "@/lib/googleCalendarLink";
+import { safeHttpsHref } from "@/lib/validators/links";
 
 function formatEventDateForEmail(isoDate: string | null) {
   // Parsed as a plain calendar date, not a Date-with-timezone -- same
@@ -9,18 +12,44 @@ function formatEventDateForEmail(isoDate: string | null) {
   return new Date(y, m - 1, d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
 }
 
+function formatEventTimeForEmail(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 async function getEventEmailFields(supabase: SupabaseClient, eventId: string) {
   const { data: event } = await supabase
     .from("events")
-    .select("event_name, event_date, event_mode, venue, city")
+    .select("event_name, event_date, event_time, event_end_time, event_mode, venue, city")
     .eq("id", eventId)
     .single();
   if (!event) return null;
+  const isOnline = event.event_mode === "online";
+  const place = isOnline
+    ? [event.city].filter(Boolean).join(", ")
+    : [event.venue, event.city].filter(Boolean).join(", ");
+  const timeLabel = event.event_time
+    ? formatEventTimeForEmail(event.event_time) + (event.event_end_time ? ` – ${formatEventTimeForEmail(event.event_end_time)}` : "")
+    : null;
   return {
     eventName: event.event_name as string,
+    isoDate: event.event_date as string | null,
+    time: event.event_time as string | null,
     dateLabel: formatEventDateForEmail(event.event_date),
-    isOnline: event.event_mode === "online",
-    place: event.event_mode === "online" ? [event.city].filter(Boolean).join(", ") : [event.venue, event.city].filter(Boolean).join(", "),
+    timeLabel,
+    isOnline,
+    place,
+    calendarLink: event.event_date
+      ? buildGoogleCalendarLink({
+          title: event.event_name as string,
+          location: place || undefined,
+          isoDate: event.event_date as string,
+          time: event.event_time as string | null,
+          endTime: event.event_end_time as string | null,
+        })
+      : null,
   };
 }
 
@@ -30,9 +59,9 @@ async function getEventEmailFields(supabase: SupabaseClient, eventId: string) {
  * returns a value when the acting user is actually authorized to see it
  * (the event's host, or -- since this is only ever called right after that
  * exact registration's payment_status flips to 'paid', both at the
- * registerForEvent free-ticket path and confirmPayment's confirm path --
- * the registrant themself). Never fetched/sent for a still-unpaid
- * registration (see sendPaymentPendingEmail, which never calls this). */
+ * registerForEvent free-ticket path and verifyRazorpayPayment's success
+ * path -- the registrant themself). Never fetched/sent for a still-unpaid
+ * registration. */
 async function getMeetingLinkForEmail(supabase: SupabaseClient, eventId: string) {
   const { data } = await supabase.from("event_meeting_links").select("meeting_link").eq("event_id", eventId).maybeSingle();
   return (data?.meeting_link as string | undefined) ?? null;
@@ -40,9 +69,9 @@ async function getMeetingLinkForEmail(supabase: SupabaseClient, eventId: string)
 
 /** The real "you're in" email -- only ever sent once a spot is actually
  * confirmed: immediately for a free ticket (nothing left to do), or from
- * confirmPayment once the host manually confirms a paid one. Never sent
- * at registration time for a paid ticket -- see sendPaymentPendingEmail
- * for that moment instead. */
+ * verifyRazorpayPayment once a paid ticket's Razorpay signature checks out.
+ * Never sent at registration time for a paid ticket -- there's nothing to
+ * confirm yet at that point. */
 export async function sendRegistrationConfirmationEmail(
   supabase: SupabaseClient,
   { email, eventId, registrantName }: { email: string; eventId: string; registrantName: string },
@@ -54,70 +83,101 @@ export async function sendRegistrationConfirmationEmail(
   // is actually confirmed (this function's own doc comment) -- "only
   // registered users should receive the meeting link" from the request.
   const meetingLink = fields.isOnline ? await getMeetingLinkForEmail(supabase, eventId) : null;
+  const name = escapeHtml(registrantName);
+  const eventName = escapeHtml(fields.eventName);
 
   await sendEmail({
     to: email,
-    subject: `You're registered: ${fields.eventName}`,
-    html: `
-      <p>Hi ${registrantName},</p>
-      <p>You're registered for <strong>${fields.eventName}</strong>.</p>
-      <p>${fields.dateLabel}${fields.place ? ` &middot; ${fields.place}` : ""}</p>
-      ${
-        fields.isOnline
-          ? meetingLink
-            ? `<p>Join here: <a href="${meetingLink}">${meetingLink}</a></p>`
-            : `<p>This is an online event -- the host hasn't shared a meeting link yet. Check the event page closer to the date.</p>`
-          : ""
-      }
-    `,
+    subject: `You're in! 🎉 ${fields.eventName}`,
+    html: renderEmailShell({
+      preheader: `You're locked in for ${fields.eventName} -- here's everything you need.`,
+      bodyHtml: `
+        <p style="margin:0 0 8px;font-size:17px;">Hey ${name} 👋</p>
+        <p style="margin:0 0 20px;">Good news -- you're officially registered for <strong>${eventName}</strong>. Save the date, we'll see you there.</p>
+        ${emailCallout(`
+          <strong>${fields.dateLabel}${fields.timeLabel ? ` &middot; ${fields.timeLabel}` : ""}</strong>
+          ${fields.place ? `<br/>${escapeHtml(fields.place)}` : ""}
+        `)}
+        ${
+          fields.isOnline
+            ? meetingLink
+              ? `<p style="margin:20px 0 0;">Here's your link -- keep it handy: <a href="${safeHttpsHref(meetingLink)}" style="color:#1a7a5e;">${escapeHtml(meetingLink)}</a></p>`
+              : `<p style="margin:20px 0 0;color:#6b6f6b;">It's an online event and the host hasn't dropped the meeting link yet -- check back on the event page closer to the date.</p>`
+            : ""
+        }
+        ${fields.calendarLink ? `<p style="margin:24px 0 0;">${emailButton("Add to Google Calendar", fields.calendarLink)}</p>` : ""}
+      `,
+    }),
   });
 }
 
-/** Sent at registration time for a PAID ticket instead of the
- * confirmation above -- the spot is reserved (capacity/rate-limit checks
- * already ran), but not actually confirmed until the host manually
- * confirms the UPI payment (confirmPayment in app/actions/events.ts). Says
- * so plainly rather than implying "you're in" before money has moved.
- * Shows the host's own UPI QR/ID (set inline while creating/editing the
- * event, PaymentDetailsForm) -- registrants pay the host directly and
- * tell us the reference number back, there's no checkout link at all. */
-export async function sendPaymentPendingEmail(
+/** Sent to every existing registrant when the host edits an event's core
+ * details (updateEvent in app/actions/events.ts) -- date/time/venue/etc.
+ * Deliberately generic rather than diffing old vs. new field-by-field
+ * (real value, low complexity: "something changed, here's what it says
+ * now" covers every case without tracking per-field history). Shows the
+ * event's CURRENT details -- getEventEmailFields reads them fresh, so this
+ * always reflects what was just saved, not what the registrant originally
+ * signed up for. */
+/** Sent to every existing registrant when the host cancels an event
+ * (cancelEvent in app/actions/events.ts). Refund language is generic
+ * ("if you paid") rather than looking up this registrant's actual payment
+ * status/amount -- matches sendEventUpdatedEmail's "something changed,
+ * here's what it means" philosophy, and this is what /cancellation-refund
+ * (Section 3) already promises: notification + a full refund entitlement
+ * for a paid ticket, phrased so it's still correct for a free registrant. */
+export async function sendEventCancelledEmail(
   supabase: SupabaseClient,
-  {
-    email,
-    eventId,
-    registrantName,
-    upiId,
-    qrImageUrl,
-    amountRupees,
-  }: {
-    email: string;
-    eventId: string;
-    registrantName: string;
-    upiId: string | null;
-    qrImageUrl: string | null;
-    amountRupees: number;
-  },
+  { email, eventId, registrantName }: { email: string; eventId: string; registrantName: string },
 ) {
   const fields = await getEventEmailFields(supabase, eventId);
   if (!fields) return;
 
+  const name = escapeHtml(registrantName);
+  const eventName = escapeHtml(fields.eventName);
+  const refundPolicyLink = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/cancellation-refund`;
+
   await sendEmail({
     to: email,
-    subject: `Complete your payment: ${fields.eventName}`,
-    html: `
-      <p>Hi ${registrantName},</p>
-      <p>Your spot for <strong>${fields.eventName}</strong> is reserved, but not confirmed yet -- pay &#8377;${amountRupees} by UPI to lock it in, then tell us the reference number back on the event page.</p>
-      <p>${fields.dateLabel}${fields.place ? ` &middot; ${fields.place}` : ""}</p>
-      ${
-        upiId || qrImageUrl
-          ? `
-        ${qrImageUrl ? `<p><img src="${qrImageUrl}" alt="Payment QR code" width="180" height="180" style="border:1px solid #ddd;border-radius:8px" /></p>` : ""}
-        ${upiId ? `<p>UPI ID: <strong>${upiId}</strong></p>` : ""}
-        <p><a href="${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/events/${eventId}">Go to the event page to enter your payment reference</a></p>
-      `
-          : `<p>Payment setup ran into an issue -- contact the organizer to complete payment.</p>`
-      }
-    `,
+    subject: `Cancelled: ${fields.eventName}`,
+    html: renderEmailShell({
+      preheader: `${fields.eventName} has been cancelled by the organizer.`,
+      bodyHtml: `
+        <p style="margin:0 0 8px;font-size:17px;">Hey ${name} 👋</p>
+        <p style="margin:0 0 20px;">The organizer has cancelled <strong>${eventName}</strong>, which you were registered for.</p>
+        <p style="margin:0 0 20px;">If you paid for a ticket, you're entitled to a full refund -- our team will process it back to your original payment method, typically within 5-7 business days. If your registration was free, there's nothing further you need to do.</p>
+        <p style="margin:24px 0 0;">${emailButton("Read our refund policy", refundPolicyLink)}</p>
+      `,
+    }),
   });
 }
+
+export async function sendEventUpdatedEmail(
+  supabase: SupabaseClient,
+  { email, eventId, registrantName }: { email: string; eventId: string; registrantName: string },
+) {
+  const fields = await getEventEmailFields(supabase, eventId);
+  if (!fields) return;
+
+  const name = escapeHtml(registrantName);
+  const eventName = escapeHtml(fields.eventName);
+  const eventPageLink = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/events/${eventId}`;
+
+  await sendEmail({
+    to: email,
+    subject: `Updated: ${fields.eventName}`,
+    html: renderEmailShell({
+      preheader: `The organizer just updated details for ${fields.eventName} -- here's what it looks like now.`,
+      bodyHtml: `
+        <p style="margin:0 0 8px;font-size:17px;">Hey ${name} 👋</p>
+        <p style="margin:0 0 20px;">The organizer just updated <strong>${eventName}</strong>, which you're registered for. Here's what it looks like now:</p>
+        ${emailCallout(`
+          <strong>${fields.dateLabel}${fields.timeLabel ? ` &middot; ${fields.timeLabel}` : ""}</strong>
+          ${fields.place ? `<br/>${escapeHtml(fields.place)}` : ""}
+        `)}
+        <p style="margin:24px 0 0;">${emailButton("View the event", eventPageLink)}</p>
+      `,
+    }),
+  });
+}
+

@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 // logo/cover/gallery already coexisted in one bucket per entity type.
 export async function uploadDescriptionImage(
   file: File,
-  bucket: "community-images" | "event-images",
+  bucket: "community-images" | "event-images" | "community-post-images",
   entityId: string,
 ): Promise<{ url: string | null; error: string | null }> {
   const supabase = createClient();

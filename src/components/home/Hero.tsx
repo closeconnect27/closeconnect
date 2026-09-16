@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MoreMenu } from "@/components/layout/MoreMenu";
 
 // The entire homepage, full stop -- a single non-scrolling screen (see
 // SiteChromeInner's isHome branch for the scroll lock + the Footer that
@@ -7,8 +8,12 @@ import Link from "next/link";
 // the same source every community/event card draws from, not fresh/random
 // stock) drift right-to-left at three different speeds for a layered feel,
 // tilted as one field rather than kept perfectly horizontal. Pure CSS
-// (globals.css's .hero-marquee-row/.hero-fade-in) -- no client-side JS
-// anywhere on this page, so it ships with zero hydration cost.
+// (globals.css's .hero-marquee-row/.hero-fade-in) for the marquee/fade-in
+// itself -- MoreMenu below is this page's one deliberate exception (a real
+// client component/hydration cost), since SiteChromeInner never renders the
+// normal Header here at all, and that's where About/Support/Terms/Privacy
+// live for every other route. Without it, the homepage had no way to reach
+// any of them once Footer was trimmed down to just the copyright line.
 type Card = { slug: string; caption: string; url: string };
 
 function img(photo: string, w = 440, h = 300) {
@@ -108,6 +113,14 @@ export function Hero() {
             "radial-gradient(ellipse 55% 62% at 50% 50%, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.95) 45%, rgba(0,0,0,0.78) 63%, rgba(0,0,0,0.35) 78%, rgba(0,0,0,0) 92%)",
         }}
       />
+
+      {/* z-20, above the foreground block below -- top-right corner is
+          where this sits in every other route's Header, so its position is
+          at least familiar even though this page has no header bar to
+          anchor it in. */}
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <MoreMenu dark />
+      </div>
 
       {/* Foreground -- z-10 makes the stacking order explicit rather than
           relying on DOM order alone to win over the two absolute layers

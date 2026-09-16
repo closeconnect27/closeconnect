@@ -19,7 +19,7 @@ export async function setCommunityFounding(communityId: string, founding: boolea
   const { error } = await supabase.from("communities").update({ is_founding: founding }).eq("id", communityId);
   if (error) return { error: error.message };
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   revalidatePath("/admin");
   return { error: null };
 }

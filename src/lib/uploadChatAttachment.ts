@@ -18,11 +18,11 @@ function classify(file: File): "image" | "video" | "file" {
   return "file";
 }
 
-export type ChatAttachment = { path: string; type: "image" | "video" | "file"; name: string };
+export type ChatAttachment = { path: string; type: "image" | "video" | "file" | "voice"; name: string; durationSeconds?: number };
 
 export async function uploadChatAttachment(
   file: File,
-  groupId: string,
+  folderPrefix: string,
 ): Promise<{ attachment: ChatAttachment | null; error: string | null }> {
   const type = classify(file);
   if (type === "file" && file.size > LIMITS.file) {
@@ -37,7 +37,7 @@ export async function uploadChatAttachment(
 
   const supabase = createClient();
   const ext = file.name.split(".").pop() ?? "bin";
-  const path = `${groupId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${folderPrefix}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage.from("chat-attachments").upload(path, file, {
     contentType: file.type,
@@ -46,4 +46,26 @@ export async function uploadChatAttachment(
   if (error) return { attachment: null, error: error.message };
 
   return { attachment: { path, type, name: file.name }, error: null };
+}
+
+const VOICE_NOTE_LIMIT = 25 * 1024 * 1024;
+
+// The recorder (voiceRecording.ts) hands back a raw Blob from
+// MediaRecorder, not a File from an <input> picker -- same bucket/path
+// convention as uploadChatAttachment, just a fixed "voice" classification
+// and content type instead of sniffing one from a picked file.
+export async function uploadVoiceNote(blob: Blob, folderPrefix: string, durationSeconds: number): Promise<{ attachment: ChatAttachment | null; error: string | null }> {
+  if (blob.size > VOICE_NOTE_LIMIT) return { attachment: null, error: "That recording is larger than the 25MB limit." };
+
+  const supabase = createClient();
+  const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+  const path = `${folderPrefix}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage.from("chat-attachments").upload(path, blob, {
+    contentType: blob.type || "audio/webm",
+    cacheControl: "3600",
+  });
+  if (error) return { attachment: null, error: error.message };
+
+  return { attachment: { path, type: "voice", name: "Voice message", durationSeconds }, error: null };
 }

@@ -20,14 +20,22 @@ export async function submitEventFeedback(eventId: string, rating: number, comme
   // anyone who hasn't checked in, so a clear "why" here is a better failure
   // mode than a generic RLS 42501 for the only way to reach this (a direct
   // call bypassing the UI).
-  const { data: registration } = await supabase
+  //
+  // Plain select + .some(), not .maybeSingle() -- re-registering for the
+  // same event is explicitly allowed (0059), and multiple session dates
+  // (0073) add another reason a user can end up with more than one
+  // form_responses row for this event. .maybeSingle() errors out the
+  // instant a second row exists, which silently broke this check for
+  // exactly the "registered twice / different sessions, but checked in on
+  // one of them" case -- checked in on ANY of them is what should count,
+  // same as getMyEventCheckIn's own query already does.
+  const { data: registrations } = await supabase
     .from("form_responses")
     .select("checked_in_at")
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
-    .eq("respondent_id", user.id)
-    .maybeSingle();
-  if (!registration?.checked_in_at) {
+    .eq("respondent_id", user.id);
+  if (!registrations?.some((r) => r.checked_in_at)) {
     return { error: "Only attendees who checked in can leave feedback." };
   }
 

@@ -12,7 +12,6 @@ import {
   IconBrandInstagram,
   IconPencil,
   IconStar,
-  IconMapPin,
   IconUsersGroup,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
@@ -20,11 +19,18 @@ import {
   getProfileDetails,
   getPublicProfileBasic,
   getCommunitiesJoinedPublic,
+  getEventsHostedPublic,
   getEventsAttendedPublic,
   getFollowRequestStatus,
   getIsFollowing,
+  getFollowers,
+  getFollowing,
+  getIsBlocked,
 } from "@/lib/queries/profileDetails";
+import { BlockButton } from "@/components/profile/BlockButton";
+import { ProfileStatsAndLists } from "@/components/profile/ProfileStatsAndLists";
 import { getOrganizerStats } from "@/lib/queries/verification";
+import { communitySlugOrId } from "@/lib/queries/communities";
 import { getCategoryVisual, getCategory } from "@/lib/categories";
 import { safeSocialHref } from "@/lib/validators/links";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -35,6 +41,7 @@ import { FoundingToggle } from "@/components/ui/FoundingToggle";
 import { setHostFounding } from "@/app/actions/admin";
 import { RequestToFollowButton } from "@/components/profile/RequestToFollowButton";
 import { FollowButton } from "@/components/profile/FollowButton";
+import { MessageButton } from "@/components/profile/MessageButton";
 import { RichTextView } from "@/components/ui/RichTextView";
 
 // bio/profile_visibility come from `basic` (profiles, always public, 0035)
@@ -55,10 +62,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const basic = await getPublicProfileBasic(supabase, id);
   if (!basic) notFound();
 
-  const [details, stats, isFollowing] = await Promise.all([
+  const [details, stats, isFollowing, isBlocked] = await Promise.all([
     getProfileDetails(supabase, id),
     getOrganizerStats(supabase, id),
     getIsFollowing(supabase, id, viewer?.id ?? null),
+    getIsBlocked(supabase, viewer?.id ?? null, id),
   ]);
   const isOwner = viewer?.id === id;
   const { data: viewerProfile } = viewer
@@ -113,10 +121,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               profile only ever reaches this branch already-followed --
               never in a state where clicking "Follow" here would hit
               profile_follows_insert_own's private-blocking RLS. */}
-          {!isOwner && viewer && details && (
-            <FollowButton targetId={id} initiallyFollowing={isFollowing} />
+          {!isOwner && viewer && !isBlocked && (
+            <div className="flex shrink-0 items-start gap-2">
+              <MessageButton targetId={id} />
+              {details && <FollowButton targetId={id} initiallyFollowing={isFollowing} />}
+            </div>
           )}
         </div>
+
+        {!isOwner && viewer && (
+          <div className="mt-2 flex justify-end">
+            <BlockButton targetId={id} initiallyBlocked={isBlocked} />
+          </div>
+        )}
 
         {isAdmin && (
           <div className="mt-3">
@@ -233,9 +250,12 @@ async function ProfileDetailSections({
   profileId: string;
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
-  const [communities, events] = await Promise.all([
+  const [communities, eventsHosted, eventsAttended, followers, following] = await Promise.all([
     getCommunitiesJoinedPublic(supabase, profileId),
+    getEventsHostedPublic(supabase, profileId),
     getEventsAttendedPublic(supabase, profileId),
+    getFollowers(supabase, profileId),
+    getFollowing(supabase, profileId),
   ]);
 
   const socialLinks = [
@@ -311,58 +331,13 @@ async function ProfileDetailSections({
         </div>
       )}
 
-      <section className="mt-8">
-        <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Communities</h2>
-        {communities.length === 0 ? (
-          <EmptyState icon={IconUsers} title="Not part of any communities yet" compact />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {communities.map((c) => {
-              const visual = getCategoryVisual(c.category);
-              return (
-                <Link
-                  key={c.id}
-                  href={`/communities/${c.id}`}
-                  className="flex items-center gap-2 rounded-full border border-border2 py-1.5 pl-1.5 pr-3 text-[13px] font-medium text-text2 transition hover:border-green hover:text-green"
-                >
-                  <span
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
-                    style={{ background: visual.bg, color: visual.light }}
-                  >
-                    {c.name.charAt(0).toUpperCase()}
-                  </span>
-                  {c.name}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Events attended</h2>
-        {events.length === 0 ? (
-          <EmptyState icon={IconCalendarEvent} title="No past events yet" compact />
-        ) : (
-          <div className="flex flex-col gap-2">
-            {events.map((e) => (
-              <Link
-                key={e.id}
-                href={`/events/${e.id}`}
-                className="card-elevated flex items-center justify-between gap-3 rounded-card bg-bg2 p-3 transition hover:border-border-card-hover"
-              >
-                <span className="min-w-0 truncate text-[13px] font-medium text-text">{e.event_name}</span>
-                {e.city && (
-                  <span className="flex shrink-0 items-center gap-1 text-[12px] text-text3">
-                    <IconMapPin size={12} />
-                    {e.city}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+      <ProfileStatsAndLists
+        followers={followers}
+        following={following}
+        communities={communities}
+        eventsHosted={eventsHosted}
+        eventsAttended={eventsAttended}
+      />
     </>
   );
 }

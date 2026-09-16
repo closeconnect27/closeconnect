@@ -48,7 +48,7 @@ export async function submitRating(communityId: string, rating: number, review: 
     }
     return { error: error.message };
   }
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   trackServerEvent("rating_submitted", user.id, { community_id: communityId, rating: parsed.data.rating });
   return { error: null };
 }

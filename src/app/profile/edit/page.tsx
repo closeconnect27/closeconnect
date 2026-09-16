@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileDetails, getPublicProfileBasic } from "@/lib/queries/profileDetails";
 import { EditProfileForm } from "@/components/profile/EditProfileForm";
+import { DeleteAccountSection } from "@/components/profile/DeleteAccountSection";
 
 export default async function EditProfilePage() {
   const user = await requireUser();
@@ -29,6 +30,7 @@ export default async function EditProfilePage() {
         </Link>
         <h1 className="mb-6 font-heading text-[18px] font-bold leading-tight">Edit profile</h1>
         <EditProfileForm basic={basic} details={details} />
+        <DeleteAccountSection />
       </div>
     </div>
   );

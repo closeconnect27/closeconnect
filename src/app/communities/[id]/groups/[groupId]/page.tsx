@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getCommunityById, communitySlugOrId } from "@/lib/queries/communities";
 import { canReadGroup, canPostToGroup, getGroupMessages, getGroupById, getGroupMediaAndLinks } from "@/lib/queries/chat";
 import { markGroupRead } from "@/app/actions/chat";
 import { GroupChat } from "@/components/communities/GroupChat";
@@ -17,19 +18,30 @@ export default async function GroupChatPage({
   const user = await requireUser(); // chat requires an account, same as joining (SPEC.md Section 1)
   const supabase = await createClient();
 
+  // id may be a slug or a uuid (getCommunityById accepts either) -- group.
+  // community_id is always the real uuid, so the membership check below
+  // compares against the resolved community, never the raw route param.
+  let community;
+  try {
+    community = await getCommunityById(supabase, id);
+  } catch {
+    notFound();
+  }
+  const communityHref = communitySlugOrId(community);
+
   let group;
   try {
     group = await getGroupById(supabase, groupId);
   } catch {
     notFound();
   }
-  if (group.community_id !== id) notFound();
+  if (group.community_id !== community.id) notFound();
 
   // Announcement groups: readable by any community member, decoupled from
   // having separately joined this specific sub-group (0020) -- every other
   // group still requires an explicit join.
   const canRead = await canReadGroup(supabase, group, user.id);
-  if (!canRead) redirect(`/communities/${id}`);
+  if (!canRead) redirect(`/communities/${communityHref}`);
 
   const canPost = await canPostToGroup(supabase, group, user.id);
   const messages = await getGroupMessages(supabase, groupId);
@@ -52,7 +64,7 @@ export default async function GroupChatPage({
       <div className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col">
         <div className="shrink-0 pb-3">
           <Link
-            href={`/communities/${id}`}
+            href={`/communities/${communityHref}`}
             className="mb-2 inline-block text-[13px] text-text3 transition hover:text-text2"
           >
             ← Back to community

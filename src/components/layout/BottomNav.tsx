@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  IconHome,
   IconCalendarEvent,
   IconUsers,
-  IconCirclePlus,
+  IconMessageCircle,
   IconUserCircle,
 } from "@tabler/icons-react";
+import { useProfileDmBadge } from "@/lib/useProfileDmBadge";
 
 // Bottom tab bar for primary mobile destinations, replacing the old
 // hamburger-only MobileMenu. Research on real products (BookMyShow's mobile
@@ -16,17 +18,27 @@ import {
 // combo nav) shows bottom tabs beat a hamburger for a handful of frequent,
 // thumb-reachable destinations. Hidden entirely at `sm`+ where the header's
 // horizontal nav already covers the same destinations.
-export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
+//
+// Create tab replaced with Messages (individual DMs, /messages) -- every
+// one of Feed/Events/Communities already has its own "+"/"New X" entry
+// point in its own page header, so a global Create tab was redundant; this
+// is the same trade mobile's own bottom tab bar made this session (Create
+// -> Inbox). Messages carries the same red-dot badge as the header's
+// MessagesBell (useProfileDmBadge, shared rather than duplicated).
+export function BottomNav({ isLoggedIn, userId }: { isLoggedIn: boolean; userId: string | null }) {
   const pathname = usePathname();
+  const hasUnreadMessages = useProfileDmBadge(userId);
 
   const items = [
-    { href: "/events", label: "Events", icon: IconCalendarEvent, exact: false },
-    { href: "/communities", label: "Communities", icon: IconUsers, exact: false },
+    { href: "/feed", label: "Feed", icon: IconHome, exact: false, badge: false },
+    { href: "/events", label: "Events", icon: IconCalendarEvent, exact: false, badge: false },
+    { href: "/communities", label: "Communities", icon: IconUsers, exact: false, badge: false },
     {
-      href: "/create",
-      label: "Create",
-      icon: IconCirclePlus,
+      href: isLoggedIn ? "/messages" : "/login?redirect=/messages",
+      label: "Messages",
+      icon: IconMessageCircle,
       exact: true,
+      badge: isLoggedIn && hasUnreadMessages,
     },
     {
       // ?redirect=<current path> -- signing in from here (rather than one
@@ -37,6 +49,7 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
       label: isLoggedIn ? "Profile" : "Sign in",
       icon: IconUserCircle,
       exact: true,
+      badge: false,
     },
   ];
 
@@ -58,7 +71,10 @@ export function BottomNav({ isLoggedIn }: { isLoggedIn: boolean }) {
               isActive ? "text-green" : "text-text3"
             }`}
           >
-            <Icon size={22} stroke={isActive ? 2.2 : 1.8} />
+            <span className="relative">
+              <Icon size={22} stroke={isActive ? 2.2 : 1.8} />
+              {item.badge && <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-pink" />}
+            </span>
             {item.label}
           </Link>
         );

@@ -91,7 +91,7 @@ export function RichTextEditor({
   placeholder?: string;
   /** Which bucket/entity images upload under -- required when allowImages
    * is true. */
-  imageUpload?: { bucket: "community-images" | "event-images"; entityId: string };
+  imageUpload?: { bucket: "community-images" | "event-images" | "community-post-images"; entityId: string };
   allowImages?: boolean;
   maxImages?: number;
 }) {

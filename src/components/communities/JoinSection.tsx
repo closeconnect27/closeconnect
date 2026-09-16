@@ -16,6 +16,11 @@ export function JoinSection({
   isFull,
   pendingStatus,
   formFields,
+  // Set when this is embedded somewhere other than the community's own
+  // page (e.g. an event's detail page) -- "Join" alone is clear when the
+  // whole page is already about that community, but ambiguous dropped into
+  // an event page, so the button spells out which community it joins.
+  communityName,
 }: {
   communityId: string;
   joinMode: "open" | "request";
@@ -28,6 +33,7 @@ export function JoinSection({
   isFull: boolean;
   pendingStatus: "pending" | "approved" | "rejected" | null;
   formFields: FormField[];
+  communityName?: string;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -95,8 +101,8 @@ export function JoinSection({
   if (joinMode === "open") {
     return (
       <div>
-        <button onClick={handleJoinOpen} disabled={pending} className="btn-primary px-6 py-3 text-[14px]">
-          {pending ? "Joining…" : "Join"}
+        <button onClick={handleJoinOpen} disabled={pending} className="btn-join px-6 py-3 text-[14px]">
+          {pending ? "Joining…" : communityName ? `Join ${communityName}` : "Join"}
         </button>
         {error && <p className="mt-2 text-[13px] text-pink">{error}</p>}
       </div>
@@ -105,12 +111,13 @@ export function JoinSection({
 
   // request mode
   if (!showForm) {
+    const label = communityName ? `Request to join ${communityName}` : "Request to join";
     return (
       <button
         onClick={() => requireLoginOrRun(() => setShowForm(true))}
         className="btn-secondary px-6 py-3 text-[14px]"
       >
-        {pendingStatus === "rejected" ? "Request to join again" : "Request to join"}
+        {pendingStatus === "rejected" ? `${label} again` : label}
       </button>
     );
   }
@@ -127,7 +134,7 @@ export function JoinSection({
         <button
           onClick={handleSubmitRequest}
           disabled={pending}
-          className="btn-primary px-6 py-3 text-[14px]"
+          className="btn-join px-6 py-3 text-[14px]"
         >
           {pending ? "Submitting…" : "Submit request"}
         </button>

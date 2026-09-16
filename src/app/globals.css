@@ -31,6 +31,7 @@
   --pink: #d4537e;
   --pink-tint: #2a0e1a;
   --purple: #7f77dd;
+  --pink-neon: #db2777;
 }
 
 :root[data-theme="dark"] {
@@ -102,6 +103,7 @@
   --color-pink: var(--pink);
   --color-pink-tint: var(--pink-tint);
   --color-purple: var(--purple);
+  --color-pink-neon: var(--pink-neon);
   --color-border-card-hover: var(--border-card-hover);
   --shadow-card: var(--shadow-card);
   --shadow-card-hover: var(--shadow-card-hover);
@@ -118,6 +120,11 @@ body {
   font-size: 15px;
   line-height: 1.5;
   transition: background-color 0.15s ease, color 0.15s ease;
+  /* Belt-and-suspenders against any one element (an unwrapped flex row, an
+     image without max-width) pushing the whole page wider than the
+     viewport -- inside the Android app this reads as "the screen doesn't
+     fit right", not a scrollable overflow the way it might on desktop web. */
+  overflow-x: hidden;
 }
 
 /* @layer components, not plain global rules -- Tailwind v4's utility layer
@@ -140,6 +147,19 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--green);
   outline-offset: 2px;
+}
+
+/* VenueAutocomplete's own wrapper already shows focus via
+   `focus-within:border-green` around the whole control (input + the
+   current-location button), so the plain input's own native ring above is
+   redundant here -- two green rectangles nested inside each other. Has to
+   be a plain (unlayered) rule, not a Tailwind utility: Tailwind utilities
+   are always generated inside `@layer utilities`, and per the CSS Cascade
+   Layers spec an unlayered rule (the one above) always beats a layered one
+   regardless of specificity, so no `outline-none`/`focus-visible:outline-none`
+   utility could ever win against it. */
+.venue-autocomplete-input:focus-visible {
+  outline: none;
 }
 
 @layer components {
@@ -223,6 +243,37 @@ textarea:focus-visible,
   transform: scale(0.97);
 }
 .btn-primary:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Native community "Join" specifically -- not the app-wide primary green,
+   since that reads as WhatsApp's own brand color right next to the
+   external "Join on WhatsApp" link (CommunityDetailActions), which
+   defeats the point of the two being visually distinguishable.
+   --pink-neon (not the softer --pink already reserved for destructive/
+   error states like ReportModal) is its own dedicated shade, fixed across
+   both themes rather than flipping like --green/--purple do. --bg as ink
+   (not a fixed white) mirrors --green-dark's own trick of flipping
+   lightness with the theme so it stays legible in both. */
+.btn-join {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  background: var(--pink-neon);
+  color: var(--bg);
+  font-weight: 700;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.btn-join:hover {
+  filter: brightness(1.1);
+}
+.btn-join:active {
+  transform: scale(0.97);
+}
+.btn-join:disabled {
   opacity: 0.4;
   pointer-events: none;
 }
@@ -414,4 +465,56 @@ textarea:focus-visible,
     transform: none;
   }
 }
+}
+
+/* Google Places Autocomplete (VenueAutocomplete) renders its suggestion
+   dropdown as `.pac-container`, appended straight to <body> with Google's
+   own default styling (white background, its own font/shadow) -- nothing
+   like the rest of this app's dropdowns (Combobox/DatePicker/TimePicker's
+   shared bg2 card + rounded-card-sm items). Re-themed here with the same
+   tokens so it doesn't look like a foreign widget bolted onto the form;
+   using the CSS custom properties (not Tailwind classes, since this
+   content isn't in React's tree for Tailwind to apply to) means it still
+   follows dark/light theme automatically. */
+.pac-container {
+  background-color: var(--bg2) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+  margin-top: 8px;
+  padding: 6px;
+  font-family: inherit !important;
+}
+.pac-container:after {
+  /* Hides the "powered by Google" logo strip -- Google's terms require
+     attribution to remain somewhere in the UI when using Autocomplete,
+     which the Terms link already covers; this is purely the wordmark
+     image Google injects at the bottom of the dropdown, not the whole
+     attribution requirement. */
+  display: none;
+}
+.pac-item {
+  border-top: none !important;
+  padding: 8px 10px !important;
+  border-radius: var(--radius-card-sm);
+  font-family: inherit !important;
+  font-size: 13px !important;
+  color: var(--text2) !important;
+  cursor: pointer;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background-color: var(--bg3) !important;
+}
+.pac-icon {
+  display: none;
+}
+.pac-item-query {
+  font-size: 13px !important;
+  color: var(--text) !important;
+  padding-right: 4px;
+}
+.pac-matched {
+  color: var(--green) !important;
+  font-weight: 600;
 }

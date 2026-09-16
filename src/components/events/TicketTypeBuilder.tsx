@@ -4,9 +4,19 @@ import { IconTrash, IconPlus } from "@tabler/icons-react";
 
 export type TicketTypeDraft = {
   name: string;
-  price: number;
+  price: string; // kept as text in the form (same reasoning as quantity_available below) so a
+  // controlled input can hold an in-progress decimal like "49." without the value round-tripping
+  // through Number() on every keystroke and silently dropping the trailing point.
   quantity_available: string; // kept as text in the form, parsed to number|undefined on submit
 };
+
+// Shared with NewEventForm/EditEventForm, which need the same parse when
+// building the Server Action payload (schema wants a real number) and when
+// checking whether any ticket is paid.
+export function parsePrice(raw: string): number {
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-2.5 text-[14px] transition focus:border-green";
@@ -14,12 +24,11 @@ const inputClass =
 /**
  * Editor for an event's ticket types (SPEC.md Section 8: free + paid +
  * early-bird tiers, optional quantity cap). Paid tickets don't collect a
- * host-pasted payment link here -- registrants pay the host directly by
- * UPI, using whatever UPI ID/QR code the host sets in the payment details
- * section below (only shown once a ticket here has a price).
- * Mirrors FormBuilder's list-editor shape but for a different field set --
- * kept separate rather than generalizing FormBuilder further since ticket
- * types aren't part of the unified form-field system.
+ * host-pasted payment link here -- registrants pay through the platform's
+ * own Razorpay Standard Checkout (RazorpayPayButton), no setup required
+ * per host. Mirrors FormBuilder's list-editor shape but for a different
+ * field set -- kept separate rather than generalizing FormBuilder further
+ * since ticket types aren't part of the unified form-field system.
  */
 export function TicketTypeBuilder({
   tickets,
@@ -29,7 +38,7 @@ export function TicketTypeBuilder({
   onChange: (tickets: TicketTypeDraft[]) => void;
 }) {
   function addTicket() {
-    onChange([...tickets, { name: tickets.length === 0 ? "General" : "", price: 0, quantity_available: "" }]);
+    onChange([...tickets, { name: tickets.length === 0 ? "General" : "", price: "0", quantity_available: "" }]);
   }
 
   function updateTicket(i: number, patch: Partial<TicketTypeDraft>) {
@@ -67,29 +76,47 @@ export function TicketTypeBuilder({
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-bold text-text3">Price (₹, 0 = free)</span>
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
                 value={t.price}
-                onChange={(e) => updateTicket(i, { price: Number(e.target.value) || 0 })}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  // Free typing of a decimal, incl. in-progress states like
+                  // "49." or "" -- reject anything that isn't digits plus at
+                  // most one decimal point rather than coercing every
+                  // keystroke through Number().
+                  if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+                  updateTicket(i, { price: raw });
+                }}
                 className={inputClass}
               />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-bold text-text3">Quantity (optional)</span>
               <input
-                type="number"
-                min={1}
+                type="text"
+                inputMode="numeric"
                 value={t.quantity_available}
-                onChange={(e) => updateTicket(i, { quantity_available: e.target.value })}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  // Digits only, same reasoning as the price field just
+                  // above -- a real <input type="number">'s built-in
+                  // up/down spinner is the one piece of native browser
+                  // chrome nothing else in this app's inputs has, which is
+                  // exactly what read as inconsistent here.
+                  if (raw !== "" && !/^\d*$/.test(raw)) return;
+                  updateTicket(i, { quantity_available: raw });
+                }}
                 placeholder="Unlimited"
                 className={inputClass}
               />
             </label>
           </div>
 
-          {t.price > 0 && (
+          {parsePrice(t.price) > 0 && (
             <p className="mt-3 text-[11px] text-text3">
-              Registrants pay you directly by UPI -- add your UPI ID/QR code below, no link to paste here.
+              Registrants pay securely through Razorpay at checkout -- no setup needed.
             </p>
           )}
         </div>

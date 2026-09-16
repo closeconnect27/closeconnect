@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityById } from "@/lib/queries/communities";
-import { getMyVerificationRequestStatus } from "@/lib/queries/verification";
+import { getCommunityMembership } from "@/lib/queries/membership";
 import { EditCommunityForm } from "@/components/communities/EditCommunityForm";
 
 export default async function EditCommunityPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,14 +19,16 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
   }
 
   // Page-level gate in addition to the Server Action's own check (SPEC.md
-  // Section 11) -- redirect rather than notFound so a non-owner who lands
-  // here (e.g. an old bookmark after ownership changed) gets a clear reason,
-  // not a bare 404 that reads as "this community doesn't exist".
-  if (community.owner_id !== user.id) {
+  // Section 11) -- redirect rather than notFound so a non-admin who lands
+  // here (e.g. an old bookmark after their role changed) gets a clear
+  // reason, not a bare 404 that reads as "this community doesn't exist".
+  // Any admin can edit now, not just whoever created it (0108) -- owner_id
+  // is still checked as a defensive fallback (see dashboard.ts's comment).
+  const membership = await getCommunityMembership(supabase, id, user.id);
+  const isStaff = community.owner_id === user.id || membership?.role === "moderator";
+  if (!isStaff) {
     redirect(`/communities/${id}`);
   }
-
-  const verificationStatus = await getMyVerificationRequestStatus(supabase, "community", id, user.id);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -38,7 +40,7 @@ export default async function EditCommunityPage({ params }: { params: Promise<{ 
           ← Back to community
         </Link>
         <h1 className="mb-6 font-heading text-[18px] font-bold leading-tight">Edit community</h1>
-        <EditCommunityForm community={community} verificationStatus={verificationStatus} />
+        <EditCommunityForm community={community} />
       </div>
     </div>
   );

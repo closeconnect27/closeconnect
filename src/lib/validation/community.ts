@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isCategorySlug } from "@/lib/categories";
 import { isCity } from "@/lib/cities";
 import { formFieldsSchema } from "@/lib/validation/forms";
-import { isValidExternalLink } from "@/lib/validators/links";
+import { isValidInstagramUrl, isValidFacebookUrl, isValidLinkedInUrl, isValidWhatsAppUrl } from "@/lib/validators/links";
 import { descriptionContentField } from "@/lib/validation/richText";
 
 // Forms convert an empty selection to `undefined` before this ever runs
@@ -12,7 +12,22 @@ import { descriptionContentField } from "@/lib/validation/richText";
 // zod's type-predicate narrow this to `City`, not just `string`, so it
 // composes with extra_cities.includes(city) below without a cast.
 const cityField = z.string().trim().refine(isCity, "Choose a valid city").optional();
-const extraCitiesField = z.array(z.string().refine(isCity)).max(5).default([]);
+// No cap -- a community/event with no fixed home city can list under as
+// many as it wants; `all_cities` (below) is the separate "don't bother
+// picking, show everywhere" escape hatch for one that isn't tied to any
+// particular city at all.
+const extraCitiesField = z.array(z.string().refine(isCity)).default([]);
+const allCitiesField = z.boolean().default(false);
+
+// All optional -- a host adds whichever of these they actually have, same
+// "empty converts to undefined before this runs" convention as cityField
+// above. Render-time sanitizing (safeSocialHref) is the defense-in-depth
+// backstop, same reasoning as meetingLinkField (validation/event.ts).
+const instagramUrlField = z.string().trim().refine(isValidInstagramUrl, "Must be a valid Instagram profile URL").optional();
+const facebookUrlField = z.string().trim().refine(isValidFacebookUrl, "Must be a valid Facebook page URL").optional();
+const linkedinUrlField = z.string().trim().refine(isValidLinkedInUrl, "Must be a valid LinkedIn URL").optional();
+const whatsappUrlField = z.string().trim().refine(isValidWhatsAppUrl, "Must be a valid WhatsApp group or channel link").optional();
+const phoneField = z.string().trim().min(6, "Enter a valid phone number").max(20).optional();
 
 export const createCommunitySchema = z
   .object({
@@ -29,12 +44,18 @@ export const createCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
+    all_cities: allCitiesField,
     join_mode: z.enum(["open", "request"]),
     join_form_fields: formFieldsSchema.default([]),
     // Omitted/undefined means unlimited -- matches the DB column default
     // (0057). Enforced again at the DB level (a trigger, not just this
     // schema) since this is also reachable by directly calling the action.
     member_limit: z.number().int().min(1, "Must be at least 1").max(1_000_000).optional(),
+    instagram_url: instagramUrlField,
+    facebook_url: facebookUrlField,
+    linkedin_url: linkedinUrlField,
+    whatsapp_url: whatsappUrlField,
+    phone: phoneField,
   })
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",
@@ -60,7 +81,13 @@ export const updateCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
+    all_cities: allCitiesField,
     member_limit: z.number().int().min(1, "Must be at least 1").max(1_000_000).optional(),
+    instagram_url: instagramUrlField,
+    facebook_url: facebookUrlField,
+    linkedin_url: linkedinUrlField,
+    whatsapp_url: whatsappUrlField,
+    phone: phoneField,
   })
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",
@@ -73,10 +100,14 @@ export const updateCommunitySchema = z
 
 export type UpdateCommunityInput = z.infer<typeof updateCommunitySchema>;
 
-// Public, no-login submission for an external community listing -- the
-// original site's Add Community modal, which this app never actually had
-// (confirmed by audit, not assumed). No join_mode here: it only means
-// something for a native community with actual membership.
+// Public, no-login submission for a community listing -- the original
+// site's Add Community modal, which this app never actually had (confirmed
+// by audit, not assumed). This always creates a native community (0083):
+// kind stopped being how "claimable, unowned" is expressed -- owner_id/
+// claim_status alone already carry that -- so a listing submitted here gets
+// the full native toolkit (join, groups, chat) immediately, with a Claim
+// button until a real owner turns up. No join_mode here: the row is
+// created with the join_mode column default (open), same as before.
 export const submitExternalCommunitySchema = z
   .object({
     name: z.string().trim().min(3, "Community name must be at least 3 characters").max(80),
@@ -86,7 +117,12 @@ export const submitExternalCommunitySchema = z
     extra_categories: z.array(z.string().refine(isCategorySlug)).max(4).default([]),
     city: cityField,
     extra_cities: extraCitiesField,
-    external_link: z.string().trim().refine(isValidExternalLink, "Must be a WhatsApp or Instagram link"),
+    all_cities: allCitiesField,
+    instagram_url: instagramUrlField,
+    facebook_url: facebookUrlField,
+    linkedin_url: linkedinUrlField,
+    whatsapp_url: whatsappUrlField,
+    phone: phoneField,
   })
   .refine((c) => !c.extra_categories.includes(c.category), {
     message: "Extra categories can't repeat the primary category",

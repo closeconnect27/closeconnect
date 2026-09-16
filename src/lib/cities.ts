@@ -31,6 +31,7 @@ export const CITIES = [
   "Coimbatore",
   "Thiruvananthapuram",
   "Patna",
+  "Mysore",
 ] as const;
 
 export type City = (typeof CITIES)[number];

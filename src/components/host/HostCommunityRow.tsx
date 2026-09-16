@@ -3,7 +3,7 @@ import { IconUsers, IconStar } from "@tabler/icons-react";
 import { getCategoryVisual } from "@/lib/categories";
 import { communitySeed } from "@/lib/categoryImages";
 import { CategoryImage } from "@/components/ui/CategoryImage";
-import type { Community } from "@/lib/queries/communities";
+import { type Community, communitySlugOrId } from "@/lib/queries/communities";
 
 // Compact utility row, not a photo-forward browse card -- a management
 // console is scanned for status (pending count, role), not browsed for
@@ -23,7 +23,7 @@ export function HostCommunityRow({
 
   return (
     <Link
-      href={`/communities/${c.id}`}
+      href={`/communities/${communitySlugOrId(c)}`}
       className="card-elevated flex items-center gap-3 rounded-card bg-bg2 p-3 sm:p-4"
     >
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-card-sm" style={{ background: visual.bg }}>
@@ -48,21 +48,15 @@ export function HostCommunityRow({
           )}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-text3">
-          {c.kind === "native" ? (
-            <>
-              <span className="flex items-center gap-1">
-                <IconUsers size={12} />
-                {c.member_count}
-              </span>
-              <span className="flex items-center gap-1">
-                <IconStar size={12} className={c.avg_rating > 0 ? "fill-green text-green" : ""} />
-                {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings"}
-              </span>
-              <span>{c.join_mode === "request" ? "Request to join" : "Open"}</span>
-            </>
-          ) : (
-            <span>External</span>
-          )}
+          <span className="flex items-center gap-1">
+            <IconUsers size={12} />
+            {c.member_count}
+          </span>
+          <span className="flex items-center gap-1">
+            <IconStar size={12} className={c.avg_rating > 0 ? "fill-green text-green" : ""} />
+            {c.avg_rating > 0 ? c.avg_rating.toFixed(1) : "No ratings"}
+          </span>
+          <span>{c.join_mode === "request" ? "Request to join" : "Open"}</span>
         </div>
       </div>
 

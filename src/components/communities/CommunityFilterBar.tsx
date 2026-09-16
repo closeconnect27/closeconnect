@@ -2,24 +2,18 @@
 
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Combobox } from "@/components/ui/Combobox";
 import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { CITY_OPTIONS } from "@/lib/cities";
 
 // Category moved to CategorySidebar -- this is now just the top filter row:
 // City (multi-select, matches primary-or-extra same as the sidebar's
-// category logic) and native/external (kept -- it isn't in the reference
-// layout, but nothing gets dropped here). Online/offline "Type" filter
-// removed entirely -- it never drove any real behavior for a community.
-const KIND_OPTIONS = [
-  { value: "native", label: "Native only" },
-  { value: "external", label: "External only" },
-];
-
+// category logic). The native/external kind filter is gone (0083) -- every
+// community is native now, so "Native only"/"External only" no longer
+// distinguishes anything. Online/offline "Type" filter removed entirely
+// earlier -- it never drove any real behavior for a community.
 export function CommunityFilterBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeKind = searchParams.get("kind") ?? "";
 
   // Local state for the multi-select, not read from searchParams on every
   // render -- router.push() resolves asynchronously, and pushing once per
@@ -65,7 +59,6 @@ export function CommunityFilterBar() {
   return (
     <div className="flex flex-wrap gap-2 px-4 sm:px-6">
       <MultiCombobox values={cities} onChange={updateCities} options={CITY_OPTIONS} placeholder="All cities" />
-      <Combobox value={activeKind} onChange={(v) => setParam("kind", v)} options={KIND_OPTIONS} placeholder="Native + external" />
     </div>
   );
 }

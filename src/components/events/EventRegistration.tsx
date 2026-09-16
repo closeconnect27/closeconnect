@@ -2,22 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { IconCircleCheck } from "@tabler/icons-react";
+import { IconCircleCheck, IconBrandGoogle, IconDownload } from "@tabler/icons-react";
 import { DynamicForm } from "@/components/forms/DynamicForm";
-import { registerForEvent, submitPaymentReference } from "@/app/actions/events";
+import { registerForEvent } from "@/app/actions/events";
+import { RazorpayPayButton } from "@/components/events/RazorpayPayButton";
 import type { FormField } from "@/lib/queries/membership";
 import type { EventTicketType } from "@/lib/queries/events";
 
 // Registration requires a real account (SPEC.md's earlier guest-friendly
 // decision is deliberately reversed -- see Section 9 of the redesign brief):
-// legitimacy/security won out over convenience. Email now comes from the
-// signed-in session server-side, never a client-editable field -- name
-// stays editable since a registrant may reasonably check someone else in
-// under a different name than their account's. Paid tickets show the
-// host's own UPI QR/ID and collect a payment reference for the host to
-// manually confirm (registerForEvent/submitPaymentReference in
-// app/actions/events.ts) -- there's no checkout link at all, the
-// registrant pays the host directly.
+// legitimacy/security won out over convenience. Email and name now both come
+// from the signed-in session/profile server-side, never client-editable
+// fields -- a signed-in registrant is never asked to retype who they are.
+// Paid tickets pay through Razorpay Standard Checkout (RazorpayPayButton)
+// right in this same visit -- the platform's one Razorpay account takes it
+// regardless of host, so no per-host payment setup exists anymore (see
+// 0086's own history).
 export function EventRegistration({
   eventId,
   ticketTypes,
@@ -25,7 +25,9 @@ export function EventRegistration({
   availability,
   isLoggedIn,
   email,
+  displayName,
   alreadyRegisteredCount = 0,
+  calendarLink,
 }: {
   eventId: string;
   ticketTypes: EventTicketType[];
@@ -33,25 +35,31 @@ export function EventRegistration({
   availability: Map<string, number>;
   isLoggedIn: boolean;
   email?: string;
+  // The signed-in user's own profiles.display_name -- used as the
+  // registration's name with no separate input, same reasoning as email
+  // above. Falls back to the email's local-part if a profile somehow has no
+  // display_name yet, so registerForEvent never receives an empty string.
+  displayName?: string | null;
   // Duplicate registrations are allowed at the DB level (0059) -- this is
   // just what triggers the "you've already registered, register again?"
   // confirmation instead of silently resubmitting.
   alreadyRegisteredCount?: number;
+  // Same link as the page-level "Add to Calendar" button (computed once in
+  // the parent page and passed down) -- null whenever there's no real date
+  // yet or the event's cancelled.
+  calendarLink?: string | null;
 }) {
   const router = useRouter();
   const [ticketTypeId, setTicketTypeId] = useState(ticketTypes[0]?.id ?? "");
-  const [name, setName] = useState("");
+  const name = displayName?.trim() || email?.split("@")[0] || "";
   const [quantity, setQuantity] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [registrationId, setRegistrationId] = useState<string | null>(null);
-  const [hostUpi, setHostUpi] = useState<{ upiId: string | null; qrImageUrl: string | null } | null>(null);
-  const [reference, setReference] = useState("");
-  const [referenceSubmitted, setReferenceSubmitted] = useState(false);
+  const [razorpayPaid, setRazorpayPaid] = useState(false);
   const [confirmingReRegister, setConfirmingReRegister] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [referencePending, startReferenceTransition] = useTransition();
 
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
   const isSoldOut = (t: EventTicketType) =>
@@ -78,39 +86,53 @@ export function EventRegistration({
 
   function submitRegistration() {
     startTransition(async () => {
-      const result = await registerForEvent(eventId, { ticket_type_id: ticketTypeId, name, answers, quantity });
+      const result = await registerForEvent(eventId, {
+        ticket_type_id: ticketTypeId,
+        name,
+        answers,
+        quantity,
+      });
       if (result?.error) {
         setError(result.error);
         setConfirmingReRegister(false);
       } else {
         setRegistrationId(result.registrationId ?? null);
-        setHostUpi(result.hostUpi ?? null);
         setDone(true);
       }
     });
   }
 
-  function submitReference(e: React.FormEvent) {
-    e.preventDefault();
-    if (!registrationId || !reference.trim()) return;
-    setError("");
-    startReferenceTransition(async () => {
-      const result = await submitPaymentReference(eventId, registrationId, reference);
-      if (result?.error) setError(result.error);
-      else setReferenceSubmitted(true);
-    });
-  }
-
   if (!isLoggedIn) {
+    // Ticket prices render here too, not just post-login -- a signed-out
+    // visitor (or an automated crawler, e.g. a payment-gateway reviewer
+    // checking the site actually prices in INR) should be able to see what
+    // an event costs without an account; only the act of registering stays
+    // gated. Read-only (no onClick/select state -- that only exists in the
+    // logged-in form below), so this is just the same ₹ price list, static.
     return (
-      <div className="card-elevated flex flex-col items-center gap-3 rounded-card bg-bg2 p-6 text-center">
-        <p className="text-[13px] text-text2">Sign in to register for this event.</p>
-        <button
-          onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/events/${eventId}`)}`)}
-          className="btn-primary px-6 py-2.5 text-[14px]"
-        >
-          Sign in to register
-        </button>
+      <div className="card-elevated flex flex-col gap-3 rounded-card bg-bg2 p-6">
+        {ticketTypes.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {ticketTypes.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between rounded-card-sm border border-border2 px-4 py-3 text-left text-[13px]"
+              >
+                <span className="font-bold text-text">{t.name}</span>
+                <span className="font-bold text-green">{t.price === 0 ? "Free" : `₹${t.price}`}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-col items-center gap-3 pt-1 text-center">
+          <p className="text-[13px] text-text2">Sign in to register for this event.</p>
+          <button
+            onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/events/${eventId}`)}`)}
+            className="btn-primary px-6 py-2.5 text-[14px]"
+          >
+            Sign in to register
+          </button>
+        </div>
       </div>
     );
   }
@@ -126,74 +148,49 @@ export function EventRegistration({
           <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
           <p className="text-[15px] font-bold text-text">You&apos;re registered!</p>
           <p className="mt-1 text-[13px] text-text2">A confirmation has been sent to your email.</p>
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <DownloadTicketButton registrationId={registrationId} />
+            <AddToCalendarButton calendarLink={calendarLink} />
+          </div>
         </div>
       );
     }
 
-    if (!hostUpi?.upiId && !hostUpi?.qrImageUrl) {
+    // A Razorpay-verified signature IS the payment confirmation -- same
+    // success state as a free ticket, arriving the moment checkout clears
+    // instead of instantly.
+    if (razorpayPaid) {
       return (
         <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
           <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
-          <p className="text-[15px] font-bold text-text">Your spot is reserved</p>
-          <p className="mt-1 text-[13px] text-text2">
-            The organizer hasn&apos;t set up payment details yet -- contact them directly to complete payment.
-          </p>
-        </div>
-      );
-    }
-
-    if (!referenceSubmitted) {
-      return (
-        <div className="card-elevated flex flex-col gap-4 rounded-card bg-bg2 p-6 text-center">
-          <div>
-            <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
-            <p className="text-[15px] font-bold text-text">Your spot is reserved</p>
-            <p className="mt-1 text-[13px] text-text2">
-              Pay ₹{selectedTicket.price * quantity} by UPI, then tell us the reference number below to confirm it.
-            </p>
+          <p className="text-[15px] font-bold text-text">You&apos;re registered!</p>
+          <p className="mt-1 text-[13px] text-text2">A confirmation has been sent to your email.</p>
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <DownloadTicketButton registrationId={registrationId} />
+            <AddToCalendarButton calendarLink={calendarLink} />
           </div>
-
-          {hostUpi?.qrImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element -- storage public URL, not a static remote pattern next/image can optimize
-            <img
-              src={hostUpi.qrImageUrl}
-              alt="Payment QR code"
-              className="mx-auto h-44 w-44 rounded-card-sm border border-border2 object-contain"
-            />
-          )}
-          {hostUpi?.upiId && (
-            <p className="text-[14px] text-text2">
-              UPI ID: <span className="font-bold text-text">{hostUpi.upiId}</span>
-            </p>
-          )}
-
-          <form onSubmit={submitReference} className="flex flex-col gap-2 text-left">
-            <label className="flex flex-col gap-2">
-              <span className="text-[13px] font-medium text-text">Payment reference / UTR number</span>
-              <input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="e.g. 123456789012"
-                required
-                className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
-              />
-            </label>
-            {error && <p className="text-[13px] text-pink">{error}</p>}
-            <button type="submit" disabled={referencePending} className="btn-primary py-3 text-[14px]">
-              {referencePending ? "Submitting…" : "I've paid -- submit reference"}
-            </button>
-          </form>
         </div>
       );
     }
 
     return (
-      <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
-        <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
-        <p className="text-[15px] font-bold text-text">Payment submitted</p>
-        <p className="mt-1 text-[13px] text-text2">
-          The organizer will confirm your payment shortly -- you&apos;ll get an email once it&apos;s done.
-        </p>
+      <div className="card-elevated flex flex-col gap-4 rounded-card bg-bg2 p-6 text-center">
+        <div>
+          <IconCircleCheck size={32} className="mx-auto mb-2 text-green" />
+          <p className="text-[15px] font-bold text-text">Your spot is reserved</p>
+          <p className="mt-1 text-[13px] text-text2">Complete payment to confirm it.</p>
+        </div>
+
+        <RazorpayPayButton
+          eventId={eventId}
+          registrationId={registrationId!}
+          amountRupees={selectedTicket.price * quantity}
+          registrantName={name}
+          email={email}
+          onSuccess={() => setRazorpayPaid(true)}
+        />
+
+        <AddToCalendarButton calendarLink={calendarLink} />
       </div>
     );
   }
@@ -240,15 +237,10 @@ export function EventRegistration({
         )
       )}
 
-      <label className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         <span className="text-[13px] font-medium text-text">Name</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
-        />
-      </label>
+        <p className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] text-text2">{name}</p>
+      </div>
 
       <label className="flex flex-col gap-2">
         <span className="text-[13px] font-medium text-text">
@@ -316,5 +308,35 @@ export function EventRegistration({
         </button>
       )}
     </form>
+  );
+}
+
+// Shown on every post-registration success state above (free-ticket
+// confirmed, spot reserved, payment submitted) -- same link as the
+// page-level button in the parent page, just surfaced right where a
+// registrant actually sees "you're in" instead of only in the follow-up
+// email.
+function AddToCalendarButton({ calendarLink }: { calendarLink?: string | null }) {
+  if (!calendarLink) return null;
+  return (
+    <a href={calendarLink} target="_blank" rel="noopener noreferrer" className="btn-secondary justify-center px-4 py-2 text-[13px]">
+      <IconBrandGoogle size={14} />
+      Add to Calendar
+    </a>
+  );
+}
+
+// Shared with the profile page's RegisteredEventRow -- same PDF endpoint
+// (src/app/api/tickets/[id]/route.ts), same button, wherever a confirmed
+// registration is shown. A plain <a> (not a fetch+blob download) so the
+// browser's own download UI handles it and the request rides on the
+// visitor's existing session cookie automatically.
+export function DownloadTicketButton({ registrationId }: { registrationId: string | null }) {
+  if (!registrationId) return null;
+  return (
+    <a href={`/api/tickets/${registrationId}`} className="btn-secondary justify-center px-4 py-2 text-[13px]">
+      <IconDownload size={14} />
+      Download ticket
+    </a>
   );
 }

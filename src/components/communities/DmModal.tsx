@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useTransition } from "react";
-import { IconX, IconSend2, IconMessageCircle2 } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
+import { IconX, IconSend2, IconMessageCircle2, IconTrash } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
-import { sendCommunityDm, replyToCommunityDm } from "@/app/actions/dm";
+import { sendCommunityDm, replyToCommunityDm, deleteCommunityDmMessage } from "@/app/actions/dm";
+import { markDmThreadRead } from "@/app/actions/dmReads";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Linkify } from "@/components/ui/Linkify";
 import type { DmMessage } from "@/lib/queries/dm";
@@ -31,6 +33,7 @@ export function DmModal({
   mode: "member" | "staff";
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [threadId, setThreadId] = useState(initialThreadId);
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");
@@ -38,6 +41,23 @@ export function DmModal({
   const [pending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+
+  // Marks read as soon as an existing thread is opened. router.refresh()
+  // afterward is the actual fix for "the count doesn't go away" -- the
+  // unread badge on DmInboxSection/ReachOutButton is computed server-side
+  // (readTimestamps is a prop from the parent page's own data fetch), so
+  // marking a thread read in the DB alone never reaches that
+  // already-rendered prop; refresh() re-runs the page's server-side data
+  // fetch and pushes the updated count down. See EventDmModal's identical
+  // comment (0074).
+  useEffect(() => {
+    if (initialThreadId) {
+      markDmThreadRead("community", initialThreadId)
+        .then(() => router.refresh())
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!threadId) return;
@@ -49,17 +69,41 @@ export function DmModal({
         (payload) => {
           const row = payload.new as DmMessage;
           setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+          markDmThreadRead("community", threadId)
+            .then(() => router.refresh())
+            .catch(() => {});
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "community_dm_messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const deletedId = (payload.old as { id: string }).id;
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [threadId, supabase]);
+  }, [threadId, supabase, router]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  function handleDelete(messageId: string) {
+    setError("");
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    startTransition(async () => {
+      const result = await deleteCommunityDmMessage(messageId);
+      if (result.error) {
+        setError(result.error);
+        setMessages(previous);
+      }
+    });
+  }
 
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -121,12 +165,24 @@ export function DmModal({
               const isMine = m.sender_id === currentUserId;
               return (
                 <div key={m.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
-                  <div
-                    className={`inline-block max-w-[80%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
-                      isMine ? "rounded-br-sm bg-green text-green-dark" : "rounded-bl-sm bg-bg2 text-text shadow-card"
-                    }`}
-                  >
-                    <Linkify text={m.content} />
+                  <div className={`flex items-end gap-1.5 ${isMine ? "flex-row-reverse" : ""}`}>
+                    <div
+                      className={`inline-block max-w-[80%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                        isMine ? "rounded-br-sm bg-green text-green-dark" : "rounded-bl-sm bg-bg2 text-text shadow-card"
+                      }`}
+                    >
+                      <Linkify text={m.content} />
+                    </div>
+                    {isMine && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m.id)}
+                        aria-label="Delete message"
+                        className="shrink-0 p-1 text-text3 transition hover:text-pink"
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

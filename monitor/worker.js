@@ -39,7 +39,7 @@ async function sendAlert(env, subject, html) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Close.Connect Monitor <notifications@closeconnect.in>",
+      from: "CloseConnect Monitor <notifications@closeconnect.in>",
       to: env.ADMIN_EMAIL,
       subject,
       html,

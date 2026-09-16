@@ -85,7 +85,7 @@ export async function sendCommunityDm(communityId: string, content: string) {
   const sendError = await insertDmMessage(supabase, threadId, user.id, text);
   if (sendError) return { error: sendError };
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   return { error: null, threadId };
 }
 
@@ -104,6 +104,25 @@ export async function replyToCommunityDm(communityId: string, threadId: string, 
   const sendError = await insertDmMessage(supabase, threadId, user.id, text);
   if (sendError) return { error: sendError };
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
+  return { error: null };
+}
+
+// Sender-only, hard delete (0082) -- either party (member or staff) can
+// delete their own message, never the other side's. RLS
+// (community_dm_messages_delete_own) is the real gate; the explicit
+// .eq("sender_id", ...) here just turns "not yours" into a clear error.
+export async function deleteCommunityDmMessage(messageId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error, count } = await supabase
+    .from("community_dm_messages")
+    .delete({ count: "exact" })
+    .eq("id", messageId)
+    .eq("sender_id", user.id);
+
+  if (error) return { error: error.message };
+  if (!count) return { error: "You can only delete your own messages" };
   return { error: null };
 }

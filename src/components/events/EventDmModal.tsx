@@ -1,0 +1,204 @@
+"use client";
+
+import { useState, useEffect, useRef, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { IconX, IconSend2, IconMessageCircle2, IconTrash } from "@tabler/icons-react";
+import { createClient } from "@/lib/supabase/client";
+import { sendEventDm, replyToEventDm, deleteEventDmMessage } from "@/app/actions/eventDm";
+import { markDmThreadRead } from "@/app/actions/dmReads";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Linkify } from "@/components/ui/Linkify";
+import type { EventDmMessage } from "@/lib/queries/eventDm";
+
+// Mirrors src/components/communities/DmModal.tsx exactly ("contact host"
+// instead of "reach out to admin") -- kept as its own component rather
+// than generalizing DmModal to take both, so the already-shipped
+// community DM flow can't be affected by this addition.
+export function EventDmModal({
+  eventId,
+  threadId: initialThreadId,
+  initialMessages,
+  currentUserId,
+  otherPartyName,
+  mode,
+  onClose,
+}: {
+  eventId: string;
+  threadId: string | null;
+  initialMessages: EventDmMessage[];
+  currentUserId: string;
+  otherPartyName: string;
+  mode: "member" | "staff";
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [threadId, setThreadId] = useState(initialThreadId);
+  const [messages, setMessages] = useState(initialMessages);
+  const [content, setContent] = useState("");
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const supabase = useMemo(() => createClient(), []);
+
+  // Marks read as soon as an existing thread is opened -- a fresh thread
+  // (threadId null, about to be created by the first send) has nothing to
+  // mark yet. router.refresh() afterward is the actual fix for "the count
+  // doesn't go away" -- the unread badge on EventDmInboxSection/
+  // EventReachOutButton is computed server-side (readTimestamps is a prop
+  // from the parent page's own data fetch), so marking a thread read in the
+  // DB alone never reaches that already-rendered prop; refresh() re-runs
+  // the page's server-side data fetch and pushes the updated count down.
+  useEffect(() => {
+    if (initialThreadId) {
+      markDmThreadRead("event", initialThreadId)
+        .then(() => router.refresh())
+        .catch(() => {});
+    }
+    // Only on mount/open, not every time threadId changes (it changes once,
+    // right after this attendee's first-ever message creates it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!threadId) return;
+    const channel = supabase
+      .channel(`event-dm-${threadId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "event_dm_messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const row = payload.new as EventDmMessage;
+          setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+          markDmThreadRead("event", threadId)
+            .then(() => router.refresh())
+            .catch(() => {});
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "event_dm_messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const deletedId = (payload.old as { id: string }).id;
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [threadId, supabase, router]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  function handleDelete(messageId: string) {
+    setError("");
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    startTransition(async () => {
+      const result = await deleteEventDmMessage(messageId);
+      if (result.error) {
+        setError(result.error);
+        setMessages(previous);
+      }
+    });
+  }
+
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!content.trim() || pending) return;
+    setError("");
+    const text = content;
+    setContent("");
+    startTransition(async () => {
+      if (mode === "member") {
+        const result = await sendEventDm(eventId, text);
+        if (result.error !== null) {
+          setError(result.error);
+          setContent(text);
+          return;
+        }
+        setThreadId(result.threadId);
+      } else {
+        const result = await replyToEventDm(eventId, threadId!, text);
+        if (result.error !== null) {
+          setError(result.error);
+          setContent(text);
+          return;
+        }
+      }
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="flex h-[70vh] w-full max-w-[440px] flex-col overflow-hidden rounded-card bg-bg2 shadow-card-hover">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <span className="font-heading text-[14px] font-bold">{otherPartyName}</span>
+          <button onClick={onClose} className="text-text2 transition hover:text-text">
+            <IconX size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-bg p-4">
+          {messages.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState icon={IconMessageCircle2} title="No messages yet" description="Say hello!" compact />
+            </div>
+          ) : (
+            messages.map((m) => {
+              const isMine = m.sender_id === currentUserId;
+              return (
+                <div key={m.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
+                  <div className={`flex items-end gap-1.5 ${isMine ? "flex-row-reverse" : ""}`}>
+                    <div
+                      className={`inline-block max-w-[80%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                        isMine ? "rounded-br-sm bg-green text-green-dark" : "rounded-bl-sm bg-bg2 text-text shadow-card"
+                      }`}
+                    >
+                      <Linkify text={m.content} />
+                    </div>
+                    {isMine && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m.id)}
+                        aria-label="Delete message"
+                        className="shrink-0 p-1 text-text3 transition hover:text-pink"
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        <form onSubmit={handleSend} className="flex gap-3 border-t border-border bg-bg2 p-4">
+          <input
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Message…"
+            maxLength={1000}
+            className="flex-1 rounded-full border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green"
+          />
+          <button
+            type="submit"
+            disabled={pending || !content.trim()}
+            aria-label="Send message"
+            className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0"
+          >
+            <IconSend2 size={18} />
+          </button>
+        </form>
+        {error && <p className="border-t border-border px-4 py-2 text-[12px] text-pink">{error}</p>}
+      </div>
+    </div>
+  );
+}

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const TABS = [
   { key: "about", label: "About" },
-  { key: "groups", label: "Groups" },
+  { key: "groups", label: "Circles" },
   { key: "members", label: "Members" },
   { key: "events", label: "Events" },
 ] as const;

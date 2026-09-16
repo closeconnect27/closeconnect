@@ -11,6 +11,23 @@ export type EventTicketType = {
   sort_order: number;
 };
 
+/** One row of a multi-day event's date list (0111) -- empty for a
+ * single-day event, which uses the flat event_date/event_time columns
+ * directly instead. Each entry can have its own venue (e.g. a multi-city
+ * tour), unlike the top-level `venue` field which describes one place. */
+export type EventDateEntry = {
+  id: string;
+  event_id: string;
+  event_date: string;
+  event_time: string | null;
+  event_end_time: string | null;
+  venue: string | null;
+  venue_lat: number | null;
+  venue_lng: number | null;
+  venue_place_id: string | null;
+  sort_order: number;
+};
+
 export type EventListItem = {
   id: string;
   host_id: string;
@@ -25,12 +42,25 @@ export type EventListItem = {
   // duplicateEvent(), before the host has set a real date. Public listing
   // queries exclude these; the detail page 404s them for non-hosts.
   event_date: string | null;
+  /** Optional end date for a multi-day event (0072) -- null, or equal to
+   * event_date, means single-day. */
+  event_end_date: string | null;
   event_time: string | null;
+  /** Optional -- set alongside event_time via NewEventForm/EditEventForm's
+   * start/end/duration trio (EventTimeFields), never on its own (0071). */
+  event_end_time: string | null;
   event_mode: "online" | "offline";
   venue: string | null;
+  /** Set together, only when the host picked a real Places Autocomplete
+   * suggestion (VenueAutocomplete) -- null for a hand-typed venue, an
+   * online event, or any event created before this column existed. */
+  venue_lat: number | null;
+  venue_lng: number | null;
   city: string | null;
   extra_cities: string[] | null;
+  all_cities: boolean;
   category: string | null;
+  extra_categories: string[] | null;
   status: "active" | "cancelled";
   // Assigned once at creation (or by backfill), not recomputed per render
   // -- see src/lib/unsplash.ts. Null only for rows predating this system.
@@ -39,7 +69,7 @@ export type EventListItem = {
   feedback_count: number;
   created_at: string;
   host: { display_name: string } | null;
-  community: { id: string; name: string } | null;
+  community: { id: string; slug: string; name: string } | null;
   event_ticket_types: { price: number }[];
 };
 
@@ -52,7 +82,7 @@ export type EventDetail = Omit<EventListItem, "host" | "community"> & {
     host_rating_count: number;
     is_founding_host: boolean;
   } | null;
-  community: { id: string; name: string } | null;
+  community: { id: string; slug: string; name: string } | null;
 };
 
 export type EventRegistration = {
@@ -99,7 +129,7 @@ export type EventFilters = {
 // infer which relationship "host:profiles(...)" means and 404s the query
 // entirely (PGRST201, ambiguous embed) without this hint.
 const EVENT_LIST_SELECT =
-  "*, host:profiles!events_host_id_fkey(display_name), community:communities(id,name), event_ticket_types(price)";
+  "*, host:profiles!events_host_id_fkey(display_name), community:communities(id,slug,name), event_ticket_types(price)";
 
 function todayIso() {
   const d = new Date();
@@ -114,10 +144,10 @@ export async function getEvents(supabase: SupabaseClient, filters: EventFilters 
   // dateFrom skips them entirely).
   let query = supabase.from("events").select(EVENT_LIST_SELECT).eq("status", "active").not("event_date", "is", null);
 
-  if (filters.category) query = query.eq("category", filters.category);
+  if (filters.category) query = query.or(`category.eq.${filters.category},extra_categories.cs.{${filters.category}}`);
   const validCities = filters.cities?.filter(isCity) ?? [];
   if (validCities.length > 0) {
-    query = query.or(validCities.map((c) => `city.eq.${c},extra_cities.cs.{${c}}`).join(","));
+    query = query.or(["all_cities.eq.true", ...validCities.map((c) => `city.eq.${c},extra_cities.cs.{${c}}`)].join(","));
   }
   if (filters.communityId) query = query.eq("community_id", filters.communityId);
   if (filters.hostId) query = query.eq("host_id", filters.hostId);
@@ -145,7 +175,7 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
     .eq("status", "active")
     .not("event_date", "is", null)
     .gte("event_date", todayIso())
-    .or(`city.eq.${city},extra_cities.cs.{${city}}`)
+    .or(`all_cities.eq.true,city.eq.${city},extra_cities.cs.{${city}}`)
     .order("event_date", { ascending: true });
 
   if (opts.limit) query = query.limit(opts.limit);
@@ -159,7 +189,7 @@ export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
     .select(
-      "*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating,host_rating_count,is_founding_host), community:communities(id,name)",
+      "*, host:profiles!events_host_id_fkey(id,display_name,avatar_url,host_rating,host_rating_count,is_founding_host), community:communities(id,slug,name)",
     )
     .eq("id", id)
     .single();
@@ -175,6 +205,16 @@ export async function getEventTicketTypes(supabase: SupabaseClient, eventId: str
     .order("sort_order");
   if (error) throw error;
   return data as EventTicketType[];
+}
+
+export async function getEventDateEntries(supabase: SupabaseClient, eventId: string) {
+  const { data, error } = await supabase
+    .from("event_date_entries")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("sort_order");
+  if (error) throw error;
+  return data as EventDateEntry[];
 }
 
 export async function getEventFormFields(supabase: SupabaseClient, eventId: string) {

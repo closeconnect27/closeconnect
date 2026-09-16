@@ -9,8 +9,9 @@ export const sendMessageSchema = z.object({
   attachment: z
     .object({
       path: z.string().min(1),
-      type: z.enum(["image", "video", "file"]),
+      type: z.enum(["image", "video", "file", "voice"]),
       name: z.string().min(1).max(255),
+      durationSeconds: z.number().int().positive().optional(),
     })
     .optional(),
 });

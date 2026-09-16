@@ -32,16 +32,50 @@ function formatEventDate(isoDate: string) {
   return date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
 }
 
-async function sendReminderEmail(to: string, eventName: string, dateLabel: string, venue: string | null, message: string | null) {
+// Same escape/shell/button visual language as src/lib/emailTemplate.ts and
+// src/lib/email.ts on the Next.js side -- duplicated rather than shared
+// because this is a separately-deployed Deno Edge Function with no access
+// to that bundle, not a different design.
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function renderReminderEmail(eventName: string, dateLabel: string, venue: string | null, message: string | null, eventLink: string) {
+  const name = escapeHtml(eventName);
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f5f6f4;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f4;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr><td style="padding:0 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#1a1a1a;">
+          Close<span style="color:#1a7a5e;">connect</span>
+        </td></tr>
+        <tr><td style="background:#ffffff;border:1px solid #e5e7e5;border-radius:16px;padding:36px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;">
+          <p style="margin:0 0 8px;font-size:17px;">📣 A quick update on <strong>${name}</strong></p>
+          <div style="background:#edf7f3;border-radius:12px;padding:18px 20px;margin:16px 0;font-size:14px;">
+            <strong>${dateLabel}</strong>${venue ? `<br/>${escapeHtml(venue)}` : ""}
+          </div>
+          ${message ? `<p style="margin:0 0 20px;">${escapeHtml(message)}</p>` : ""}
+          <p style="margin:24px 0 0;">
+            <a href="${eventLink}" style="display:inline-block;padding:14px 30px;background:#1a7a5e;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:700;font-size:15px;">View the event</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:24px 8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:#6b6f6b;">
+          <p style="margin:0;">&copy; ${new Date().getFullYear()} CloseConnect</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+async function sendReminderEmail(to: string, eventName: string, dateLabel: string, venue: string | null, message: string | null, eventId: string) {
+  const siteUrl = Deno.env.get("NEXT_PUBLIC_SITE_URL") ?? "https://closeconnect.in";
   const body = {
-    from: "Close.Connect <notifications@closeconnect.in>",
+    from: "CloseConnect <notifications@closeconnect.in>",
     to,
     subject: `Reminder: ${eventName}`,
-    html: `
-      <h2>${eventName}</h2>
-      <p>${dateLabel}${venue ? ` &middot; ${venue}` : ""}</p>
-      ${message ? `<p>${message}</p>` : ""}
-    `,
+    html: renderReminderEmail(eventName, dateLabel, venue, message, `${siteUrl}/events/${eventId}`),
   };
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -115,7 +149,7 @@ Deno.serve(async (req) => {
       respondentIds.map(async (userId) => {
         const { data: userResult, error: userError } = await supabase.auth.admin.getUserById(userId);
         if (userError || !userResult.user?.email) return;
-        await sendReminderEmail(userResult.user.email, event.event_name, dateLabel, event.venue, reminder.message);
+        await sendReminderEmail(userResult.user.email, event.event_name, dateLabel, event.venue, reminder.message, reminder.event_id);
       }),
     );
 

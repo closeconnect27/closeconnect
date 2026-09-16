@@ -53,6 +53,25 @@ export function safeJoinHref(url: string | null | undefined): string {
   return "#";
 }
 
+// General-purpose version of the same write-time-validate /
+// render-time-sanitize pair above, for links with no fixed platform/host
+// to allowlist (an event's meeting link can legitimately be Zoom, Google
+// Meet, Teams, or anything else) -- scheme-restricted only. `.url()`
+// alone (zod's validator, and the browser's own `new URL()`) accepts
+// `javascript:`/`data:` URIs just fine, which is exactly the gap this closes.
+export function isSafeHttpsUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function safeHttpsHref(url: string | null | undefined): string {
+  if (!url || !isSafeHttpsUrl(url)) return "#";
+  return url;
+}
+
 export function isInstagramLink(url: string | null | undefined): boolean {
   return !!url && url.includes("instagram.com");
 }
@@ -88,10 +107,43 @@ export function isValidInstagramUrl(url: string): boolean {
   }
 }
 
+export function isValidFacebookUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /^(www\.|m\.)?facebook\.com$/.test(u.hostname) && u.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+// Same two hosts isValidExternalLink already recognizes as WhatsApp (group
+// invite link or channel), factored out here so a community's whatsapp_url
+// field can go through the same social-link validate/sanitize pair as
+// Instagram/Facebook/LinkedIn instead of the separate external-link path.
+export function isValidWhatsAppUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    if (u.hostname === "chat.whatsapp.com" && /^\/[A-Za-z0-9_-]{10,}$/.test(u.pathname)) return true;
+    if (
+      (u.hostname === "whatsapp.com" || u.hostname === "www.whatsapp.com") &&
+      u.pathname.startsWith("/channel/") &&
+      u.pathname.length > 10
+    ) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const SOCIAL_URL_VALIDATORS = {
   linkedin: isValidLinkedInUrl,
   github: isValidGithubUrl,
   instagram: isValidInstagramUrl,
+  facebook: isValidFacebookUrl,
+  whatsapp: isValidWhatsAppUrl,
 } as const;
 
 export function safeSocialHref(

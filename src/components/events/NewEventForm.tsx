@@ -2,21 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CATEGORIES, type CategorySlug } from "@/lib/categories";
+import type { CategorySlug } from "@/lib/categories";
 import { createEventSchema } from "@/lib/validation/event";
 import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
-import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { TicketTypeBuilder, parsePrice, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { EventDateEntryBuilder, type EventDateEntryDraft } from "@/components/events/EventDateEntryBuilder";
 import { createEvent } from "@/app/actions/events";
 import { Combobox } from "@/components/ui/Combobox";
-import { MultiCombobox } from "@/components/ui/MultiCombobox";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { CityMultiSelect } from "@/components/ui/CityMultiSelect";
+import { CategoryMultiSelect } from "@/components/ui/CategoryMultiSelect";
+import { EventDatePicker } from "@/components/events/EventDatePicker";
+import { EventTimeFields } from "@/components/events/EventTimeFields";
+import { VenueAutocomplete, type VenuePick } from "@/components/ui/VenueAutocomplete";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
-import { PaymentDetailsForm } from "@/components/host/PaymentDetailsForm";
-import { CITY_OPTIONS } from "@/lib/cities";
-import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 
 function todayIso() {
   const d = new Date();
@@ -27,12 +27,8 @@ const inputClass =
 
 export function NewEventForm({
   hostableCommunities,
-  userId,
-  paymentDetails,
 }: {
   hostableCommunities: { id: string; name: string }[];
-  userId: string;
-  paymentDetails: HostPaymentDetails | null;
 }) {
   const router = useRouter();
   // Generated once, up front -- same reasoning as NewCommunityForm's
@@ -43,17 +39,28 @@ export function NewEventForm({
   const [eventId] = useState(() => crypto.randomUUID());
   const [eventName, setEventName] = useState("");
   const [description, setDescription] = useState({ json: null as object | null, text: "" });
+  // Single-day is the default and shows one date + one start/end time.
+  // Multi-day shows a repeatable list of (date, start time, end time,
+  // venue) entries instead (EventDateEntryBuilder) -- not a continuous
+  // date-range picker, which implied every day in between was also part of
+  // the event whether or not that was true.
+  const [dayType, setDayType] = useState<"single" | "multi">("single");
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [eventEndTime, setEventEndTime] = useState("");
+  const [eventDates, setEventDates] = useState<EventDateEntryDraft[]>([
+    { date: "", time: "", endTime: "", venue: "" },
+  ]);
   const [eventMode, setEventMode] = useState<"online" | "offline">("offline");
   const [venue, setVenue] = useState("");
+  const [venueCoords, setVenueCoords] = useState<{ lat?: number; lng?: number; placeId?: string }>({});
   const [meetingLink, setMeetingLink] = useState("");
-  const [city, setCity] = useState("");
-  const [extraCities, setExtraCities] = useState<string[]>([]);
-  const [category, setCategory] = useState<CategorySlug>(CATEGORIES[0].slug);
+  const [cities, setCities] = useState<string[]>([]);
+  const [allCities, setAllCities] = useState(false);
+  const [categories, setCategories] = useState<CategorySlug[]>([]);
   const [communityId, setCommunityId] = useState("");
   const [tickets, setTickets] = useState<TicketTypeDraft[]>([
-    { name: "General", price: 0, quantity_available: "" },
+    { name: "General", price: "0", quantity_available: "" },
   ]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
   const [error, setError] = useState("");
@@ -68,18 +75,36 @@ export function NewEventForm({
       event_name: eventName,
       description: description.text || undefined,
       description_content: description.json,
-      event_date: eventDate,
-      event_time: eventTime || undefined,
+      event_date: dayType === "single" ? eventDate : undefined,
+      event_time: dayType === "single" ? eventTime : undefined,
+      event_end_time: dayType === "single" ? eventEndTime || undefined : undefined,
+      event_dates:
+        dayType === "multi"
+          ? eventDates.map((d) => ({
+              event_date: d.date,
+              event_time: d.time || undefined,
+              event_end_time: d.endTime || undefined,
+              venue: d.venue || undefined,
+              venue_lat: d.venueLat,
+              venue_lng: d.venueLng,
+              venue_place_id: d.venuePlaceId,
+            }))
+          : [],
       event_mode: eventMode,
-      venue: eventMode === "offline" ? venue || undefined : undefined,
+      venue: dayType === "single" && eventMode === "offline" ? venue || undefined : undefined,
+      venue_lat: dayType === "single" && eventMode === "offline" ? venueCoords.lat : undefined,
+      venue_lng: dayType === "single" && eventMode === "offline" ? venueCoords.lng : undefined,
+      venue_place_id: dayType === "single" && eventMode === "offline" ? venueCoords.placeId : undefined,
       meeting_link: eventMode === "online" ? meetingLink || undefined : undefined,
-      city: city || undefined,
-      extra_cities: extraCities,
-      category,
+      city: eventMode === "online" ? undefined : allCities ? undefined : cities[0] || undefined,
+      extra_cities: eventMode === "online" ? [] : allCities ? [] : cities.slice(1),
+      all_cities: eventMode === "online" ? false : allCities,
+      category: categories[0] || "",
+      extra_categories: categories.slice(1),
       community_id: communityId || undefined,
       ticket_types: tickets.map((t) => ({
         name: t.name,
-        price: t.price,
+        price: parsePrice(t.price),
         quantity_available: t.quantity_available ? Number(t.quantity_available) : undefined,
       })),
       form_fields: formFields,
@@ -132,14 +157,43 @@ export function NewEventForm({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Date">
-              <DatePicker value={eventDate || null} onChange={setEventDate} minDate={todayIso()} placeholder="Select a date" />
+          <Field label="Event length">
+            <div className="flex gap-2">
+              {(["single", "multi"] as const).map((t) => (
+                <button
+                  type="button"
+                  key={t}
+                  onClick={() => setDayType(t)}
+                  className={
+                    dayType === t
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                  }
+                >
+                  {t === "single" ? "Single day" : "Multi-day"}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {dayType === "single" ? (
+            <>
+              <Field label="Date">
+                <EventDatePicker
+                  startValue={eventDate || null}
+                  endValue={null}
+                  onChange={(start) => setEventDate(start)}
+                  minDate={todayIso()}
+                  allowRange={false}
+                />
+              </Field>
+              <EventTimeFields time={eventTime} onTimeChange={setEventTime} endTime={eventEndTime} onEndTimeChange={setEventEndTime} />
+            </>
+          ) : (
+            <Field label="Dates">
+              <EventDateEntryBuilder entries={eventDates} onChange={setEventDates} minDate={todayIso()} eventMode={eventMode} />
             </Field>
-            <Field label="Time (optional)">
-              <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className={inputClass} />
-            </Field>
-          </div>
+          )}
 
           <Field label="Format">
             <div className="flex gap-2">
@@ -160,40 +214,38 @@ export function NewEventForm({
             </div>
           </Field>
 
-          {eventMode === "offline" ? (
-            <Field label="Venue (optional)">
-              <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+          {eventMode === "offline" && dayType === "single" ? (
+            <Field label="Venue">
+              <VenueAutocomplete
+                value={venue}
+                onChange={(pick: VenuePick) => {
+                  setVenue(pick.address);
+                  setVenueCoords({ lat: pick.lat, lng: pick.lng, placeId: pick.placeId });
+                }}
+              />
             </Field>
-          ) : (
+          ) : eventMode === "offline" ? null : (
             <Field label="Meeting link">
               <input
                 value={meetingLink}
                 onChange={(e) => setMeetingLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
-                required
                 className={inputClass}
               />
               <p className="text-[11px] text-text3">
-                Only shown to people who register -- never on the public event page.
+                Shared only with the host and confirmed/paid registrants. Never shown on the public event page.
               </p>
             </Field>
           )}
 
-          <Field label="City (optional)">
-            <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />
-          </Field>
+          {eventMode === "offline" && (
+            <Field label="Cities">
+              <CityMultiSelect cities={cities} allCities={allCities} onChange={(c, a) => { setCities(c); setAllCities(a); }} />
+            </Field>
+          )}
 
-          <Field label="Also show up under (optional, up to 5 more cities)">
-            <MultiCombobox
-              values={extraCities}
-              onChange={setExtraCities}
-              options={CITY_OPTIONS.filter((o) => o.value !== city)}
-              placeholder="Add more cities"
-            />
-          </Field>
-
-          <Field label="Category">
-            <CategoryPicker value={category} onChange={setCategory} />
+          <Field label="Categories (up to 5)">
+            <CategoryMultiSelect values={categories} onChange={setCategories} />
           </Field>
 
           {hostableCommunities.length > 0 && (
@@ -210,10 +262,6 @@ export function NewEventForm({
           <Field label="Ticket types">
             <TicketTypeBuilder tickets={tickets} onChange={setTickets} />
           </Field>
-
-          {tickets.some((t) => t.price > 0) && (
-            <PaymentDetailsForm userId={userId} details={paymentDetails} />
-          )}
 
           <Field label="Registration questions (optional)">
             <FormBuilder fields={formFields} onChange={setFormFields} />
@@ -235,7 +283,7 @@ export function NewEventForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-bold text-text3">{label}</span>
+      <span className="text-[12px] font-bold text-text2">{label}</span>
       {children}
     </div>
   );

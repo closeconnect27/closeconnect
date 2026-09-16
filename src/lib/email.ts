@@ -3,7 +3,7 @@
 // templates). One place for the verified sender domain -- closeconnect.in,
 // not closeconnect.app -- so this can't drift out of sync the way
 // send-event-reminders did before that got caught and fixed.
-const FROM = "Close.Connect <notifications@closeconnect.in>";
+const FROM = "CloseConnect <notifications@closeconnect.in>";
 
 export async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
   const res = await fetch("https://api.resend.com/emails", {

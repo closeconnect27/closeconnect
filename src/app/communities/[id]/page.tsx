@@ -1,10 +1,22 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IconStar, IconUsers, IconMapPin, IconPencil, IconChartBar } from "@tabler/icons-react";
+import {
+  IconStar,
+  IconUsers,
+  IconMapPin,
+  IconPencil,
+  IconChartBar,
+  IconBrandInstagram,
+  IconBrandFacebook,
+  IconBrandLinkedin,
+  IconBrandWhatsapp,
+  IconPhone,
+} from "@tabler/icons-react";
+import { safeSocialHref } from "@/lib/validators/links";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { createClient } from "@/lib/supabase/server";
-import { getCommunityById } from "@/lib/queries/communities";
+import { getCommunityById, communitySlugOrId, communityLookupColumn } from "@/lib/queries/communities";
 import {
   getCommunityMembership,
   getCommunityGroups,
@@ -17,12 +29,10 @@ import {
 } from "@/lib/queries/membership";
 import { getEvents } from "@/lib/queries/events";
 import { getCategoryVisual } from "@/lib/categories";
-import { communitySeed } from "@/lib/categoryImages";
 import { getMyRating } from "@/lib/queries/ratings";
 import { getUnreadCounts } from "@/lib/queries/chat";
 import { CommunityDetailActions } from "@/components/communities/CommunityDetailActions";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
-import { CategoryImage } from "@/components/ui/CategoryImage";
 import { JoinSection } from "@/components/communities/JoinSection";
 import { GroupList } from "@/components/communities/GroupList";
 import { CreateGroupForm } from "@/components/communities/CreateGroupForm";
@@ -32,10 +42,11 @@ import { MemberCountVisibilityToggle } from "@/components/communities/MemberCoun
 import { PendingRequests } from "@/components/communities/PendingRequests";
 import { RatingSection } from "@/components/communities/RatingSection";
 import { ClaimSection } from "@/components/communities/ClaimSection";
-import { GoNativeButton } from "@/components/communities/GoNativeButton";
+import { LeaveCommunitySection } from "@/components/communities/LeaveCommunitySection";
 import { ReachOutButton } from "@/components/communities/ReachOutButton";
 import { DmInboxSection } from "@/components/communities/DmInboxSection";
 import { getMyDmThread, getCommunityDmThreads, getDmThreadMessages } from "@/lib/queries/dm";
+import { getDmReadTimestamps, isThreadUnread } from "@/lib/queries/dmReads";
 import { CommunityTabs } from "@/components/communities/CommunityTabs";
 import { EventCard } from "@/components/events/EventCard";
 import { RichTextView } from "@/components/ui/RichTextView";
@@ -49,7 +60,11 @@ import { IconCalendarEvent } from "@tabler/icons-react";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: community } = await supabase.from("communities").select("name, description, city, category").eq("id", id).single();
+  const { data: community } = await supabase
+    .from("communities")
+    .select("name, description, city, category")
+    .eq(communityLookupColumn(id), id)
+    .single();
   if (!community) return {};
 
   const title = `${community.name}${community.city ? ` in ${community.city}` : ""}`;
@@ -71,6 +86,12 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   } catch {
     notFound();
   }
+  // Every query below this point needs the real uuid (community_members,
+  // community_groups, etc. all FK against it) -- id itself may be a slug
+  // now, only ever safe to pass to getCommunityById/generateMetadata's own
+  // dual-lookup queries above, never anything downstream of the fetch.
+  const communityId = community.id;
+  const communityHref = communitySlugOrId(community);
 
   const {
     data: { user },
@@ -85,7 +106,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
 
   const isNative = community.kind === "native";
 
-  const membership = isNative && user ? await getCommunityMembership(supabase, id, user.id) : null;
+  const membership = isNative && user ? await getCommunityMembership(supabase, communityId, user.id) : null;
   const isOwner = !!user && community.owner_id === user.id;
   // communities.owner_id is authoritative for ownership, not
   // community_members.role -- that row is separate and mutable, and can
@@ -96,7 +117,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
   const isMember = !!membership || isOwner;
   const isStaff = isOwner || membership?.role === "owner" || membership?.role === "moderator";
 
-  const groups = isNative ? await getCommunityGroups(supabase, id) : [];
+  const groups = isNative ? await getCommunityGroups(supabase, communityId) : [];
   const joinedGroupIds =
     isNative && user
       ? await getUserGroupMemberships(supabase, user.id, groups.map((g) => g.id))
@@ -109,48 +130,63 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
     user && joinedGroupIds.size > 0 ? await getUnreadCounts(supabase, [...joinedGroupIds]) : {};
 
   const formFields =
-    isNative && community.join_mode === "request" ? await getCommunityFormFields(supabase, id) : [];
+    isNative && community.join_mode === "request" ? await getCommunityFormFields(supabase, communityId) : [];
 
   const pendingStatus =
-    isNative && user && !isMember ? await getMyJoinRequestStatus(supabase, id, user.id) : null;
+    isNative && user && !isMember ? await getMyJoinRequestStatus(supabase, communityId, user.id) : null;
 
-  const members = isNative ? await getCommunityMembers(supabase, id) : [];
-  const memberCount = isNative ? await getCommunityMemberCount(supabase, id) : 0;
+  const members = isNative ? await getCommunityMembers(supabase, communityId) : [];
+  const memberCount = isNative ? await getCommunityMemberCount(supabase, communityId) : 0;
   const isFull = community.member_limit != null && community.member_count >= community.member_limit;
-  const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, id) : [];
-  const myRating = isNative && user && !isOwner ? await getMyRating(supabase, id, user.id) : null;
+  const pendingRequests = isNative && isStaff ? await getPendingJoinRequests(supabase, communityId) : [];
+  const myRating = isNative && user && !isOwner ? await getMyRating(supabase, communityId, user.id) : null;
   // includePast so a community with only past events (or none upcoming)
   // still shows its history in the Events tab, not just an empty state --
   // getEvents already excludes drafts (null event_date) unconditionally.
-  const hostedEvents = isMember ? await getEvents(supabase, { communityId: id, includePast: true }) : [];
+  // Public for native communities (even pre-join) and for claimed-but-not-
+  // yet-native external ones -- a visitor deciding whether to join/trust a
+  // community should be able to see what it actually hosts without
+  // joining first. isMember also fetches it (redundantly, when isNative is
+  // already true) purely so the condition still reads correctly if native
+  // membership visibility rules ever diverge from this.
+  const canSeePublicEvents = isNative || community.claim_status === "approved";
+  const hostedEvents =
+    isMember || canSeePublicEvents ? await getEvents(supabase, { communityId, includePast: true }) : [];
 
   // "Reach out to admin": a member's own thread (ReachOutButton), or --
   // for the owner/moderators -- every member thread that's ever been
   // opened (DmInboxSection). Never both for the same viewer: isStaff and
   // "isMember && !isStaff" are mutually exclusive by construction.
-  const myDm = isNative && isMember && !isStaff && user ? await getMyDmThread(supabase, id, user.id) : null;
-  const dmThreads = isNative && isStaff ? await getCommunityDmThreads(supabase, id) : [];
+  const myDm = isNative && isMember && !isStaff && user ? await getMyDmThread(supabase, communityId, user.id) : null;
+  const dmThreads = isNative && isStaff ? await getCommunityDmThreads(supabase, communityId) : [];
   const dmMessagesByThread =
     dmThreads.length > 0
       ? Object.fromEntries(await Promise.all(dmThreads.map(async (t) => [t.id, await getDmThreadMessages(supabase, t.id)] as const)))
       : {};
+  // "Unread" badge source -- see isThreadUnread's comment (0074). Staff
+  // reads one marker per member thread; a member reads just their own.
+  const dmReadTimestamps =
+    user && (dmThreads.length > 0 || myDm?.threadId)
+      ? await getDmReadTimestamps(
+          supabase,
+          user.id,
+          "community",
+          isStaff ? dmThreads.map((t) => t.id) : myDm?.threadId ? [myDm.threadId] : [],
+        )
+      : new Map<string, string>();
+  const myDmHasUnread =
+    !!myDm?.threadId &&
+    !!myDm.messages.length &&
+    isThreadUnread(
+      myDm.messages[myDm.messages.length - 1].created_at,
+      myDm.messages[myDm.messages.length - 1].sender_id,
+      user!.id,
+      dmReadTimestamps.get(myDm.threadId),
+    );
 
   return (
     <div className="flex-1 pb-10">
       <PageViewTracker targetType="community" targetId={community.id} viewerId={user?.id ?? null} />
-      <div className="relative h-40 w-full sm:h-52" style={{ background: visual.bg }}>
-        <CategoryImage
-          slug={community.category}
-          seed={communitySeed(community.id)}
-          unsplashImageUrl={community.unsplash_image_url}
-          alt=""
-          fill
-          sizes="100vw"
-          className="object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
-      </div>
-
       <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-6">
         <div className="mb-3 flex flex-wrap gap-2">
           <span
@@ -168,9 +204,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               {ec.label}
             </span>
           ))}
-          <span className="rounded-full border border-border2 px-3 py-1 font-mono text-[11px] font-medium text-text2">
-            {isNative ? "Native community" : "External"}
-          </span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -193,32 +226,30 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
         {/* Join/request action surfaces immediately below the header --
             the decision a visitor is here to make -- rather than after
             the description and meta row. Visible pre-join since it's the
-            whole point of a non-member's visit here. */}
-        {isNative && (
-          <div className="mt-4 flex flex-wrap gap-3">
-            <JoinSection
-              communityId={community.id}
-              joinMode={community.join_mode}
-              isMember={isMember}
-              isOwner={isOwner}
-              isLoggedIn={!!user}
-              isFull={isFull}
-              pendingStatus={pendingStatus}
-              formFields={formFields}
-            />
-            <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isOwner} isMember={isMember} myRating={myRating} />
-          </div>
-        )}
+            whole point of a non-member's visit here. Unconditional (0083)
+            -- every community is native from creation now, claimed or not,
+            so an unclaimed listing gets the same live Join/chat as an
+            owned one instead of waiting for a claim first. */}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <JoinSection
+            communityId={community.id}
+            joinMode={community.join_mode}
+            isMember={isMember}
+            isOwner={isOwner}
+            isLoggedIn={!!user}
+            isFull={isFull}
+            pendingStatus={pendingStatus}
+            formFields={formFields}
+          />
+          <RatingSection communityId={community.id} isLoggedIn={!!user} isOwner={isStaff} isMember={isMember} myRating={myRating} />
+        </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {isOwner && (
-            <Link href={`/communities/${community.id}/edit`} className="btn-secondary px-4 py-2 text-[13px]">
+          {isStaff && (
+            <Link href={`/communities/${communityHref}/edit`} className="btn-secondary px-4 py-2 text-[13px]">
               <IconPencil size={14} />
               Edit
             </Link>
-          )}
-          {isOwner && !isNative && community.claim_status === "approved" && (
-            <GoNativeButton communityId={community.id} />
           )}
           {/* Native only -- every stat on the analytics page (join
               requests, member growth, active members) is a native
@@ -226,7 +257,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               for an external listing, even one a claim gave a real
               owner_id to. */}
           {isNative && isStaff && (
-            <Link href={`/communities/${community.id}/analytics`} className="btn-secondary px-4 py-2 text-[13px]">
+            <Link href={`/communities/${communityHref}/analytics`} className="btn-secondary px-4 py-2 text-[13px]">
               <IconChartBar size={14} />
               Analytics
             </Link>
@@ -239,6 +270,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               threads={dmThreads}
               messagesByThread={dmMessagesByThread}
               currentUserId={user!.id}
+              readTimestamps={dmReadTimestamps}
             />
           )}
           {isMember && !isStaff && (
@@ -248,9 +280,10 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               threadId={myDm?.threadId ?? null}
               initialMessages={myDm?.messages ?? []}
               currentUserId={user!.id}
+              hasUnread={myDmHasUnread}
             />
           )}
-          {isMember && <CopyLinkButton path={`/communities/${community.id}`} />}
+          {isMember && <CopyLinkButton path={`/communities/${communityHref}`} />}
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-4 text-[13px] font-medium text-text2">
@@ -279,12 +312,93 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
           )}
         </div>
 
+        {(community.whatsapp_url || community.instagram_url || community.facebook_url || community.linkedin_url || community.phone) && (
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            {community.whatsapp_url && (
+              <a
+                href={safeSocialHref("whatsapp", community.whatsapp_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                className="flex items-center gap-1.5 text-[13px] font-medium transition hover:brightness-110"
+                style={{ color: "#25D366" }}
+              >
+                <IconBrandWhatsapp size={26} />
+                WhatsApp
+              </a>
+            )}
+            {community.instagram_url && (
+              <a
+                href={safeSocialHref("instagram", community.instagram_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="flex items-center gap-1.5 text-[13px] font-medium transition hover:brightness-110"
+                style={{ color: "#E1306C" }}
+              >
+                <IconBrandInstagram size={26} />
+                Instagram
+              </a>
+            )}
+            {community.facebook_url && (
+              <a
+                href={safeSocialHref("facebook", community.facebook_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="transition hover:brightness-110"
+                style={{ color: "#1877F2" }}
+              >
+                <IconBrandFacebook size={18} />
+              </a>
+            )}
+            {community.linkedin_url && (
+              <a
+                href={safeSocialHref("linkedin", community.linkedin_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                className="transition hover:brightness-110"
+                style={{ color: "#0A66C2" }}
+              >
+                <IconBrandLinkedin size={18} />
+              </a>
+            )}
+            {community.phone && (
+              <a href={`tel:${community.phone}`} aria-label="Phone" className="flex items-center gap-1.5 text-[13px] font-medium text-green transition hover:brightness-110">
+                <IconPhone size={16} />
+                {community.phone}
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Pre-join / non-native: description shown plain here. Once a
             member of a native community, it moves into the About tab
             below instead, alongside the rest of the community's details. */}
         {(!isNative || !isMember) && (
           <div className="mt-4 text-[15px] leading-relaxed">
             <RichTextView content={community.description_content} plainFallback={community.description} />
+          </div>
+        )}
+
+        {/* Public events: shown here directly (not gated behind the
+            member-only Tabs below) for anyone who can see events per
+            canSeePublicEvents but isn't already getting them via the
+            native member Tabs' own events slot -- i.e. every case except
+            "native and already a member." */}
+        {canSeePublicEvents && !(isNative && isMember) && (
+          <div className="mt-8">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Events</h2>
+            {hostedEvents.length === 0 ? (
+              <EmptyState icon={IconCalendarEvent} title="No events yet" description="Nothing hosted under this community yet." compact />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {hostedEvents.map((e) => (
+                  <EventCard key={e.id} event={e} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -296,6 +410,7 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                   <section>
                     <GroupList
                       communityId={community.id}
+                      communityHref={communityHref}
                       groups={groups}
                       isMember={isMember}
                       joinedGroupIds={joinedGroupIds}
@@ -339,7 +454,6 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
                         totalCount={memberCount}
                         ownerId={community.owner_id}
                         isStaff={isStaff}
-                        isOwner={isOwner}
                         membersListVisible={community.members_list_visible}
                         currentUserId={user?.id ?? null}
                       />
@@ -375,23 +489,35 @@ export default async function CommunityDetailPage({ params }: { params: Promise<
               />
             ) : (
               <p className="rounded-card border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
-                Join this community to see its groups and members.
+                Join this community to see its circles and members.
               </p>
             )}
           </div>
         )}
 
-        {!isNative && (
+        {/* Gated on owner_id, not kind (0083) -- kind is always 'native'
+            now, so owner_id/claim_status alone say whether this community
+            still needs a real owner. ClaimSection itself already no-ops
+            once claim_status is 'approved'; this just covers the
+            still-pending/never-submitted cases without depending on kind. */}
+        {!community.owner_id && (
           <div className="mt-8">
             <ClaimSection communityId={community.id} claimStatus={community.claim_status} isLoggedIn={!!user} email={user?.email} />
           </div>
         )}
 
-        <CommunityDetailActions
-          communityId={community.id}
-          externalLink={community.external_link}
-          isLoggedIn={!!user}
-        />
+        <CommunityDetailActions communityId={community.id} isLoggedIn={!!user} />
+
+        {isMember && (
+          <LeaveCommunitySection
+            communityId={community.id}
+            communityName={community.name}
+            isOwner={isOwner}
+            otherMembers={members
+              .filter((m) => m.user_id !== user?.id)
+              .map((m) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? "Member" }))}
+          />
+        )}
 
         <Link href="/communities" className="mt-8 block text-center text-[13px] text-text3 transition hover:text-text2">
           ← Back to communities

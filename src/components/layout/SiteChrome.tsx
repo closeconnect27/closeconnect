@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { Capacitor } from "@capacitor/core";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Footer } from "@/components/layout/Footer";
 import { HeaderSlotProvider, useHeaderSlotContent } from "@/components/layout/HeaderSlotContext";
 import { track, identify } from "@/lib/mixpanel/client";
+import { initGoogleAnalytics, trackPageview } from "@/lib/ga/client";
 
 // The landing page (/) is a standalone full-bleed hero -- the header/bottom
 // nav are chrome for navigating an app you're already inside of, not for a
@@ -52,10 +54,19 @@ function SiteChromeInner({
   // The page's own "← Back to community" link already covers what Header
   // would have (a way back out).
   const isChatPage = /^\/communities\/[^/]+\/groups\/[^/]+$/.test(pathname);
+  // /login is the native app's actual entry screen now (see /app's
+  // redirect gate) -- a header with its own redundant "Sign in" button
+  // floating above the sign-in card itself reads as an oversight, and a
+  // full-screen focused card is what a native app's own login screen
+  // looks like anyway.
+  const isLoginPage = pathname === "/login";
+  const isImmersivePage = isChatPage || isLoginPage;
   const slotContent = useHeaderSlotContent();
 
   useEffect(() => {
     track("page_view", { path: pathname });
+    initGoogleAnalytics();
+    trackPageview(pathname);
   }, [pathname]);
 
   // Homepage is a single, non-scrolling screen (Hero + Footer sized to
@@ -88,18 +99,23 @@ function SiteChromeInner({
 
   return (
     <>
-      {!isHome && !isChatPage && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
+      {!isHome && !isImmersivePage && <Header isLoggedIn={isLoggedIn} userId={userId} pathname={pathname} slot={slotContent} />}
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
           Only needed when BottomNav is actually rendered (not isHome,
-          not isChatPage). */}
+          not isImmersivePage). */}
       <div
-        className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : isChatPage ? "" : "pb-16 sm:pb-0"}`}
+        className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : isImmersivePage ? "" : "pb-16 sm:pb-0"}`}
       >
         {children}
-        {!isChatPage && <Footer dark={isHome} />}
+        {/* The native app hides this entirely -- a persistent
+            Support/phone-numbers/Terms/copyright strip on every screen is
+            website chrome, not app chrome. Same links live on the Profile
+            page instead, same place a native app's own Settings screen
+            would put them. */}
+        {!isImmersivePage && !Capacitor.isNativePlatform() && <Footer dark={isHome} />}
       </div>
-      {!isHome && !isChatPage && <BottomNav isLoggedIn={isLoggedIn} />}
+      {!isHome && !isImmersivePage && <BottomNav isLoggedIn={isLoggedIn} userId={userId} />}
     </>
   );
 }

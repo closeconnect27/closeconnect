@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.closeconnect.app",
+      "sha256_cert_fingerprints": [
+        "8C:C1:8D:D4:B3:38:97:8A:FC:D7:1C:10:2B:1A:1B:63:0D:BC:89:AE:7F:F9:CD:4D:44:35:01:37:E2:47:60:58"
+      ]
+    }
+  }
+]

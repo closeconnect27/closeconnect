@@ -1,15 +1,18 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { IconDownload, IconUsers, IconCircleCheck, IconHeart, IconUserX } from "@tabler/icons-react";
+import { IconDownload, IconUsers, IconCircleCheck, IconHeart, IconUserX, IconChartBar } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
 import { getEventInterestCount, getVisibleInterestedUsers } from "@/lib/queries/interests";
 import { getEventReminders } from "@/lib/queries/reminders";
+import { getEventDmThreads, getEventDmThreadMessages } from "@/lib/queries/eventDm";
+import { getDmReadTimestamps } from "@/lib/queries/dmReads";
 import { EventRegistrantList } from "@/components/events/EventRegistrantList";
 import { EventManageActions } from "@/components/events/EventManageActions";
 import { EventFunnel } from "@/components/events/EventFunnel";
 import { MessageAttendeesSection } from "@/components/events/MessageAttendeesSection";
+import { EventDmInboxSection } from "@/components/events/EventDmInboxSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 
@@ -18,8 +21,18 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default async function ManageEventPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ManageEventPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  // ?dmThread=<id> -- deep-link target from a "contact host" notification
+  // click (notify_event_dm_message, 0074), opening straight into that
+  // attendee's conversation instead of just the inbox list.
+  searchParams: Promise<{ dmThread?: string }>;
+}) {
   const { id } = await params;
+  const { dmThread } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -32,14 +45,22 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
 
   if (event.host_id !== user.id) redirect(`/events/${id}`);
 
-  const [registrations, ticketTypes, formFields, interestCount, visibleInterested, reminders] = await Promise.all([
+  const [registrations, ticketTypes, formFields, interestCount, visibleInterested, reminders, dmThreads] = await Promise.all([
     getEventRegistrations(supabase, id),
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
     getEventInterestCount(supabase, id),
     getVisibleInterestedUsers(supabase, id),
     getEventReminders(supabase, id),
+    getEventDmThreads(supabase, id),
   ]);
+
+  const dmMessagesByThread =
+    dmThreads.length > 0
+      ? Object.fromEntries(await Promise.all(dmThreads.map(async (t) => [t.id, await getEventDmThreadMessages(supabase, t.id)] as const)))
+      : {};
+  const dmReadTimestamps =
+    dmThreads.length > 0 ? await getDmReadTimestamps(supabase, user.id, "event", dmThreads.map((t) => t.id)) : new Map<string, string>();
 
   // Counted in TICKETS (sum of quantity), not registration rows -- a group
   // booking of 4 is 4 people, not 1, for every stat below (0055).
@@ -57,17 +78,31 @@ export default async function ManageEventPage({ params }: { params: Promise<{ id
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link href={`/events/${id}`} className="text-[13px] text-text3 transition hover:text-text2">
               ← {event.event_name}
             </Link>
             <h1 className="mt-2 font-heading text-[18px] font-bold leading-tight">Manage registrants</h1>
           </div>
-          <EventManageActions eventId={id} status={event.status} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/events/${id}/analytics`} className="btn-secondary px-3 py-1.5 text-[12px]">
+              <IconChartBar size={13} />
+              Analytics
+            </Link>
+            <EventDmInboxSection
+              eventId={id}
+              threads={dmThreads}
+              messagesByThread={dmMessagesByThread}
+              currentUserId={user.id}
+              readTimestamps={dmReadTimestamps}
+              autoOpenThreadId={dmThread ?? null}
+            />
+            <EventManageActions eventId={id} status={event.status} />
+          </div>
         </div>
 
-        <div className="mt-6 flex gap-4">
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4">
           <StatCard icon={IconHeart} label="Interested" value={interestCount} />
           <StatCard icon={IconUsers} label="Registered" value={totalTickets} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />

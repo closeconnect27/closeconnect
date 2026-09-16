@@ -3,6 +3,7 @@ import { IconUsers, IconCalendarEvent, IconInbox, IconTicket, IconPlus, IconShie
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
+import { communitySlugOrId } from "@/lib/queries/communities";
 import { getPendingJoinRequests, getCommunityFormFields } from "@/lib/queries/membership";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -82,7 +83,7 @@ export default async function HostDashboardPage() {
               {needsAttention.map(({ community, requests, formFields }) => (
                 <div key={community.id} id={`community-${community.id}`}>
                   <Link
-                    href={`/communities/${community.id}`}
+                    href={`/communities/${communitySlugOrId(community)}`}
                     className="mb-2 block text-[13px] font-bold text-text transition hover:text-green"
                   >
                     {community.name}

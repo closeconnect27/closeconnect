@@ -7,6 +7,7 @@ import { EventFilterBar } from "@/components/events/EventFilterBar";
 import { CategorySidebarMobile, CategorySidebarDesktop } from "@/components/ui/CategorySidebar";
 import { HeaderSearchSlot } from "@/components/ui/HeaderSearchSlot";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { NativeOnly, WebOnly } from "@/components/system/PlatformGate";
 
 type SearchParams = Promise<{
   category?: string;
@@ -48,27 +49,36 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     <div className="flex-1 pb-16">
       <HeaderSearchSlot basePath="/events" placeholder="Search events…" />
 
-      <div className="flex flex-col gap-4 px-4 pb-6 pt-8 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">
-              What&apos;s Happening
-              <br />
-              Around You
-            </h1>
-            <p className="mt-2 max-w-md text-[14px] text-text3">
-              Meetups, workshops, and socials hosted by communities near you — filter by what fits your week.
-            </p>
+      {/* App skips the marketing heading/description and the Host button --
+          "Create" already has its own BottomNav tab, so a second Host
+          button here is redundant, and a real app's own list screen leads
+          with search+filters, not sell copy. */}
+      <WebOnly>
+        <div className="flex flex-col gap-4 px-4 pb-6 pt-8 sm:px-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-[28px] font-black leading-tight sm:text-[40px] lg:text-[56px]">
+                What&apos;s Happening
+                <br />
+                Around You
+              </h1>
+              <p className="mt-2 max-w-md text-[14px] text-text3">
+                Meetups, workshops, and socials hosted by communities near you — filter by what fits your week.
+              </p>
+            </div>
+            <Link
+              href={user ? "/events/new" : "/login?redirect=/events/new"}
+              className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
+            >
+              <span className="hidden sm:inline">Host an event</span>
+              <span className="sm:hidden">Host</span>
+            </Link>
           </div>
-          <Link
-            href={user ? "/events/new" : "/login?redirect=/events/new"}
-            className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
-          >
-            <span className="hidden sm:inline">Host an event</span>
-            <span className="sm:hidden">Host</span>
-          </Link>
         </div>
-      </div>
+      </WebOnly>
+      <NativeOnly>
+        <div className="h-4" />
+      </NativeOnly>
 
       <CategorySidebarMobile basePath="/events" />
 
@@ -76,6 +86,11 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
         <CategorySidebarDesktop basePath="/events" />
         <div className="min-w-0 flex-1">
           <EventFilterBar />
+          {/* grid-cols-1 below `sm`: two columns at the narrowest phone
+              widths squeezed each card's aspect-video image down to
+              ~96px tall, colliding the absolutely-positioned date chip
+              and bottom category/title overlay into an unreadable stack
+              -- one column gives the image its full aspect ratio back. */}
           <div className="mt-6">
             {events.length === 0 ? (
               <EmptyState
@@ -91,7 +106,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
                 }
               />
             ) : (
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {events.map((e) => (
                   <EventCard key={e.id} event={e} />
                 ))}

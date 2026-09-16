@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
+import { renderEmailShell, emailButton, emailButtonSecondary, escapeHtml } from "@/lib/emailTemplate";
 import { trackServerEvent } from "@/lib/mixpanel/server";
 import { assignPhotoForEntity, triggerDownloadPing } from "@/lib/unsplash";
 import {
@@ -60,11 +61,17 @@ export async function createCommunity(
       description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
-      city: data.city || null,
-      extra_cities: data.extra_cities,
+      city: data.all_cities ? null : data.city || null,
+      extra_cities: data.all_cities ? [] : data.extra_cities,
+      all_cities: data.all_cities,
       kind: "native",
       join_mode: data.join_mode,
       member_limit: data.member_limit ?? null,
+      instagram_url: data.instagram_url || null,
+      facebook_url: data.facebook_url || null,
+      linkedin_url: data.linkedin_url || null,
+      whatsapp_url: data.whatsapp_url || null,
+      phone: data.phone || null,
       owner_id: user.id,
       unsplash_image_url: photo.imageUrl,
       unsplash_photo_id: photo.photoId,
@@ -106,8 +113,8 @@ export async function createCommunity(
   // No redirect() here -- the caller (NewCommunityForm) still needs the new
   // id to navigate to /communities/[id] itself. Every other caller-facing
   // shape in this file returns { error } on failure; a successful create
-  // additionally carries the new id.
-  return { error: null, communityId: community.id };
+  // additionally carries the new id/slug.
+  return { error: null, communityId: community.id, communitySlug: community.slug as string | undefined };
 }
 
 export async function updateCommunity(
@@ -131,12 +138,14 @@ export async function updateCommunity(
 
   const supabase = await createClient();
 
-  // Explicit ownership check, not just RLS as the only gate (SPEC.md Section
-  // 11) -- a fresh read of owner_id, never trusting a value the caller could
-  // have passed in. RLS (0017) backs this up independently, including
-  // locking columns this action doesn't even attempt to write
-  // (owner_id/claim_status/join_mode), but a clear "you don't own this"
-  // error here is a better failure mode than a silent zero-row RLS no-op.
+  // Explicit staff check, not just RLS as the only gate (SPEC.md Section
+  // 11) -- a fresh read, never trusting a value the caller could have
+  // passed in. RLS (0017, loosened by 0108 to any admin) backs this up
+  // independently, including locking columns this action doesn't even
+  // attempt to write (owner_id/claim_status/join_mode), but a clear "not
+  // allowed" error here is a better failure mode than a silent zero-row
+  // RLS no-op. Any admin can edit now, not just whoever created it (0108)
+  // -- owner_id is still checked as a defensive fallback.
   const { data: existing, error: fetchError } = await supabase
     .from("communities")
     .select("owner_id")
@@ -147,7 +156,15 @@ export async function updateCommunity(
     return { error: "Community not found" };
   }
   if (existing.owner_id !== user.id) {
-    return { error: "Only the owner can edit this community" };
+    const { data: membership } = await supabase
+      .from("community_members")
+      .select("role")
+      .eq("community_id", communityId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (membership?.role !== "moderator") {
+      return { error: "Only an admin can edit this community" };
+    }
   }
 
   // Column list is explicit, not a spread of `data` -- even though the
@@ -162,9 +179,15 @@ export async function updateCommunity(
       description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
-      city: data.city || null,
-      extra_cities: data.extra_cities,
+      city: data.all_cities ? null : data.city || null,
+      extra_cities: data.all_cities ? [] : data.extra_cities,
+      all_cities: data.all_cities,
       member_limit: data.member_limit ?? null,
+      instagram_url: data.instagram_url || null,
+      facebook_url: data.facebook_url || null,
+      linkedin_url: data.linkedin_url || null,
+      whatsapp_url: data.whatsapp_url || null,
+      phone: data.phone || null,
     })
     .eq("id", communityId);
 
@@ -175,7 +198,7 @@ export async function updateCommunity(
     return { error: error.message };
   }
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   redirect(`/communities/${communityId}`);
 }
 
@@ -202,7 +225,7 @@ export async function toggleMembersListVisibility(communityId: string, visible: 
     .eq("id", communityId);
   if (error) return { error: error.message };
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   return { error: null };
 }
 
@@ -227,7 +250,7 @@ export async function toggleMemberCountVisibility(communityId: string, visible: 
     .eq("id", communityId);
   if (error) return { error: error.message };
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   return { error: null };
 }
 
@@ -258,10 +281,19 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
       description_content: data.description_content ?? null,
       category: data.category,
       extra_categories: data.extra_categories,
-      city: data.city || null,
-      extra_cities: data.extra_cities,
-      external_link: data.external_link,
-      kind: "external",
+      city: data.all_cities ? null : data.city || null,
+      extra_cities: data.all_cities ? [] : data.extra_cities,
+      all_cities: data.all_cities,
+      instagram_url: data.instagram_url || null,
+      facebook_url: data.facebook_url || null,
+      linkedin_url: data.linkedin_url || null,
+      whatsapp_url: data.whatsapp_url || null,
+      phone: data.phone || null,
+      // Native from creation (0083) -- kind no longer distinguishes
+      // "claimable, unowned" from "owned"; owner_id/claim_status alone do
+      // that. A listing submitted here gets the full native toolkit (join,
+      // groups, chat) immediately, with a Claim button until claimed.
+      kind: "native",
       owner_id: null,
       claim_status: "unclaimed",
       unsplash_image_url: photo.imageUrl,
@@ -272,11 +304,17 @@ export async function submitExternalCommunity(input: SubmitExternalCommunityInpu
 
   if (error || !community) {
     if (error?.message.includes("too quickly")) return { error: error.message };
+    // 23505 = unique_violation -- communities_unique_name_per_category_native
+    // (0043) now applies to every listing, not just owner-created ones,
+    // since everything is native from creation.
+    if (error?.code === "23505") {
+      return { error: "A community with this name already exists in this category." };
+    }
     return { error: error?.message ?? "Could not submit this listing" };
   }
 
   triggerDownloadPing(photo.photoId);
-  redirect(`/communities/${community.id}`);
+  redirect(`/communities/${community.slug || community.id}`);
 }
 
 export async function submitCommunityClaim(communityId: string, input: ClaimCommunityInput) {
@@ -294,11 +332,12 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
   // that the UI only showed this form when it should have.
   const { data: community, error: fetchError } = await supabase
     .from("communities")
-    .select("name, kind, claim_status")
+    .select("name, claim_status")
     .eq("id", communityId)
     .single();
   if (fetchError || !community) return { error: "Community not found" };
-  if (community.kind !== "external") return { error: "Only external communities can be claimed" };
+  // claim_status alone decides claimability (0083) -- kind is always
+  // 'native' now, so it stopped meaning "unclaimed" a while ago.
   if (community.claim_status !== "unclaimed" && community.claim_status !== "rejected") {
     return { error: "This community already has a claim in progress or an owner" };
   }
@@ -338,7 +377,7 @@ export async function submitCommunityClaim(communityId: string, input: ClaimComm
     return { error: error?.message ?? "Could not submit this claim" };
   }
 
-  revalidatePath(`/communities/${communityId}`);
+  revalidatePath("/communities/[id]", "page");
   // Awaited, not fire-and-forget -- Cloudflare Workers can (and does, per a
   // real report) terminate an un-awaited promise the instant this action's
   // response is sent, killing the fetch to Resend before it completes. A
@@ -377,60 +416,24 @@ async function notifyAdminOfPendingClaim(claimId: string, communityName: string)
   await sendEmail({
     to: adminEmail,
     subject: `New claim pending review: ${communityName}`,
-    html: `
-      <p>A new claim for <strong>${communityName}</strong> is waiting for review.</p>
-      <p>
-        <a href="${approveLink}" style="display:inline-block;padding:10px 22px;background:#1a7a5e;color:#fff;border-radius:999px;text-decoration:none;font-weight:600;margin-right:10px">Approve</a>
-        <a href="${rejectLink}" style="display:inline-block;padding:10px 22px;background:#f3f4f6;color:#111;border-radius:999px;text-decoration:none;font-weight:600">Reject</a>
-      </p>
-      <p style="font-size:13px;color:#888">Or review it in the <a href="${dashboardLink}">dashboard</a>.</p>
-    `,
+    html: renderEmailShell({
+      preheader: `${communityName} has a claim waiting for review.`,
+      bodyHtml: `
+        <p style="margin:0 0 20px;">A new claim for <strong>${escapeHtml(communityName)}</strong> is waiting for review.</p>
+        <p style="margin:0 0 16px;">
+          ${emailButton("Approve", approveLink)}
+          <span style="display:inline-block;width:10px;"></span>
+          ${emailButtonSecondary("Reject", rejectLink)}
+        </p>
+        <p style="margin:0;font-size:13px;color:#6b6f6b;">Or review it in the <a href="${dashboardLink}" style="color:#1a7a5e;">dashboard</a>.</p>
+      `,
+    }),
   });
 }
 
-// "Go Native" -- a claimed external community's owner can opt into the
-// full native feature set (groups, chat, member list, join settings,
-// analytics) while keeping the original WhatsApp/Instagram link visible
-// (CommunityDetailActions/CommunityCard key off external_link's presence,
-// not kind, for that button). No new rows to seed here: on_community_created
-// already made this community's General/Announcements groups at insert
-// time, and review_community_claim already gave the claimant an owner
-// community_members + community_group_members row when the claim was
-// approved (0024) -- flipping kind is the entire switch. join_mode and
-// join_mode already has a real value from submission/approval too (column
-// default, never null), so every isNative-gated feature on the detail
-// page lights up immediately with no follow-up write.
-export async function switchCommunityToNative(communityId: string) {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from("communities")
-    .select("owner_id, kind, claim_status")
-    .eq("id", communityId)
-    .single();
-  if (fetchError || !existing) return { error: "Community not found" };
-  if (existing.owner_id !== user.id) return { error: "Only the owner can do this" };
-  if (existing.kind !== "external") return { error: "This community is already native" };
-  if (existing.claim_status !== "approved") return { error: "Only a claimed community can switch" };
-
-  const { error } = await supabase.from("communities").update({ kind: "native" }).eq("id", communityId);
-  if (error) {
-    // 23505 = unique_violation -- communities_unique_name_per_category_native
-    // (0043): a native community with this exact name+category already
-    // exists, so this one can't become native without a rename first.
-    if (error.code === "23505") {
-      return { error: "A native community with this name already exists in this category — rename it first, then try again." };
-    }
-    return { error: error.message };
-  }
-
-  trackServerEvent("community_switched_native", user.id, { community_id: communityId });
-  revalidatePath(`/communities/${communityId}`);
-  revalidatePath(`/communities/${communityId}/edit`);
-  return { error: null };
-}
-
+// Admin-dashboard path for approving/rejecting a claim -- the actual
+// owner_id/community_members/claim_status side effects live in the
+// review_community_claim() DB trigger (0024), fired by the update below.
 export async function reviewCommunityClaim(claimId: string, decision: "approved" | "rejected") {
   const user = await requireUser();
   const supabase = await createClient();
@@ -442,16 +445,23 @@ export async function reviewCommunityClaim(claimId: string, decision: "approved"
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
   if (!profile?.is_admin) return { error: "Only an admin can review claims" };
 
+  // .eq("status", "pending") makes a second decision on an already-decided
+  // claim a no-op instead of silently flipping it again -- the same guard
+  // the one-click email link (api/claims/[id]/decide) already has; this
+  // admin-dashboard path was missing it, letting a claim already approved
+  // (owner_id set, community_members row created) get flipped back to
+  // 'rejected' with nothing to undo the approval side-effects.
   const { data: claim, error } = await supabase
     .from("claims")
     .update({ status: decision })
     .eq("id", claimId)
+    .eq("status", "pending")
     .select("community_id")
     .single();
 
-  if (error || !claim) return { error: error?.message ?? "Could not update this claim" };
+  if (error || !claim) return { error: error?.message ?? "This claim has already been reviewed" };
 
   revalidatePath("/host/dashboard");
-  revalidatePath(`/communities/${claim.community_id}`);
+  revalidatePath("/communities/[id]", "page");
   return { error: null };
 }

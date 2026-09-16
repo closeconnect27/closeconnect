@@ -176,7 +176,7 @@ site_url = "https://closeconnect.in"
 # callback path exactly the same way, which is what was landing real users
 # on http://localhost:3000/?code=... after clicking a magic link or
 # finishing Google sign-in.
-additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3000/**", "https://closeconnect.in/**"]
+additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3000/**", "https://closeconnect.in/**", "closeconnect://**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -363,7 +363,18 @@ email_optional = false
 # browser's redirect to Google), only the secret needs env-var indirection.
 [auth.external.google]
 enabled = true
-client_id = "367176452996-sd5m574dnee1jg9p7jqap9caemhuu474.apps.googleusercontent.com"
+# Comma-separated list, web client first: Supabase's signInWithIdToken
+# accepts a token whose `aud` claim matches ANY client ID in this list, not
+# just the first one (GoTrue's own documented multi-platform pattern). The
+# 2nd and 3rd entries are the Android app's Firebase project
+# (closeconnect-6845c) OAuth clients from android/app/google-services.json --
+# client_type 3 (web) is what @capacitor-firebase/authentication actually
+# passes as the ID token's audience on Android (the client_type 1 Android
+# entry only authorizes which app/cert can request a token via Play
+# Services, it's never the token's own audience) -- both are listed since
+# neither costs anything to trust and Firebase could regenerate which one a
+# given SDK path prefers.
+client_id = "367176452996-sd5m574dnee1jg9p7jqap9caemhuu474.apps.googleusercontent.com,124212992824-cm0tkls8oqueiokkpltst7c4vh0sgcfa.apps.googleusercontent.com,124212992824-qum9vhmaqm583lo5dj02iskh3iqm1ev3.apps.googleusercontent.com"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
 url = ""
@@ -447,3 +458,13 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# send-push-notification is called by a DB trigger (net.http_post) with a
+# custom single-purpose secret, not a Supabase-issued JWT (see
+# 0091_push_notification_trigger.sql for why the anon key -- a real JWT
+# accepted by the platform default -- isn't used here). The gateway's
+# default verify_jwt would reject that bearer value before the function's
+# own code ever runs, so it's disabled here; the function's own Authorization
+# check against PUSH_TRIGGER_SECRET is the real gate.
+[functions.send-push-notification]
+verify_jwt = false

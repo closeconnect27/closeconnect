@@ -1,10 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-// Query layer only -- no dashboard page wired to this yet, deliberately.
-// Zero historical page_views data exists until tracking has actually been
-// live for a while, so a dashboard built today would just show empty
-// charts; these are ready to plug into one once there's something real to
-// show (SPEC.md Section 5's own explicit sequencing).
+import type { ReferrerSource } from "@/lib/referrerSource";
 
 export async function getViewCount(supabase: SupabaseClient, targetType: "community" | "event", targetId: string) {
   // RLS (page_views_select_owner_or_host) is the real gate -- a non-owner
@@ -36,6 +31,25 @@ export async function getViewsByDay(supabase: SupabaseClient, targetType: "commu
   return [...counts.entries()]
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Where views are actually coming from -- classify_referrer's own bucket
+ * set (direct/search/social/instagram/linkedin/other), captured on every
+ * page_views row since 0038 but never surfaced anywhere until now. */
+export async function getReferrerBreakdown(supabase: SupabaseClient, targetType: "community" | "event", targetId: string) {
+  const { data, error } = await supabase
+    .from("page_views")
+    .select("referrer_source")
+    .eq("target_type", targetType)
+    .eq("target_id", targetId);
+  if (error) throw error;
+
+  const counts = new Map<ReferrerSource, number>();
+  for (const row of data ?? []) {
+    const source = (row.referrer_source as ReferrerSource) ?? "direct";
+    counts.set(source, (counts.get(source) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
 }
 
 export type JoinRequestMetrics = {

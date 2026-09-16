@@ -9,6 +9,8 @@ import { HostCommunityRow } from "@/components/host/HostCommunityRow";
 import { RegisteredEventRow } from "@/components/profile/RegisteredEventRow";
 import { IncomingFollowRequests } from "@/components/profile/IncomingFollowRequests";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { NativeOnly } from "@/components/system/PlatformGate";
 
 function todayIso() {
   const d = new Date();
@@ -117,11 +119,49 @@ export default async function ProfilePage() {
           Edit profile
         </Link>
 
+        <Link href="/profile/blocked" className="mt-3 block w-full py-1 text-center text-[12px] text-text3 transition hover:text-text2">
+          Blocked users
+        </Link>
+
+        {/* Header's own toggle is web-only -- the app's theme setting lives
+            here instead, same place a native app's Settings screen would
+            put it. */}
+        <NativeOnly>
+          <div className="mt-8 flex items-center justify-between rounded-card bg-bg2 p-4">
+            <span className="text-[13px] font-medium text-text2">Appearance</span>
+            <ThemeToggle />
+          </div>
+        </NativeOnly>
+
         <form action={signOut} className="mt-3">
           <button type="submit" className="btn-secondary w-full py-2.5 text-[13px]">
             Sign out
           </button>
         </form>
+
+        {/* Support/legal used to live in a footer shown on every page --
+            fine for a website, but it's the single biggest thing that made
+            the Android app read as "a website in a wrapper" instead of a
+            real app (SiteChrome hides that footer entirely on native now).
+            This is its one reachable home instead, in the same place a
+            native app's own Settings screen would put it. */}
+        <div className="mt-8 flex flex-col items-center gap-3 border-t border-border pt-6 text-[12px] text-text3">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <a href="mailto:closeconnect27@gmail.com" className="transition hover:text-text2">
+              Support
+            </a>
+            <Link href="/terms" className="transition hover:text-text2">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="transition hover:text-text2">
+              Privacy Policy
+            </Link>
+            <Link href="/cancellation-refund" className="transition hover:text-text2">
+              Cancellation &amp; Refund Policy
+            </Link>
+          </div>
+          <span>© {new Date().getFullYear()} CloseConnect</span>
+        </div>
       </div>
     </div>
   );

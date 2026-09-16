@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { IconCalendar, IconClock, IconMapPin, IconVideo, IconStar, IconSettings, IconPencil } from "@tabler/icons-react";
+import { IconCalendar, IconClock, IconMapPin, IconVideo, IconStar, IconSettings, IconPencil, IconBrandGoogle } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/server";
+import { getCommunityById, communitySlugOrId } from "@/lib/queries/communities";
 import {
   getEventById,
   getEventTicketTypes,
   getEventFormFields,
+  getEventDateEntries,
   getTicketAvailability,
   getMyEventCheckIn,
   getMyRegistrationCount,
@@ -14,9 +16,10 @@ import {
 } from "@/lib/queries/events";
 import { getMyInterestStatus } from "@/lib/queries/interests";
 import { getMyEventFeedback, getEventFeedbackList } from "@/lib/queries/eventFeedback";
+import { getCommunityMembership, getMyJoinRequestStatus, getCommunityFormFields } from "@/lib/queries/membership";
+import { getPublicProfileBasic } from "@/lib/queries/profileDetails";
+import { isEventPast } from "@/lib/eventStatus";
 import { getCategoryVisual } from "@/lib/categories";
-import { communitySeed } from "@/lib/categoryImages";
-import { CategoryImage } from "@/components/ui/CategoryImage";
 import { EventRegistration } from "@/components/events/EventRegistration";
 import { InterestedButton } from "@/components/events/InterestedButton";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
@@ -25,6 +28,13 @@ import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { FoundingBadge } from "@/components/ui/FoundingBadge";
+import { EventVenueMap } from "@/components/events/EventVenueMap";
+import { EventReachOutButton } from "@/components/events/EventReachOutButton";
+import { JoinSection } from "@/components/communities/JoinSection";
+import { getMyEventDmThread } from "@/lib/queries/eventDm";
+import { getDmReadTimestamps, isThreadUnread } from "@/lib/queries/dmReads";
+import { buildGoogleCalendarLink } from "@/lib/googleCalendarLink";
+import { safeHttpsHref } from "@/lib/validators/links";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -71,41 +81,96 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const visual = getCategoryVisual(event.category ?? "other");
 
-  const [ticketTypes, formFields, availability, myInterest, hasCheckedIn, myFeedback, feedbackList, myRegistrationCount, meetingLink] =
-    await Promise.all([
-      getEventTicketTypes(supabase, id),
-      getEventFormFields(supabase, id),
-      getTicketAvailability(supabase, id),
-      user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
-      user ? getMyEventCheckIn(supabase, id, user.id) : Promise.resolve(false),
-      user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
-      getEventFeedbackList(supabase, id),
-      user ? getMyRegistrationCount(supabase, id, user.id) : Promise.resolve(0),
-      // event_meeting_links' own RLS (0069) is the real gate -- host or a
-      // confirmed/paid registrant gets the real link back, anyone else
-      // (including a logged-out visitor) gets null, same as "no link set
-      // yet." Only worth asking for at all when the event is online.
-      user && event.event_mode === "online" ? getEventMeetingLink(supabase, id) : Promise.resolve(null),
+  const [
+    ticketTypes,
+    formFields,
+    dateEntries,
+    availability,
+    myInterest,
+    hasCheckedIn,
+    myFeedback,
+    feedbackList,
+    myRegistrationCount,
+    meetingLink,
+    myProfile,
+  ] = await Promise.all([
+    getEventTicketTypes(supabase, id),
+    getEventFormFields(supabase, id),
+    getEventDateEntries(supabase, id),
+    getTicketAvailability(supabase, id),
+    user ? getMyInterestStatus(supabase, id, user.id) : Promise.resolve(null),
+    user ? getMyEventCheckIn(supabase, id, user.id) : Promise.resolve(false),
+    user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
+    getEventFeedbackList(supabase, id),
+    user ? getMyRegistrationCount(supabase, id, user.id) : Promise.resolve(0),
+    // event_meeting_links' own RLS (0069) is the real gate -- host or a
+    // confirmed/paid registrant gets the real link back, anyone else
+    // (including a logged-out visitor) gets null, same as "no link set
+    // yet." Only worth asking for at all when the event is online.
+    user && event.event_mode === "online" ? getEventMeetingLink(supabase, id) : Promise.resolve(null),
+    // Registration's own "Name" field (EventRegistration) reads this instead
+    // of asking a signed-in registrant to type it -- they already have one.
+    user ? getPublicProfileBasic(supabase, user.id) : Promise.resolve(null),
     ]);
 
+  // "Contact host" -- an attendee's own thread (0074), never fetched for
+  // the host themselves (they get the inbox on the manage page instead,
+  // same mutual-exclusivity as the community page's ReachOutButton/
+  // DmInboxSection split).
+  const myEventDm = user && !isHost ? await getMyEventDmThread(supabase, id, user.id) : null;
+  const myEventDmReadTimestamps =
+    user && myEventDm?.threadId ? await getDmReadTimestamps(supabase, user.id, "event", [myEventDm.threadId]) : new Map<string, string>();
+  const myEventDmHasUnread =
+    !!myEventDm?.threadId &&
+    !!myEventDm.messages.length &&
+    isThreadUnread(
+      myEventDm.messages[myEventDm.messages.length - 1].created_at,
+      myEventDm.messages[myEventDm.messages.length - 1].sender_id,
+      user!.id,
+      myEventDmReadTimestamps.get(myEventDm.threadId),
+    );
+
+  // Full community record (join_mode/member_limit/member_count) plus this
+  // viewer's own membership/request status -- only fetched when the event
+  // actually belongs to a community, and event.community itself (id/slug/
+  // name) already comes free with getEventById's own join.
+  const eventCommunity = event.community ? await getCommunityById(supabase, event.community.id) : null;
+  const [communityMembership, communityPendingStatus, communityFormFields] = eventCommunity
+    ? await Promise.all([
+        user ? getCommunityMembership(supabase, eventCommunity.id, user.id) : Promise.resolve(null),
+        user ? getMyJoinRequestStatus(supabase, eventCommunity.id, user.id) : Promise.resolve(null),
+        eventCommunity.join_mode === "request" ? getCommunityFormFields(supabase, eventCommunity.id) : Promise.resolve([]),
+      ])
+    : [null, null, []];
+  const isCommunityFull =
+    !!eventCommunity && eventCommunity.member_limit != null && eventCommunity.member_count >= eventCommunity.member_limit;
+
   const dateLabel = formatEventDate(event.event_date);
+  const isPastEvent = isEventPast(event);
+
+  // Computed once and reused for both the page-level button and the
+  // post-registration success states (EventRegistration) -- null whenever
+  // there's no real date yet or the event's been cancelled, same guard the
+  // page-level button already used.
+  const calendarLink =
+    event.event_date && event.status !== "cancelled"
+      ? buildGoogleCalendarLink({
+          title: event.event_name,
+          description: event.description ?? undefined,
+          location:
+            event.event_mode === "online"
+              ? [event.city].filter(Boolean).join(", ") || undefined
+              : [event.venue, event.city].filter(Boolean).join(", ") || undefined,
+          isoDate: event.event_date,
+          endIsoDate: event.event_end_date,
+          time: event.event_time,
+          endTime: event.event_end_time,
+        })
+      : null;
 
   return (
     <div className="flex-1 pb-10">
       <PageViewTracker targetType="event" targetId={event.id} viewerId={user?.id ?? null} />
-      <div className="relative h-48 w-full overflow-hidden sm:h-64" style={{ background: visual.bg }}>
-        <CategoryImage
-          slug={event.category ?? "other"}
-          seed={communitySeed(event.id)}
-          unsplashImageUrl={event.unsplash_image_url}
-          alt=""
-          fill
-          sizes="100vw"
-          className="object-cover"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 to-black/40" />
-      </div>
-
       <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
@@ -117,7 +182,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </span>
             {event.community && (
               <Link
-                href={`/communities/${event.community.id}`}
+                href={`/communities/${communitySlugOrId(event.community)}`}
                 className="rounded-full border border-border2 px-3 py-1 font-mono text-[11px] font-semibold text-green"
               >
                 {event.community.name}
@@ -126,10 +191,16 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           </div>
           {isHost && (
             <div className="flex gap-2">
-              <Link href={`/events/${event.id}/edit`} className="btn-secondary px-3 py-1.5 text-[12px]">
-                <IconPencil size={13} />
-                Edit
-              </Link>
+              {/* Editing is frozen once the event's happened (updateEvent's
+                  own Server Action rejects it too) -- Manage stays available
+                  since reviewing past registrants/check-ins is still
+                  legitimate after the fact. */}
+              {!isPastEvent && (
+                <Link href={`/events/${event.id}/edit`} className="btn-secondary px-3 py-1.5 text-[12px]">
+                  <IconPencil size={13} />
+                  Edit
+                </Link>
+              )}
               <Link
                 href={`/events/${event.id}/manage`}
                 className="btn-secondary px-3 py-1.5 text-[12px]"
@@ -143,8 +214,24 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
         <h1 className="font-heading text-[18px] font-bold leading-tight">{event.event_name}</h1>
 
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <CopyLinkButton path={`/events/${event.id}`} label="Copy shareable link" />
+          {calendarLink && (
+            <a href={calendarLink} target="_blank" rel="noopener noreferrer" className="btn-secondary px-4 py-2 text-[13px]">
+              <IconBrandGoogle size={14} />
+              Add to Calendar
+            </a>
+          )}
+          {user && !isHost && (
+            <EventReachOutButton
+              eventId={event.id}
+              eventName={event.event_name}
+              threadId={myEventDm?.threadId ?? null}
+              initialMessages={myEventDm?.messages ?? []}
+              currentUserId={user.id}
+              hasUnread={myEventDmHasUnread}
+            />
+          )}
         </div>
 
         <div className="mt-3 flex flex-col gap-2 text-[14px] text-text2">
@@ -156,6 +243,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <span className="flex items-center gap-2">
               <IconClock size={16} className="text-text3" />
               {formatEventTime(event.event_time)}
+              {event.event_end_time && ` – ${formatEventTime(event.event_end_time)}`}
             </span>
           )}
           {event.event_mode === "online" ? (
@@ -173,52 +261,115 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
+        {event.event_mode === "offline" && (
+          <EventVenueMap lat={event.venue_lat} lng={event.venue_lng} address={event.venue ?? ""} />
+        )}
+
+        {/* Multi-day agenda -- each entry is its own date/time/venue rather
+            than one continuous range, so the summary date/time line above
+            (which still shows the overall min-to-max span, for a
+            quick-glance header) isn't precise enough on its own. */}
+        {dateEntries.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2 rounded-card border border-border bg-bg2 p-4">
+            <h2 className="font-heading text-[13px] font-bold">Dates</h2>
+            {dateEntries.map((d) => (
+              <div key={d.id} className="flex flex-col gap-0.5 border-b border-border pb-2 text-[13px] text-text2 last:border-b-0 last:pb-0">
+                <span className="font-medium text-text">{formatEventDate(d.event_date)}</span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-text3">
+                  {d.event_time && (
+                    <span>
+                      {formatEventTime(d.event_time)}
+                      {d.event_end_time && ` – ${formatEventTime(d.event_end_time)}`}
+                    </span>
+                  )}
+                  {d.venue && <span>{d.venue}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Meeting link: never rendered from event.* directly (there is no
             such column -- see event_meeting_links/0069) and never shown
             just because event_mode is 'online'. meetingLink is only
             non-null here when this exact viewer's RLS-scoped query was
             actually authorized to read it (host, or a confirmed/paid
-            registrant) -- anyone else, this block simply doesn't render. */}
+            registrant) -- anyone else, this block simply doesn't render.
+            Mandatory at creation for online events (validation/event.ts),
+            so a null value here only ever means "not authorized to see it
+            yet", never "host hasn't set one up." */}
         {meetingLink && (
           <div className="mt-3 flex flex-col gap-1 rounded-card-sm border border-green/30 bg-green-tint px-4 py-3 text-[13px]">
             <span className="flex items-center gap-1.5 font-bold text-text">
               <IconVideo size={14} className="text-green" />
               Meeting link
             </span>
-            <a href={meetingLink} target="_blank" rel="noopener noreferrer" className="break-all text-green hover:underline">
+            <a href={safeHttpsHref(meetingLink)} target="_blank" rel="noopener noreferrer" className="break-all text-green hover:underline">
               {meetingLink}
             </a>
           </div>
         )}
-        {event.event_mode === "online" && !meetingLink && !isHost && (
-          <p className="mt-3 text-[12px] text-text3">The meeting link is shared once you register.</p>
+        {event.event_mode === "online" && !meetingLink && (
+          <p className="mt-3 text-[12px] text-text3">The meeting link is shown once you register.</p>
         )}
 
-        {event.host && (
-          <Link
-            href={`/profile/${event.host.id}`}
-            className="mt-4 flex items-center gap-3 rounded-card-sm border border-border bg-bg2 px-4 py-3 transition hover:border-green"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-tint text-[13px] font-bold text-green">
-              {event.host.display_name.charAt(0).toUpperCase()}
-            </div>
-            <div className="text-[13px]">
-              <p className="flex items-center gap-1.5 font-bold text-text">
-                Hosted by {event.host.display_name}
-                {event.host.is_founding_host && <FoundingBadge />}
-              </p>
-              <p className="flex items-center gap-1 text-text3">
-                {event.host.host_rating_count > 0 ? (
-                  <>
-                    <IconStar size={12} className="fill-green text-green" />
-                    {event.host.host_rating.toFixed(1)} host rating
-                  </>
-                ) : (
-                  "New host"
-                )}
-              </p>
-            </div>
-          </Link>
+        {/* A community-hosted event shows the community, not the
+            individual who happens to hold host_id -- attendees came for
+            the community, and the Join section right below is the whole
+            point of surfacing it here instead of just linking through. */}
+        {eventCommunity ? (
+          <div className="mt-4 flex flex-col gap-3">
+            <Link
+              href={`/communities/${communitySlugOrId(eventCommunity)}`}
+              className="flex items-center gap-3 rounded-card-sm border border-border bg-bg2 px-4 py-3 transition hover:border-green"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-tint text-[13px] font-bold text-green">
+                {eventCommunity.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-[13px]">
+                <p className="font-bold text-text">Hosted by {eventCommunity.name}</p>
+                <p className="text-text3">Community</p>
+              </div>
+            </Link>
+            <JoinSection
+              communityId={eventCommunity.id}
+              joinMode={eventCommunity.join_mode}
+              isMember={!!communityMembership}
+              isOwner={communityMembership?.role === "owner"}
+              isLoggedIn={!!user}
+              isFull={isCommunityFull}
+              pendingStatus={communityPendingStatus}
+              formFields={communityFormFields}
+              communityName={eventCommunity.name}
+            />
+          </div>
+        ) : (
+          event.host && (
+            <Link
+              href={`/profile/${event.host.id}`}
+              className="mt-4 flex items-center gap-3 rounded-card-sm border border-border bg-bg2 px-4 py-3 transition hover:border-green"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-tint text-[13px] font-bold text-green">
+                {event.host.display_name.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-[13px]">
+                <p className="flex items-center gap-1.5 font-bold text-text">
+                  Hosted by {event.host.display_name}
+                  {event.host.is_founding_host && <FoundingBadge />}
+                </p>
+                <p className="flex items-center gap-1 text-text3">
+                  {event.host.host_rating_count > 0 ? (
+                    <>
+                      <IconStar size={12} className="fill-green text-green" />
+                      {event.host.host_rating.toFixed(1)} host rating
+                    </>
+                  ) : (
+                    "New host"
+                  )}
+                </p>
+              </div>
+            </Link>
+          )
         )}
 
         <div className="mt-4 text-[15px] leading-relaxed">
@@ -246,6 +397,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <p className="rounded-card-sm border border-pink/40 bg-pink-tint px-4 py-3 text-[13px] font-medium text-pink">
               This event has been cancelled.
             </p>
+          ) : isPastEvent ? (
+            <p className="rounded-card-sm border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
+              This event has already happened -- registration is closed.
+            </p>
           ) : (
             <>
               <div className="mb-4">
@@ -262,7 +417,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 availability={availability}
                 isLoggedIn={!!user}
                 email={user?.email}
+                displayName={myProfile?.display_name}
                 alreadyRegisteredCount={myRegistrationCount}
+                calendarLink={calendarLink}
               />
             </>
           )}
@@ -320,11 +477,17 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   );
 }
 
-function formatEventDate(isoDate: string | null) {
+function formatEventDate(isoDate: string | null, endIsoDate?: string | null) {
   if (!isoDate) return "Date to be announced";
   const [y, m, d] = isoDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  const startLabel = date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  if (!endIsoDate || endIsoDate === isoDate) return startLabel;
+
+  const [ey, em, ed] = endIsoDate.split("-").map(Number);
+  const endDate = new Date(ey, em - 1, ed);
+  const endLabel = endDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  return `${startLabel} – ${endLabel}`;
 }
 
 function formatEventTime(time: string) {

@@ -12,7 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
 
   const [{ data: communities }, { data: events }] = await Promise.all([
-    supabase.from("communities").select("id, created_at").eq("status", "active"),
+    supabase.from("communities").select("id, slug, created_at").eq("status", "active"),
     supabase.from("events").select("id, created_at").eq("status", "active").not("event_date", "is", null),
   ]);
 
@@ -20,10 +20,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/communities`, changeFrequency: "hourly", priority: 0.9 },
     { url: `${SITE_URL}/events`, changeFrequency: "hourly", priority: 0.9 },
+    { url: `${SITE_URL}/feed`, changeFrequency: "hourly", priority: 0.8 },
   ];
 
   const communityRoutes: MetadataRoute.Sitemap = (communities ?? []).map((c) => ({
-    url: `${SITE_URL}/communities/${c.id}`,
+    url: `${SITE_URL}/communities/${c.slug || c.id}`,
     lastModified: c.created_at,
     changeFrequency: "weekly",
     priority: 0.7,

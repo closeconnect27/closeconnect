@@ -1,0 +1,11 @@
+-- Security audit finding (medium): the mobile create-order route has no
+-- rate limiting -- a user could loop-call it for any unpaid registration
+-- they own, creating unlimited real Razorpay orders (a cost/noise/DoS
+-- vector against the shared platform Razorpay account, not a fund-theft
+-- path -- amount is always server-computed). This column backs an
+-- application-level check in create-order/route.ts, checked and set
+-- BEFORE calling Razorpay's API (not after, so it actually prevents the
+-- wasted external call, not just a redundant DB write). No default/
+-- trigger needed -- the route is the only writer, same pattern as
+-- razorpay_order_id itself.
+alter table form_responses add column last_order_attempt_at timestamptz;

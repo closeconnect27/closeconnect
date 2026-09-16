@@ -1,23 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CATEGORIES, type CategorySlug } from "@/lib/categories";
+import type { CategorySlug } from "@/lib/categories";
 import { updateEventSchema, updateEventTicketsAndFormSchema } from "@/lib/validation/event";
 import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { updateEvent, updateEventTicketsAndForm } from "@/app/actions/events";
-import { TicketTypeBuilder, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { TicketTypeBuilder, parsePrice, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { EventDateEntryBuilder, type EventDateEntryDraft } from "@/components/events/EventDateEntryBuilder";
 import { FormBuilder } from "@/components/forms/FormBuilder";
-import { Combobox } from "@/components/ui/Combobox";
-import { MultiCombobox } from "@/components/ui/MultiCombobox";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { CategoryPicker } from "@/components/ui/CategoryPicker";
+import { CityMultiSelect } from "@/components/ui/CityMultiSelect";
+import { CategoryMultiSelect } from "@/components/ui/CategoryMultiSelect";
+import { EventDatePicker } from "@/components/events/EventDatePicker";
+import { EventTimeFields } from "@/components/events/EventTimeFields";
+import { VenueAutocomplete, type VenuePick } from "@/components/ui/VenueAutocomplete";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
-import { PaymentDetailsForm } from "@/components/host/PaymentDetailsForm";
-import { CITY_OPTIONS } from "@/lib/cities";
-import type { EventDetail, EventTicketType } from "@/lib/queries/events";
+import type { EventDetail, EventTicketType, EventDateEntry } from "@/lib/queries/events";
 import type { FormField } from "@/lib/queries/membership";
-import type { HostPaymentDetails } from "@/lib/queries/paymentDetails";
 
 const inputClass =
   "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] transition focus:border-green";
@@ -36,21 +35,15 @@ export function EditEventForm({
   event,
   ticketTypes,
   formFields,
+  dateEntries,
   hasRegistrations,
-  userId,
-  paymentDetails,
   initialMeetingLink,
 }: {
   event: EventDetail;
   ticketTypes: EventTicketType[];
   formFields: FormField[];
+  dateEntries: EventDateEntry[];
   hasRegistrations: boolean;
-  // null when the viewer isn't the actual host (e.g. an admin editing on
-  // someone else's behalf) -- hides the payment details section entirely
-  // rather than showing a form that would silently save against the
-  // wrong account (see events/[id]/edit/page.tsx's isHost comment).
-  userId: string | null;
-  paymentDetails: HostPaymentDetails | null;
   // null/undefined when there's no link yet, or (per getEventMeetingLink's
   // own comment) when the viewer isn't authorized to see one -- this page
   // is host/admin-gated already, so in practice a null here just means
@@ -62,14 +55,32 @@ export function EditEventForm({
     json: event.description_content,
     text: event.description ?? "",
   });
+  // Seeded from whether this event already has date_entries rows -- an
+  // event created before this list existed (or a single-day event) reads
+  // as single-day, using the flat event_date/event_time fields directly.
+  const [dayType, setDayType] = useState<"single" | "multi">(dateEntries.length > 0 ? "multi" : "single");
   const [eventDate, setEventDate] = useState(event.event_date ?? "");
   const [eventTime, setEventTime] = useState(event.event_time ?? "");
+  const [eventEndTime, setEventEndTime] = useState(event.event_end_time ?? "");
+  const [eventDates, setEventDates] = useState<EventDateEntryDraft[]>(
+    dateEntries.length > 0
+      ? dateEntries.map((d) => ({ date: d.event_date, time: d.event_time ?? "", endTime: d.event_end_time ?? "", venue: d.venue ?? "" }))
+      : [{ date: "", time: "", endTime: "", venue: "" }],
+  );
   const [eventMode, setEventMode] = useState<"online" | "offline">(event.event_mode);
   const [venue, setVenue] = useState(event.venue ?? "");
+  const [venueCoords, setVenueCoords] = useState<{ lat?: number; lng?: number; placeId?: string }>({
+    lat: event.venue_lat ?? undefined,
+    lng: event.venue_lng ?? undefined,
+  });
   const [meetingLink, setMeetingLink] = useState(initialMeetingLink ?? "");
-  const [city, setCity] = useState(event.city ?? "");
-  const [extraCities, setExtraCities] = useState<string[]>(event.extra_cities ?? []);
-  const [category, setCategory] = useState<CategorySlug>((event.category ?? CATEGORIES[0].slug) as CategorySlug);
+  const [cities, setCities] = useState<string[]>(
+    event.all_cities ? [] : [event.city, ...(event.extra_cities ?? [])].filter((c): c is string => !!c),
+  );
+  const [allCities, setAllCities] = useState(event.all_cities);
+  const [categories, setCategories] = useState<CategorySlug[]>(
+    [event.category, ...(event.extra_categories ?? [])].filter((c): c is CategorySlug => !!c),
+  );
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -77,10 +88,10 @@ export function EditEventForm({
     ticketTypes.length > 0
       ? ticketTypes.map((t) => ({
           name: t.name,
-          price: t.price,
+          price: String(t.price),
           quantity_available: t.quantity_available != null ? String(t.quantity_available) : "",
         }))
-      : [{ name: "General", price: 0, quantity_available: "" }],
+      : [{ name: "General", price: "0", quantity_available: "" }],
   );
   const [draftFormFields, setDraftFormFields] = useState<FormFieldDraft[]>(
     formFields.map((f) => ({
@@ -102,14 +113,32 @@ export function EditEventForm({
       event_name: eventName,
       description: description.text || undefined,
       description_content: description.json,
-      event_date: eventDate,
-      event_time: eventTime || undefined,
+      event_date: dayType === "single" ? eventDate : undefined,
+      event_time: dayType === "single" ? eventTime : undefined,
+      event_end_time: dayType === "single" ? eventEndTime || undefined : undefined,
+      event_dates:
+        dayType === "multi"
+          ? eventDates.map((d) => ({
+              event_date: d.date,
+              event_time: d.time || undefined,
+              event_end_time: d.endTime || undefined,
+              venue: d.venue || undefined,
+              venue_lat: d.venueLat,
+              venue_lng: d.venueLng,
+              venue_place_id: d.venuePlaceId,
+            }))
+          : [],
       event_mode: eventMode,
-      venue: eventMode === "offline" ? venue || undefined : undefined,
+      venue: dayType === "single" && eventMode === "offline" ? venue || undefined : undefined,
+      venue_lat: dayType === "single" && eventMode === "offline" ? venueCoords.lat : undefined,
+      venue_lng: dayType === "single" && eventMode === "offline" ? venueCoords.lng : undefined,
+      venue_place_id: dayType === "single" && eventMode === "offline" ? venueCoords.placeId : undefined,
       meeting_link: eventMode === "online" ? meetingLink || undefined : undefined,
-      city: city || undefined,
-      extra_cities: extraCities,
-      category,
+      city: eventMode === "online" ? undefined : allCities ? undefined : cities[0] || undefined,
+      extra_cities: eventMode === "online" ? [] : allCities ? [] : cities.slice(1),
+      all_cities: eventMode === "online" ? false : allCities,
+      category: categories[0] || "",
+      extra_categories: categories.slice(1),
     };
 
     const parsed = updateEventSchema.safeParse(input);
@@ -138,7 +167,7 @@ export function EditEventForm({
     const input = {
       ticket_types: tickets.map((t) => ({
         name: t.name,
-        price: t.price,
+        price: parsePrice(t.price),
         quantity_available: t.quantity_available ? Number(t.quantity_available) : undefined,
       })),
       form_fields: draftFormFields,
@@ -173,14 +202,42 @@ export function EditEventForm({
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Date">
-            <DatePicker value={eventDate || null} onChange={setEventDate} placeholder="Select a date" />
+        <Field label="Event length">
+          <div className="flex gap-2">
+            {(["single", "multi"] as const).map((t) => (
+              <button
+                type="button"
+                key={t}
+                onClick={() => setDayType(t)}
+                className={
+                  dayType === t
+                    ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                    : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                }
+              >
+                {t === "single" ? "Single day" : "Multi-day"}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {dayType === "single" ? (
+          <>
+            <Field label="Date">
+              <EventDatePicker
+                startValue={eventDate || null}
+                endValue={null}
+                onChange={(start) => setEventDate(start)}
+                allowRange={false}
+              />
+            </Field>
+            <EventTimeFields time={eventTime} onTimeChange={setEventTime} endTime={eventEndTime} onEndTimeChange={setEventEndTime} />
+          </>
+        ) : (
+          <Field label="Dates">
+            <EventDateEntryBuilder entries={eventDates} onChange={setEventDates} eventMode={eventMode} />
           </Field>
-          <Field label="Time (optional)">
-            <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className={inputClass} />
-          </Field>
-        </div>
+        )}
 
         <Field label="Format">
           <div className="flex gap-2">
@@ -201,40 +258,38 @@ export function EditEventForm({
           </div>
         </Field>
 
-        {eventMode === "offline" ? (
-          <Field label="Venue (optional)">
-            <input value={venue} onChange={(e) => setVenue(e.target.value)} className={inputClass} />
+        {eventMode === "offline" && dayType === "single" ? (
+          <Field label="Venue">
+            <VenueAutocomplete
+              value={venue}
+              onChange={(pick: VenuePick) => {
+                setVenue(pick.address);
+                setVenueCoords({ lat: pick.lat, lng: pick.lng, placeId: pick.placeId });
+              }}
+            />
           </Field>
-        ) : (
+        ) : eventMode === "offline" ? null : (
           <Field label="Meeting link">
             <input
               value={meetingLink}
               onChange={(e) => setMeetingLink(e.target.value)}
               placeholder="https://meet.google.com/…"
-              required
               className={inputClass}
             />
             <p className="text-[11px] text-text3">
-              Only shown to people who register -- never on the public event page.
+              Shared only with the host and confirmed/paid registrants. Never shown on the public event page.
             </p>
           </Field>
         )}
 
-        <Field label="City (optional)">
-          <Combobox value={city} onChange={setCity} options={CITY_OPTIONS} placeholder="Any city" />
-        </Field>
+        {eventMode === "offline" && (
+          <Field label="Cities">
+            <CityMultiSelect cities={cities} allCities={allCities} onChange={(c, a) => { setCities(c); setAllCities(a); }} />
+          </Field>
+        )}
 
-        <Field label="Also show up under (optional, up to 5 more cities)">
-          <MultiCombobox
-            values={extraCities}
-            onChange={setExtraCities}
-            options={CITY_OPTIONS.filter((o) => o.value !== city)}
-            placeholder="Add more cities"
-          />
-        </Field>
-
-        <Field label="Category">
-          <CategoryPicker value={category} onChange={setCategory} />
+        <Field label="Categories (up to 5)">
+          <CategoryMultiSelect values={categories} onChange={setCategories} />
         </Field>
 
         {error && <p className="text-[13px] text-pink">{error}</p>}
@@ -256,10 +311,6 @@ export function EditEventForm({
               <TicketTypeBuilder tickets={tickets} onChange={setTickets} />
             </Field>
 
-            {userId && tickets.some((t) => t.price > 0) && (
-              <PaymentDetailsForm userId={userId} details={paymentDetails} />
-            )}
-
             <Field label="Registration questions (optional)">
               <FormBuilder fields={draftFormFields} onChange={setDraftFormFields} />
             </Field>
@@ -280,7 +331,7 @@ export function EditEventForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-bold text-text3">{label}</span>
+      <span className="text-[12px] font-bold text-text2">{label}</span>
       {children}
     </div>
   );

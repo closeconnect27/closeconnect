@@ -1,11 +1,23 @@
 import Link from "next/link";
-import { IconPlus, IconCalendarEvent, IconUsers } from "@tabler/icons-react";
+import { IconPlus, IconCalendarEvent, IconUsers, IconHome } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { MessagesBell } from "@/components/layout/MessagesBell";
+import { MoreMenu } from "@/components/layout/MoreMenu";
+import { WebOnly } from "@/components/system/PlatformGate";
 
 const NAV_LINKS = [
+  { href: "/feed", label: "Feed" },
   { href: "/events", label: "Events" },
   { href: "/communities", label: "Communities" },
+];
+
+// Same 3 sections, with icons -- used for the collapsed contextual links
+// shown when a page's slot (search bar) replaces the plain nav row below.
+const ICON_LINKS = [
+  { href: "/feed", label: "Feed", icon: IconHome },
+  { href: "/events", label: "Events", icon: IconCalendarEvent },
+  { href: "/communities", label: "Communities", icon: IconUsers },
 ];
 
 // Sign-in/profile is a real, always-visible button at every viewport width --
@@ -35,12 +47,12 @@ export function Header({
   pathname?: string;
   slot?: React.ReactNode;
 }) {
-  const contextualLink =
-    pathname === "/communities"
-      ? { href: "/events", label: "Events", icon: IconCalendarEvent }
-      : pathname === "/events"
-        ? { href: "/communities", label: "Communities", icon: IconUsers }
-        : null;
+  // When a page's slot (search bar) replaces the plain nav row, the other
+  // two main sections stay reachable as compact icon+label links here --
+  // not just "the one other main section" (the old two-way Events<->
+  // Communities-only version left Feed unreachable from either page's
+  // header once its search slot was active).
+  const otherLinks = ICON_LINKS.filter((link) => link.href !== pathname);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 px-5 py-4 backdrop-blur-md sm:px-8">
@@ -68,12 +80,13 @@ export function Header({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:ml-0 sm:gap-3">
-          {slot && contextualLink && (
-            <Link href={contextualLink.href} className="btn-secondary hidden px-4 py-2.5 text-[14px] sm:inline-flex">
-              <contextualLink.icon size={15} />
-              {contextualLink.label}
-            </Link>
-          )}
+          {slot &&
+            otherLinks.map((link) => (
+              <Link key={link.href} href={link.href} className="btn-secondary hidden px-4 py-2.5 text-[14px] lg:inline-flex">
+                <link.icon size={15} />
+                {link.label}
+              </Link>
+            ))}
           <Link
             href={
               isLoggedIn
@@ -88,8 +101,15 @@ export function Header({
             <IconPlus size={15} />
             Create
           </Link>
+          {isLoggedIn && userId && <MessagesBell userId={userId} />}
           {isLoggedIn && userId && <NotificationBell userId={userId} />}
-          <ThemeToggle />
+          <MoreMenu />
+          {/* Relocated to the Profile page in the app -- a native app's
+              theme toggle lives in Settings, not floating in the header
+              on every screen. */}
+          <WebOnly>
+            <ThemeToggle />
+          </WebOnly>
         </div>
       </div>
 

@@ -1,6 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAttachmentUrl } from "@/lib/resolveAttachmentUrl";
 
+export type BroadcastEventSummary = {
+  id: string;
+  event_name: string;
+  event_date: string;
+  event_time: string | null;
+  city: string | null;
+  category: string | null;
+  unsplash_image_url: string | null;
+};
+
+export type BroadcastPostSummary = {
+  id: string;
+  content: string;
+  image_path: string | null;
+  image_paths: string[] | null;
+};
+
 export type ChatMessage = {
   id: string;
   group_id: string;
@@ -8,13 +25,24 @@ export type ChatMessage = {
   content: string | null;
   created_at: string;
   attachment_path: string | null;
-  attachment_type: "image" | "video" | "file" | null;
+  attachment_type: "image" | "video" | "file" | "voice" | null;
+  attachment_duration_seconds: number | null;
   attachment_name: string | null;
   /** Resolved signed URL, not a raw DB column -- populated by
    * getGroupMessages (server) or the realtime handler (client), never
    * fetched from the table directly (see resolveAttachmentUrl). */
   attachment_url: string | null;
-  profiles: { display_name: string } | null;
+  event_id: string | null;
+  /** Joined event summary for rendering the Broadcast-group event card --
+   * null for an ordinary message, and also null (not an error) if the
+   * event this once pointed to has since been deleted (event_id itself
+   * survives that as on delete set null -- see 0076). */
+  event: BroadcastEventSummary | null;
+  post_id: string | null;
+  /** Same idea as `event` above, for a new feed post (0112) instead of a
+   * new event. */
+  post: BroadcastPostSummary | null;
+  profiles: { display_name: string; avatar_url: string | null } | null;
 };
 
 export async function isGroupMember(supabase: SupabaseClient, groupId: string, userId: string) {
@@ -72,7 +100,7 @@ export async function getGroupMessages(supabase: SupabaseClient, groupId: string
   const { data, error } = await supabase
     .from("community_messages")
     .select(
-      "id, group_id, user_id, content, created_at, attachment_path, attachment_type, attachment_name, profiles(display_name)",
+      "id, group_id, user_id, content, created_at, attachment_path, attachment_type, attachment_duration_seconds, attachment_name, event_id, event:events(id,event_name,event_date,event_time,city,category,unsplash_image_url), post_id, post:community_posts(id,content,image_path,image_paths), profiles(display_name, avatar_url)",
     )
     .eq("group_id", groupId)
     .order("created_at", { ascending: false })

@@ -6,12 +6,10 @@ import { ClickableCard } from "@/components/ui/ClickableCard";
 import { CategoryImage } from "@/components/ui/CategoryImage";
 import { EventHostLink } from "@/components/events/EventHostLink";
 
-// District-scale card: the photo is the card, not a header strip on top of
-// one -- large hero imagery, bold confident type, generous sizing, built to
-// browse via a satisfying horizontal scroll rather than a dense thumbnail
-// grid. Explicitly bigger than the previous compact pass, not a re-described
-// version of it: image area alone is taller here than the entire old card's
-// image+text combined.
+// Photo is a fixed 16:9 box (aspect-video, not a fixed height) -- same
+// ratio the mobile app's own EventCard uses, and the same ratio the
+// upload crop tool frames photos to, so a host's photo looks the same
+// wherever it's shown instead of getting cropped differently per surface.
 export function EventCard({ event: e }: { event: EventListItem }) {
   const visual = getCategoryVisual(e.category ?? "other");
   const { month, day } = formatDateChip(e.event_date);
@@ -24,7 +22,7 @@ export function EventCard({ event: e }: { event: EventListItem }) {
       trackEvent="event_card_opened"
       trackProperties={{ event_id: e.id, category: e.category }}
     >
-      <div className="relative h-72" style={{ background: visual.bg }}>
+      <div className="relative aspect-video" style={{ background: visual.bg }}>
         <CategoryImage
           slug={e.category ?? "other"}
           seed={communitySeed(e.id)}

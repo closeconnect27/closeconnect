@@ -1,8 +1,21 @@
 import type { NextConfig } from "next";
 
+// Every user-uploaded photo (avatars, community/event cover photos, chat
+// attachments -- from both this web app and the mobile app, same Supabase
+// project) lives in Supabase Storage, not Unsplash. Without this host
+// allowlisted too, next/image silently refuses to load those URLs (a
+// blocked-by-Next request, not a broken/missing file) and renders blank --
+// exactly why mobile-uploaded photos never appeared here. Derived from the
+// same env var the Supabase client itself uses, so this can't drift from
+// whichever project (dev/staging/prod) is actually configured.
+const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : undefined;
+
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      ...(supabaseHostname ? [{ protocol: "https" as const, hostname: supabaseHostname }] : []),
+    ],
   },
 };
 
