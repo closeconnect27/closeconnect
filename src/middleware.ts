@@ -37,37 +37,48 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (cookiesToSet) => {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+  // Fail OPEN, not closed: this runs on every page for every signed-in
+  // visitor, so any unhandled exception here (a transient network blip
+  // between the Workers edge and Supabase's auth API, for instance) would
+  // otherwise crash the entire page load site-wide for that visitor. An
+  // onboarding check that occasionally doesn't run is a much smaller
+  // problem than the whole site appearing down.
+  try {
+    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        },
       },
-    },
-  });
+    });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return response;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return response;
 
-  // One extra indexed lookup per request for signed-in users -- accepted
-  // for now rather than caching completion in a cookie, since this app has
-  // no other cross-request cache mechanism to piggyback on and premature
-  // caching here risks a stale "still onboarding" cookie outliving the
-  // real DB state.
-  const { data: profile } = await supabase.from("profiles").select("onboarding_completed_at").eq("id", user.id).maybeSingle();
-  if (profile && profile.onboarding_completed_at === null) {
-    // Carries the page the user was actually headed to through the detour --
-    // without this, every first-time sign-in would land on "/" once
-    // onboarding finishes, regardless of where the sign-in was initiated
-    // (the same class of bug already fixed once for Header/BottomNav's own
-    // /login?redirect= links).
-    const onboardingUrl = new URL("/onboarding", request.url);
-    onboardingUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
-    return NextResponse.redirect(onboardingUrl);
+    // One extra indexed lookup per request for signed-in users -- accepted
+    // for now rather than caching completion in a cookie, since this app has
+    // no other cross-request cache mechanism to piggyback on and premature
+    // caching here risks a stale "still onboarding" cookie outliving the
+    // real DB state.
+    const { data: profile } = await supabase.from("profiles").select("onboarding_completed_at").eq("id", user.id).maybeSingle();
+    if (profile && profile.onboarding_completed_at === null) {
+      // Carries the page the user was actually headed to through the detour --
+      // without this, every first-time sign-in would land on "/" once
+      // onboarding finishes, regardless of where the sign-in was initiated
+      // (the same class of bug already fixed once for Header/BottomNav's own
+      // /login?redirect= links).
+      const onboardingUrl = new URL("/onboarding", request.url);
+      onboardingUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
+      return NextResponse.redirect(onboardingUrl);
+    }
+  } catch (err) {
+    console.error("middleware auth/onboarding check failed:", err);
+    return NextResponse.next({ request });
   }
 
   return response;
