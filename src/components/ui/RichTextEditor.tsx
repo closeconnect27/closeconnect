@@ -20,6 +20,7 @@ import {
   IconLink,
   IconMoodSmile,
   IconPhoto,
+  IconVideo,
   IconArrowBackUp,
   IconArrowForwardUp,
   IconLoader2,
@@ -69,11 +70,20 @@ const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+// A reel, not a gallery -- one video per description, matching 0131's
+// posture for community_posts.video_path.
+const MAX_VIDEOS = 1;
+// Must match the community-images bucket's own limit (0137).
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+
 /**
  * Shared rich text editor for community/event descriptions and (a
  * restricted configuration of) profile bios -- text formatting, colors,
  * fonts, emoji, a divider ("shape"), links, and inline images (capped at
  * 5, uploaded straight into the content rather than a separate gallery).
+ * Community descriptions can also embed one video (allowVideo) -- a reel,
+ * not a gallery, so it's capped at 1 by default.
  * Content is stored as Tiptap's own JSON doc (onChange gets both the json
  * and a plain-text extract for search/preview use), not HTML -- avoids
  * ever needing to sanitize arbitrary HTML on render.
@@ -85,19 +95,28 @@ export function RichTextEditor({
   imageUpload,
   allowImages = true,
   maxImages = MAX_IMAGES,
+  allowVideo = false,
+  maxVideos = MAX_VIDEOS,
 }: {
   content: object | null;
   onChange: (value: { json: object; text: string }) => void;
   placeholder?: string;
-  /** Which bucket/entity images upload under -- required when allowImages
-   * is true. */
+  /** Which bucket/entity images (and, when allowVideo is on, video) upload
+   * under -- required when allowImages or allowVideo is true. */
   imageUpload?: { bucket: "community-images" | "event-images" | "community-post-images"; entityId: string };
   allowImages?: boolean;
   maxImages?: number;
+  /** Community descriptions only -- a single embedded video, not a gallery.
+   * Off everywhere else this shared editor is used (event descriptions,
+   * feed posts, bio). */
+  allowVideo?: boolean;
+  maxVideos?: number;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -107,6 +126,21 @@ export function RichTextEditor({
     content: content ?? "",
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
+      onChange({ json: editor.getJSON(), text: editor.getText() });
+    },
+    // Belt-and-suspenders for mobile (Capacitor/Android WebView): some
+    // keyboards (predictive/glide typing) drive input through IME
+    // composition events, and the OS renders the composing text visually
+    // before ProseMirror's own compositionend handling commits it as a
+    // transaction. Normally that still fires onUpdate once composition
+    // ends -- but tapping straight from the keyboard to a submit button
+    // (no separate tap to blur first) can race that commit, leaving the
+    // parent's `content` state one keystroke-batch behind what's visibly
+    // on screen: the user sees their text, submits, and gets "Write
+    // something to post" back. Re-syncing on blur (which a submit button
+    // tap always triggers first) closes that race regardless of which
+    // step actually dropped the update.
+    onBlur: ({ editor }) => {
       onChange({ json: editor.getJSON(), text: editor.getText() });
     },
     // Without this, pasting or dragging an image (very natural in a rich
@@ -153,6 +187,14 @@ export function RichTextEditor({
     return count;
   }
 
+  function countVideos() {
+    let count = 0;
+    editor?.state.doc.descendants((node) => {
+      if (node.type.name === "video") count++;
+    });
+    return count;
+  }
+
   async function handleImagePick(file: File) {
     setError("");
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -180,6 +222,33 @@ export function RichTextEditor({
     onChange({ json: editor!.getJSON(), text: editor!.getText() });
   }
 
+  async function handleVideoPick(file: File) {
+    setError("");
+    if (!ALLOWED_VIDEO_TYPES.includes(file.type)) {
+      setError("Only MP4, WebM, or MOV videos are allowed");
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError("Videos must be under 50MB");
+      return;
+    }
+    if (countVideos() >= maxVideos) {
+      setError(`Only up to ${maxVideos} video per description`);
+      return;
+    }
+    if (!imageUpload) return;
+
+    setVideoUploading(true);
+    const result = await uploadDescriptionImage(file, imageUpload.bucket, imageUpload.entityId);
+    setVideoUploading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    editor!.chain().focus().insertContent({ type: "video", attrs: { src: result.url! } }).run();
+    onChange({ json: editor!.getJSON(), text: editor!.getText() });
+  }
+
   function setLink() {
     const url = window.prompt("Link URL");
     if (url === null) return;
@@ -191,6 +260,7 @@ export function RichTextEditor({
   }
 
   const imageCount = countImages();
+  const videoCount = countVideos();
 
   return (
     <div className="flex flex-col gap-2">
@@ -327,6 +397,29 @@ export function RichTextEditor({
           </>
         )}
 
+        {allowVideo && (
+          <>
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept={ALLOWED_VIDEO_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleVideoPick(file);
+                e.target.value = "";
+              }}
+            />
+            <ToolbarButton
+              onClick={() => videoInputRef.current?.click()}
+              label={`Insert video (${videoCount}/${maxVideos})`}
+              disabled={videoUploading || videoCount >= maxVideos}
+            >
+              {videoUploading ? <IconLoader2 size={15} className="animate-spin" /> : <IconVideo size={15} />}
+            </ToolbarButton>
+          </>
+        )}
+
         <Divider />
 
         <ToolbarButton onClick={() => editor.chain().focus().undo().run()} label="Undo">
@@ -340,6 +433,11 @@ export function RichTextEditor({
       {allowImages && (
         <span className="text-[11px] text-text3">
           {imageCount}/{maxImages} images used
+        </span>
+      )}
+      {allowVideo && (
+        <span className="text-[11px] text-text3">
+          {videoCount}/{maxVideos} video used
         </span>
       )}
       {error && <p className="text-[12px] text-pink">{error}</p>}

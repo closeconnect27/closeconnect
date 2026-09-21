@@ -71,6 +71,36 @@ export type MyFeedPost = {
 
 export type PostableCommunity = { id: string; name: string };
 
+export type PostReactor = { user_id: string; display_name: string | null; avatar_url: string | null; reaction: ReactionKey };
+
+/** Who reacted, and with what -- the LinkedIn-style "Reactions" breakdown
+ * (All + one tab per reaction actually present), fetched on demand when
+ * someone taps the reaction count rather than attached to every feed page
+ * load (FeedPostCard already gets counts for that; this is the drill-down).
+ * Both tables are public-select, so this reads fine from either the
+ * server or a plain client-side call. */
+export async function getPostReactors(supabase: SupabaseClient, postId: string): Promise<PostReactor[]> {
+  const { data: reactions } = await supabase.from("community_post_reactions").select("user_id, reaction").eq("post_id", postId);
+  const rows = (reactions ?? []) as { user_id: string; reaction: ReactionKey }[];
+  if (rows.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url")
+    .in(
+      "id",
+      rows.map((r) => r.user_id)
+    );
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return rows.map((r) => ({
+    user_id: r.user_id,
+    reaction: r.reaction,
+    display_name: profileMap.get(r.user_id)?.display_name ?? null,
+    avatar_url: profileMap.get(r.user_id)?.avatar_url ?? null,
+  }));
+}
+
 export type PostForEdit = {
   id: string;
   community_id: string;

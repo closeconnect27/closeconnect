@@ -17,7 +17,7 @@ import {
   type CreatePollInput,
   type CreateVideoPostInput,
 } from "@/lib/validation/feed";
-import { getFeedPosts } from "@/lib/queries/feed";
+import { getFeedPosts, getPostReactors, type PostReactor } from "@/lib/queries/feed";
 
 /** Mirrors is_community_staff(community_id) (0001_init.sql) -- checked here
  * first so a caller who isn't staff of the target community gets a plain,
@@ -203,6 +203,16 @@ export async function reactToPost(postId: string, nextReaction: string | null) {
   revalidatePath("/feed");
   revalidatePath(`/feed/${postId}`);
   return { error: null };
+}
+
+/** Who reacted and with what -- fetched on demand when the "Reactions"
+ * breakdown sheet opens (FeedPostCard), not on every feed load. Public
+ * data either way (community_post_reactions/profiles are both public-
+ * select), a server action here just so a client component has a clean
+ * way to call it. */
+export async function fetchPostReactors(postId: string): Promise<PostReactor[]> {
+  const supabase = await createClient();
+  return getPostReactors(supabase, postId);
 }
 
 /** Pin/unpin a post to the top of the feed -- community_posts has no

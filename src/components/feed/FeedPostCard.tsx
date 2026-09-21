@@ -8,6 +8,7 @@ import { IconMessageCircle, IconShare, IconCheck, IconPinFilled, IconPinnedFille
 import { reactToPost, togglePinPost, votePoll } from "@/app/actions/feed";
 import { communitySlugOrId } from "@/lib/queries/communities";
 import { RichTextView } from "@/components/ui/RichTextView";
+import { ReactionsModal } from "@/components/feed/ReactionsModal";
 import { REACTIONS, type FeedPost, type ReactionKey } from "@/lib/queries/feed";
 
 function timeAgo(iso: string) {
@@ -44,6 +45,7 @@ export function FeedPostCard({ post, isLoggedIn, canModerate }: { post: FeedPost
   const [pickerOpen, setPickerOpen] = useState(false);
   const [, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
 
   useEffect(() => {
     if (!copied) return;
@@ -241,19 +243,26 @@ export function FeedPostCard({ post, isLoggedIn, canModerate }: { post: FeedPost
             ))}
           </div>
         )}
-        <button
-          onClick={() => handleReact("like")}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setPickerOpen((v) => !v);
-          }}
-          onDoubleClick={() => setPickerOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-[13px] text-text3 transition hover:text-text2"
-          title="Click to react, right-click for more reactions"
-        >
-          <span className="text-[16px] leading-none">{myReaction ? REACTION_EMOJI[myReaction] : "\u{1F90D}"}</span>
-          {reactionTotal > 0 && <span className="font-medium">{reactionTotal}</span>}
-        </button>
+        <span className="flex items-center gap-1.5 text-[13px] text-text3">
+          <button
+            onClick={() => handleReact("like")}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setPickerOpen((v) => !v);
+            }}
+            onDoubleClick={() => setPickerOpen((v) => !v)}
+            className="transition hover:text-text2"
+            title="Click to react, right-click for more reactions"
+          >
+            <span className="text-[16px] leading-none">{myReaction ? REACTION_EMOJI[myReaction] : "\u{1F90D}"}</span>
+          </button>
+          {reactionTotal > 0 && (
+            <button onClick={() => setReactionsOpen(true)} className="font-medium transition hover:text-text2 hover:underline">
+              {reactionTotal}
+            </button>
+          )}
+        </span>
+        {reactionsOpen && <ReactionsModal postId={post.id} onClose={() => setReactionsOpen(false)} />}
         <Link href={`/feed/${post.id}`} className="flex items-center gap-1.5 text-[13px] text-text3 transition hover:text-text2">
           <IconMessageCircle size={17} />
           {post.comment_count > 0 && <span className="font-medium">{post.comment_count}</span>}
