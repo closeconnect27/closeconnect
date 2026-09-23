@@ -96,6 +96,7 @@ export function EventDateEntryBuilder({
               <VenueAutocomplete
                 value={d.venue}
                 onChange={(pick: VenuePick) => updateEntry(i, { venue: pick.address, venueLat: pick.lat, venueLng: pick.lng, venuePlaceId: pick.placeId })}
+                hasCoords={d.venueLat != null && d.venueLng != null}
               />
             </label>
           )}

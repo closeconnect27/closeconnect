@@ -269,6 +269,7 @@ export function NewEventForm({
                   setVenue(pick.address);
                   setVenueCoords({ lat: pick.lat, lng: pick.lng, placeId: pick.placeId });
                 }}
+                hasCoords={venueCoords.lat != null && venueCoords.lng != null}
               />
             </Field>
           ) : eventMode === "offline" ? null : (

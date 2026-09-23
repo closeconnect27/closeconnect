@@ -32,10 +32,19 @@ export function VenueAutocomplete({
   value,
   onChange,
   placeholder = "Where's it happening?",
+  hasCoords = false,
 }: {
   value: string;
   onChange: (pick: VenuePick) => void;
   placeholder?: string;
+  // Whether the caller currently has lat/lng for `value` (from the parent's
+  // own venue_lat/venue_lng state). Free-typing without ever picking a
+  // suggestion is still a valid plain-string venue, but it means the event
+  // page can only show an "Open in Google Maps" search link instead of the
+  // real interactive map -- surfaced here so a host isn't left wondering
+  // why their event's map looks different from others (reported: "maps
+  // shows open in gmaps but not maps like other events").
+  hasCoords?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const googleRef = useRef<typeof google | null>(null);
@@ -193,6 +202,13 @@ export function VenueAutocomplete({
         </button>
       </div>
       {geoError && <p className="mt-1 text-[12px] text-pink">{geoError}</p>}
+      {!geoError && value.trim() && (
+        <p className={`mt-1 text-[12px] ${hasCoords ? "text-text3" : "text-pink"}`}>
+          {hasCoords
+            ? "Location pinned -- the event page will show an interactive map."
+            : "No exact location pinned yet -- pick a suggestion from the dropdown as you type, or the event page will only show an \"Open in Google Maps\" link instead of a map."}
+        </p>
+      )}
     </div>
   );
 }
