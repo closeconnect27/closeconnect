@@ -8,8 +8,15 @@ import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { TicketTypeBuilder, parsePrice, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { CancellationPolicyBuilder, DEFAULT_POLICY_DRAFT, draftToRules, type CancellationPolicyDraft } from "@/components/events/CancellationPolicyBuilder";
+import { FaqBuilder } from "@/components/events/FaqBuilder";
+import type { EventFaq } from "@/lib/eventFaqs";
+import { AddonBuilder, type AddonDraft } from "@/components/events/AddonBuilder";
 import { EventDateEntryBuilder, type EventDateEntryDraft } from "@/components/events/EventDateEntryBuilder";
 import { createEvent } from "@/app/actions/events";
+import { saveCancellationPolicy } from "@/app/actions/eventCancellation";
+import { saveFaqsForEvent } from "@/app/actions/eventFaqs";
+import { saveAddonsForEvent } from "@/app/actions/eventAddons";
 import { Combobox } from "@/components/ui/Combobox";
 import { CityMultiSelect } from "@/components/ui/CityMultiSelect";
 import { CategoryMultiSelect } from "@/components/ui/CategoryMultiSelect";
@@ -62,6 +69,9 @@ export function NewEventForm({
   const [tickets, setTickets] = useState<TicketTypeDraft[]>([
     { name: "General", price: "0", quantity_available: "" },
   ]);
+  const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicyDraft>(DEFAULT_POLICY_DRAFT);
+  const [faqs, setFaqs] = useState<EventFaq[]>([]);
+  const [addons, setAddons] = useState<AddonDraft[]>([]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -127,6 +137,35 @@ export function NewEventForm({
       if (result?.error || !result?.eventId) {
         setError(result?.error ?? "Could not create event");
         return;
+      }
+
+      // Its own action/table, not part of createEvent's own insert --
+      // saveCancellationPolicy is the same call the edit form uses later,
+      // so there's exactly one code path that validates/normalizes a
+      // policy's rules regardless of when it's set.
+      const policyResult = await saveCancellationPolicy(result.eventId, { enabled: cancellationPolicy.enabled, rules: draftToRules(cancellationPolicy) });
+      if (policyResult.error) {
+        setError(`Event created, but the cancellation policy failed to save: ${policyResult.error}`);
+        return;
+      }
+
+      if (faqs.length > 0) {
+        const faqResult = await saveFaqsForEvent(result.eventId, faqs);
+        if (faqResult.error) {
+          setError(`Event created, but the FAQ failed to save: ${faqResult.error}`);
+          return;
+        }
+      }
+
+      if (addons.length > 0) {
+        const addonsResult = await saveAddonsForEvent(
+          result.eventId,
+          addons.map((a) => ({ name: a.name, price: parsePrice(a.price), quantity_available: a.quantity_available ? Number(a.quantity_available) : null, is_active: a.is_active })),
+        );
+        if (addonsResult.error) {
+          setError(`Event created, but the add-ons failed to save: ${addonsResult.error}`);
+          return;
+        }
       }
 
       // No staged image uploads here anymore -- inline description images
@@ -261,6 +300,18 @@ export function NewEventForm({
 
           <Field label="Ticket types">
             <TicketTypeBuilder tickets={tickets} onChange={setTickets} />
+          </Field>
+
+          <Field label="Add-ons (optional)">
+            <AddonBuilder addons={addons} onChange={setAddons} />
+          </Field>
+
+          <Field label="Cancellation & refund policy">
+            <CancellationPolicyBuilder value={cancellationPolicy} onChange={setCancellationPolicy} />
+          </Field>
+
+          <Field label="FAQ (optional)">
+            <FaqBuilder value={faqs} onChange={setFaqs} />
           </Field>
 
           <Field label="Registration questions (optional)">

@@ -89,8 +89,13 @@ export type EventRegistration = {
   id: string;
   respondent_id: string | null;
   response_data: Record<string, string>;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "cancelled";
   checked_in_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: "attendee" | "organizer" | null;
+  refund_status: "none" | "pending" | "processing" | "processed" | "failed";
+  refund_amount_paise: number | null;
+  cancellation_charge_paise: number | null;
   /** How many of `quantity` people have actually arrived -- 0.._quantity_,
    * not a binary flag (0055). checked_in_at above still just means
    * "checked in at all". */
@@ -105,6 +110,7 @@ export type EventRegistration = {
   ticket_type_id: string | null;
   event_ticket_types: { name: string } | null;
   profiles: { display_name: string } | null;
+  form_response_addons: { name_snapshot: string; unit_price_paise: number; quantity: number }[];
 };
 
 export type EventFilters = {
@@ -185,6 +191,35 @@ export async function getEventsByCity(supabase: SupabaseClient, city: City, opts
   return data as unknown as EventListItem[];
 }
 
+/** Every event the signed-in user has an approved registration for
+ * (status='approved' -- form_responses also holds rejected/pending
+ * community-membership-form rows under the same table, owner_type='event'
+ * scopes to just this), most recently registered first. Used by "My
+ * events" (the registered half -- hosted events reuse getEvents({hostId})
+ * instead). Upcoming only (event_date >= today) -- "My events" is meant to
+ * read as "what's coming up," not a lifetime history; a past registration
+ * a customer attended months ago cluttering this list was the actual
+ * complaint that led here. */
+export async function getMyRegisteredEvents(supabase: SupabaseClient, userId: string): Promise<EventListItem[]> {
+  const { data: registrations } = await supabase
+    .from("form_responses")
+    .select("owner_id, created_at")
+    .eq("owner_type", "event")
+    .eq("respondent_id", userId)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+  const eventIds = [...new Set((registrations ?? []).map((r) => r.owner_id as string))];
+  if (eventIds.length === 0) return [];
+
+  const { data, error } = await supabase.from("events").select(EVENT_LIST_SELECT).in("id", eventIds).gte("event_date", todayIso());
+  if (error) throw error;
+  const byId = new Map(((data ?? []) as unknown as EventListItem[]).map((e) => [e.id, e]));
+  // Registration recency order, not the event query's own -- a returned
+  // row can be missing (event deleted) so this filters through byId rather
+  // than assuming every id resolved.
+  return eventIds.map((id) => byId.get(id)).filter((e): e is EventListItem => !!e);
+}
+
 export async function getEventById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase
     .from("events")
@@ -205,6 +240,26 @@ export async function getEventTicketTypes(supabase: SupabaseClient, eventId: str
     .order("sort_order");
   if (error) throw error;
   return data as EventTicketType[];
+}
+
+export type EventAddon = {
+  id: string;
+  event_id: string;
+  name: string;
+  price: number;
+  quantity_available: number | null;
+  is_active: boolean;
+  sort_order: number;
+};
+
+/** Active add-ons only -- for checkout/registration-time reads. The
+ * organizer's own editor (AddonBuilder) reads the full set including
+ * inactive/retired ones through its own direct query instead, same split
+ * getFaqsForEvent/getFaqsForEventEditor already establish. */
+export async function getEventAddons(supabase: SupabaseClient, eventId: string): Promise<EventAddon[]> {
+  const { data, error } = await supabase.from("event_addons").select("*").eq("event_id", eventId).eq("is_active", true).order("sort_order");
+  if (error) throw error;
+  return data as EventAddon[];
 }
 
 export async function getEventDateEntries(supabase: SupabaseClient, eventId: string) {
@@ -262,7 +317,7 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
   const { data, error } = await supabase
     .from("form_responses")
     .select(
-      "id, respondent_id, response_data, status, checked_in_at, checked_in_count, quantity, payment_status, payment_reference, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name)",
+      "id, respondent_id, response_data, status, checked_in_at, cancelled_at, cancelled_by, refund_status, refund_amount_paise, cancellation_charge_paise, checked_in_count, quantity, payment_status, payment_reference, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name), form_response_addons(name_snapshot, unit_price_paise, quantity)",
     )
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
@@ -326,6 +381,38 @@ export async function getMyRegistrationCount(supabase: SupabaseClient, eventId: 
     .eq("owner_id", eventId)
     .eq("respondent_id", userId);
   return count ?? 0;
+}
+
+export type MyEventRegistration = {
+  id: string;
+  payment_status: "unpaid" | "pending_verification" | "paid" | "failed";
+  ticket_type_id: string | null;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  amount_paid_paise: number | null;
+  refund_status: "none" | "pending" | "processing" | "processed" | "failed";
+  refund_amount_paise: number | null;
+  cancellation_charge_paise: number | null;
+};
+
+/** The signed-in user's most recent registration for this event, if any --
+ * lets EventRegistration reconstruct its post-registration/post-payment
+ * view on reload instead of always starting from the blank form. Those
+ * views were previously driven entirely by client-only state (done/
+ * razorpayPaid), so paying and then revisiting or refreshing the page lost
+ * the confirmation and showed the registration form again -- worse, trying
+ * to register again from there could open a second Razorpay payment for an
+ * already-paid ticket. */
+export async function getMyLatestRegistration(supabase: SupabaseClient, eventId: string, userId: string): Promise<MyEventRegistration | null> {
+  const { data } = await supabase
+    .from("form_responses")
+    .select("id, payment_status, ticket_type_id, status, amount_paid_paise, refund_status, refund_amount_paise, cancellation_charge_paise")
+    .eq("owner_type", "event")
+    .eq("owner_id", eventId)
+    .eq("respondent_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data as MyEventRegistration | null;
 }
 
 /** Returns null for anyone RLS doesn't consider authorized (not the host,

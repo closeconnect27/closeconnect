@@ -6,8 +6,13 @@ import { IconCircleCheck, IconBrandGoogle, IconDownload } from "@tabler/icons-re
 import { DynamicForm } from "@/components/forms/DynamicForm";
 import { registerForEvent } from "@/app/actions/events";
 import { RazorpayPayButton } from "@/components/events/RazorpayPayButton";
+import { CancelBookingButton } from "@/components/events/CancelBookingButton";
 import type { FormField } from "@/lib/queries/membership";
-import type { EventTicketType } from "@/lib/queries/events";
+import type { EventTicketType, MyEventRegistration, EventAddon } from "@/lib/queries/events";
+import { CancellationPolicyText } from "@/components/events/CancellationPolicyBuilder";
+import type { CancellationPolicySnapshot } from "@/lib/eventCancellation";
+import { FaqAccordion } from "@/components/events/FaqAccordion";
+import type { EventFaq } from "@/lib/eventFaqs";
 
 // Registration requires a real account (SPEC.md's earlier guest-friendly
 // decision is deliberately reversed -- see Section 9 of the redesign brief):
@@ -27,7 +32,11 @@ export function EventRegistration({
   email,
   displayName,
   alreadyRegisteredCount = 0,
+  initialRegistration = null,
   calendarLink,
+  cancellationPolicy,
+  faqs = [],
+  addons = [],
 }: {
   eventId: string;
   ticketTypes: EventTicketType[];
@@ -44,21 +53,38 @@ export function EventRegistration({
   // just what triggers the "you've already registered, register again?"
   // confirmation instead of silently resubmitting.
   alreadyRegisteredCount?: number;
+  // The viewer's most recent registration for this event, if any --
+  // reconstructs the post-registration/post-payment view below on initial
+  // render instead of always starting from the blank form (see done/
+  // registrationId/razorpayPaid init below).
+  initialRegistration?: MyEventRegistration | null;
   // Same link as the page-level "Add to Calendar" button (computed once in
   // the parent page and passed down) -- null whenever there's no real date
   // yet or the event's cancelled.
   calendarLink?: string | null;
+  cancellationPolicy: CancellationPolicySnapshot;
+  // Section 39: accessible from checkout without abandoning it -- an
+  // inline collapsible, not a separate page navigation. Defaults to []
+  // for any caller that hasn't been updated to pass it, same fallback
+  // pattern initialRegistration/calendarLink already use.
+  faqs?: EventFaq[];
+  addons?: EventAddon[];
 }) {
   const router = useRouter();
-  const [ticketTypeId, setTicketTypeId] = useState(ticketTypes[0]?.id ?? "");
+  const [showFaqs, setShowFaqs] = useState(false);
+  const [ticketTypeId, setTicketTypeId] = useState(initialRegistration?.ticket_type_id ?? ticketTypes[0]?.id ?? "");
   const name = displayName?.trim() || email?.split("@")[0] || "";
   const [quantity, setQuantity] = useState(1);
+  // addon_id -> quantity, only present for add-ons the customer actually
+  // selected (0 quantity is just "not selected", never sent to the server).
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-  const [registrationId, setRegistrationId] = useState<string | null>(null);
-  const [razorpayPaid, setRazorpayPaid] = useState(false);
+  const [done, setDone] = useState(!!initialRegistration);
+  const [registrationId, setRegistrationId] = useState<string | null>(initialRegistration?.id ?? null);
+  const [razorpayPaid, setRazorpayPaid] = useState(initialRegistration?.payment_status === "paid");
   const [confirmingReRegister, setConfirmingReRegister] = useState(false);
+  const [policyAcknowledged, setPolicyAcknowledged] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const selectedTicket = ticketTypes.find((t) => t.id === ticketTypeId);
@@ -69,12 +95,21 @@ export function EventRegistration({
       ? selectedTicket.quantity_available - (availability.get(selectedTicket.id) ?? 0)
       : null;
   const maxQuantity = Math.min(10, remainingForSelected ?? 10);
+  const addonsTotal = addons.reduce((sum, a) => sum + a.price * (selectedAddons[a.id] ?? 0), 0);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (!ticketTypeId) {
       setError("Choose a ticket type");
+      return;
+    }
+    // Section 8: payment (or, for a free ticket, registration itself)
+    // can't proceed until this is checked -- enforced here, not just by
+    // disabling the submit button, so a form submitted some other way
+    // (e.g. pressing Enter) can't bypass it either.
+    if (!policyAcknowledged) {
+      setError("Please acknowledge the cancellation & refund policy to continue.");
       return;
     }
     if (alreadyRegisteredCount > 0 && !confirmingReRegister) {
@@ -91,6 +126,9 @@ export function EventRegistration({
         name,
         answers,
         quantity,
+        addons: Object.entries(selectedAddons)
+          .filter(([, qty]) => qty > 0)
+          .map(([addon_id, qty]) => ({ addon_id, quantity: qty })),
       });
       if (result?.error) {
         setError(result.error);
@@ -124,6 +162,16 @@ export function EventRegistration({
             ))}
           </div>
         )}
+        {addons.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {addons.map((a) => (
+              <div key={a.id} className="flex items-center justify-between rounded-card-sm border border-border2 px-4 py-3 text-left text-[13px]">
+                <span className="text-text2">{a.name}</span>
+                <span className="font-bold text-green">+₹{a.price}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex flex-col items-center gap-3 pt-1 text-center">
           <p className="text-[13px] text-text2">Sign in to register for this event.</p>
           <button
@@ -138,6 +186,28 @@ export function EventRegistration({
   }
 
   if (done) {
+    // A previously-cancelled registration (the most recent one for this
+    // event, per getMyLatestRegistration) shows its own terminal state --
+    // never the registration form again (re-registering is still possible,
+    // but through the normal "no active registration" path below, not by
+    // silently resurrecting a cancelled one) and never "You're registered!"
+    // for a booking that's explicitly not active anymore.
+    if (initialRegistration?.status === "cancelled") {
+      return (
+        <div className="card-elevated rounded-card bg-bg2 p-6 text-center">
+          <p className="text-[15px] font-bold text-text">Booking cancelled</p>
+          {initialRegistration.refund_amount_paise != null && initialRegistration.refund_amount_paise > 0 ? (
+            <p className="mt-1 text-[13px] text-text2">
+              Refund of ₹{(initialRegistration.refund_amount_paise / 100).toLocaleString("en-IN")}{" "}
+              {initialRegistration.refund_status === "processed" ? "has been processed." : initialRegistration.refund_status === "failed" ? "failed -- contact support@closeconnect.in." : "is on its way."}
+            </p>
+          ) : (
+            <p className="mt-1 text-[13px] text-text2">No refund applied, per this event&apos;s cancellation policy.</p>
+          )}
+        </div>
+      );
+    }
+
     // Narrows selectedTicket to non-undefined/price>0 for everything below
     // -- isPaidTicket as a plain boolean (the previous shape here) doesn't
     // carry that narrowing through to selectedTicket.price at JSX-build
@@ -151,6 +221,7 @@ export function EventRegistration({
           <div className="mt-4 flex flex-col items-center gap-2">
             <DownloadTicketButton registrationId={registrationId} />
             <AddToCalendarButton calendarLink={calendarLink} />
+            {registrationId && <CancelBookingButton registrationId={registrationId} />}
           </div>
         </div>
       );
@@ -168,6 +239,7 @@ export function EventRegistration({
           <div className="mt-4 flex flex-col items-center gap-2">
             <DownloadTicketButton registrationId={registrationId} />
             <AddToCalendarButton calendarLink={calendarLink} />
+            {registrationId && <CancelBookingButton registrationId={registrationId} />}
           </div>
         </div>
       );
@@ -271,12 +343,78 @@ export function EventRegistration({
           )}
         </div>
       </label>
+
+      {addons.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-medium text-text">Add-ons (optional)</span>
+          <div className="flex flex-col gap-2">
+            {addons.map((a) => {
+              const remaining = a.quantity_available != null ? a.quantity_available : null;
+              const qty = selectedAddons[a.id] ?? 0;
+              return (
+                <div key={a.id} className="flex items-center justify-between rounded-card-sm border border-border2 px-4 py-3 text-[13px]">
+                  <span>
+                    <span className="font-bold text-text">{a.name}</span>
+                    <span className="ml-2 text-text3">₹{a.price}</span>
+                    {remaining != null && <span className="ml-2 text-[11px] text-text3">{remaining} left</span>}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddons((prev) => ({ ...prev, [a.id]: Math.max(0, (prev[a.id] ?? 0) - 1) }))}
+                      disabled={qty <= 0}
+                      aria-label={`Fewer ${a.name}`}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-border2 text-text2 transition hover:border-green hover:text-green disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-5 text-center font-bold text-text">{qty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAddons((prev) => ({ ...prev, [a.id]: Math.min(10, (prev[a.id] ?? 0) + 1) }))}
+                      disabled={remaining != null ? qty >= remaining : qty >= 10}
+                      aria-label={`More ${a.name}`}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-border2 text-text2 transition hover:border-green hover:text-green disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {addonsTotal > 0 && <span className="text-[13px] text-text3">₹{addonsTotal} in add-ons</span>}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         <span className="text-[13px] font-medium text-text">Email</span>
         <p className="rounded-card-sm border border-border2 bg-bg3 px-4 py-3 text-[14px] text-text2">{email}</p>
       </div>
 
       {formFields.length > 0 && <DynamicForm fields={formFields} values={answers} onChange={setAnswers} />}
+
+      {faqs.length > 0 && (
+        <div>
+          <button type="button" onClick={() => setShowFaqs((v) => !v)} className="text-[13px] font-medium text-green hover:underline">
+            {showFaqs ? "Hide event FAQs" : "Questions about this event? View event FAQs"}
+          </button>
+          {showFaqs && (
+            <div className="mt-2">
+              <FaqAccordion faqs={faqs} eventId={eventId} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-card-sm border border-border2 bg-bg3 p-3">
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-text3">Cancellation &amp; Refund Policy</p>
+        <CancellationPolicyText enabled={cancellationPolicy.enabled} rules={cancellationPolicy.rules} />
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-[12px] text-text2">
+          <input type="checkbox" checked={policyAcknowledged} onChange={(e) => setPolicyAcknowledged(e.target.checked)} className="mt-0.5" />
+          I have read and agree to the cancellation and refund policy.
+        </label>
+      </div>
 
       {error && <p className="text-[13px] text-pink">{error}</p>}
 
@@ -301,7 +439,7 @@ export function EventRegistration({
       ) : (
         <button
           type="submit"
-          disabled={pending || !ticketTypeId || (selectedTicket ? isSoldOut(selectedTicket) : false)}
+          disabled={pending || !ticketTypeId || !policyAcknowledged || (selectedTicket ? isSoldOut(selectedTicket) : false)}
           className="btn-primary py-3 text-[14px]"
         >
           {pending ? "Registering…" : "Register"}

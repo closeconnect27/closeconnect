@@ -81,18 +81,22 @@ export function MessagesInbox({
   // never messaged (no thread yet) was previously unfindable no matter how
   // exactly you typed their name. Debounced since, unlike the in-memory
   // filter above, this is a real network query on every change.
+  const searchActive = query.length >= MIN_QUERY_LEN && list.length < FEW_THREAD_MATCHES;
+
   useEffect(() => {
-    if (query.length < MIN_QUERY_LEN || list.length >= FEW_THREAD_MATCHES) {
-      setPeople([]);
-      setPeopleLoading(false);
-      setPeopleError("");
-      return;
-    }
+    // No setState here when inactive -- render gates on searchActive below
+    // instead of relying on this effect to clear stale people/loading/error
+    // state (react-hooks/set-state-in-effect: synchronous setState in an
+    // effect body risks a cascading render).
+    if (!searchActive) return;
 
     let cancelled = false;
-    setPeopleLoading(true);
-    setPeopleError("");
     const timer = setTimeout(async () => {
+      // Loading/error reset lives in this callback, not the effect body
+      // itself, so the debounce delay is the only thing gating when it
+      // fires (react-hooks/set-state-in-effect).
+      setPeopleLoading(true);
+      setPeopleError("");
       const supabase = createClient();
       // `,` and `(`/`)` are structural in PostgREST's .or() filter syntax --
       // strip them so a search containing them can't break the query.
@@ -125,10 +129,11 @@ export function MessagesInbox({
       clearTimeout(timer);
     };
     // list is intentionally read via closure, not listed as a dep -- it's a
-    // new array every render; re-running on its *length* (below) is enough
-    // to keep the exclusion set and threshold check current.
+    // new array every render; searchActive (derived from its length) and
+    // list.length itself are enough to keep the exclusion set and
+    // threshold check current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, currentUserId, list.length]);
+  }, [query, currentUserId, list.length, searchActive]);
 
   function handleStartDm(person: PlatformPerson) {
     setDmError("");
@@ -149,6 +154,7 @@ export function MessagesInbox({
       <div className="relative mb-3">
         <IconSearch size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text3" />
         <input
+          id="dm-search-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search people or chats…"
@@ -206,7 +212,7 @@ export function MessagesInbox({
         </div>
       )}
 
-      {query.length >= MIN_QUERY_LEN && (peopleLoading || people.length > 0 || peopleError) && (
+      {searchActive && (peopleLoading || people.length > 0 || peopleError) && (
         <div className="mt-4">
           <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-text3">People</p>
           {dmError && <p className="mb-2 px-1 text-[12px] text-pink">{dmError}</p>}

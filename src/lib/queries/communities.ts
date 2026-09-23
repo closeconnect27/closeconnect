@@ -128,6 +128,16 @@ export async function getCommunities(supabase: SupabaseClient, filters: Communit
   return data as Community[];
 }
 
+/** Every community the signed-in user is a member of (owner, moderator, or
+ * plain member) -- web counterpart of the mobile app's own my-communities
+ * screen. */
+export async function getMyCommunities(supabase: SupabaseClient, userId: string): Promise<Community[]> {
+  const { data, error } = await supabase.from("community_members").select("communities(*)").eq("user_id", userId);
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as Array<{ communities: Community | null }>;
+  return rows.map((r) => r.communities).filter((c): c is Community => !!c);
+}
+
 /**
  * The one place multi-city matching lives for communities, mirroring
  * getCommunitiesByCategory above: a community matches a city if it's the

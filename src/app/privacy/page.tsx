@@ -10,8 +10,7 @@ export default function PrivacyPolicyPage() {
 
       <div className="mt-6 flex flex-col gap-6 text-[15px] leading-relaxed text-text">
         <p>
-          CloseConnect (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;), operated as a proprietorship business (Udyam
-          Registration Number: UDYAM-KR-03-0741080), operates the CloseConnect mobile application and website (the
+          CloseConnect (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the CloseConnect mobile application and website (the
           &quot;Service&quot;), a hyperlocal platform for discovering local events, joining interest-based communities, and
           connecting with other users. This Privacy Policy explains how we collect, use, share, and protect your
           information when you use our Service, and describes the rights you have over it.

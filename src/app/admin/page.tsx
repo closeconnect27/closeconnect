@@ -10,6 +10,8 @@ import {
   IconShieldLock,
   IconCashBanknote,
   IconEye,
+  IconHelpCircle,
+  IconMessageQuestion,
 } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -73,10 +75,20 @@ export default async function AdminPage() {
           <StatCard icon={IconFlag} label="Open reports" value={stats.openReports} />
         </div>
 
-        <Link href="/admin/payouts" className="btn-secondary mt-3 inline-flex px-4 py-2 text-[13px]">
-          <IconCashBanknote size={14} />
-          Organizer payouts
-        </Link>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/admin/payouts" className="btn-secondary inline-flex px-4 py-2 text-[13px]">
+            <IconCashBanknote size={14} />
+            Organizer payouts
+          </Link>
+          <Link href="/admin/faqs" className="btn-secondary inline-flex px-4 py-2 text-[13px]">
+            <IconHelpCircle size={14} />
+            Platform FAQs
+          </Link>
+          <Link href="/admin/event-faqs" className="btn-secondary inline-flex px-4 py-2 text-[13px]">
+            <IconMessageQuestion size={14} />
+            Event FAQ moderation
+          </Link>
+        </div>
 
         <section className="mt-8">
           <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">

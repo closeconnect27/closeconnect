@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyRazorpaySignature } from "@/lib/razorpay";
+import { verifyRazorpaySignature, getRazorpayPaymentFee } from "@/lib/razorpay";
 import { sendRegistrationConfirmationEmail } from "@/lib/eventRegistrationEmails";
+import { getEventTicketTypes } from "@/lib/queries/events";
+import { getRegistrationAddonTotalPaise } from "@/lib/eventAddonBilling";
 
 // Mobile-only counterpart of verifyRazorpayPayment (src/app/actions/events.ts)
 // -- identical verification logic (HMAC check, order_id match against what
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   const { data: reg, error: fetchError } = await supabase
     .from("form_responses")
-    .select("respondent_id, payment_status, razorpay_order_id, response_data")
+    .select("respondent_id, payment_status, razorpay_order_id, response_data, ticket_type_id, quantity")
     .eq("id", registrationId)
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
@@ -63,6 +65,24 @@ export async function POST(request: NextRequest) {
   }
   if (!valid) return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
 
+  // Recomputed the exact same way create-order priced this order -- never
+  // re-read from Razorpay's own response. Missing this (the mobile route's
+  // original form) meant a mobile-paid registration's amount_paid_paise
+  // stayed null forever, which organizerSettlement.ts reads as ₹0 owed --
+  // silently excluding every mobile-originated sale from an organizer's
+  // payout.
+  const ticketTypes = await getEventTicketTypes(supabase, eventId);
+  const ticketType = ticketTypes.find((t) => t.id === reg.ticket_type_id);
+  const addonTotalPaise = await getRegistrationAddonTotalPaise(supabase, registrationId);
+  const amountPaidPaise = ticketType ? Math.round(ticketType.price * reg.quantity * 100) + addonTotalPaise : null;
+
+  let gatewayFeePaise: number | null = null;
+  try {
+    gatewayFeePaise = (await getRazorpayPaymentFee(razorpay_payment_id)).feePaise;
+  } catch (e) {
+    console.error("Failed to fetch Razorpay payment fee (mobile):", e);
+  }
+
   // .eq("payment_status", "unpaid") makes this write atomic: if a
   // concurrent call (e.g. a flaky-network retry, or a race against the
   // webhook) already flipped this row to 'paid' between the read above and
@@ -72,7 +92,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { data: updated, error: updateError } = await admin
     .from("form_responses")
-    .update({ payment_status: "paid", razorpay_payment_id })
+    .update({ payment_status: "paid", razorpay_payment_id, amount_paid_paise: amountPaidPaise, gateway_fee_paise: gatewayFeePaise })
     .eq("id", registrationId)
     .eq("payment_status", "unpaid")
     .select("id");

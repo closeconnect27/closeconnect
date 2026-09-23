@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventTicketTypes, getEventFormFields, getEventMeetingLink, getEventDateEntries } from "@/lib/queries/events";
 import { isEventPast } from "@/lib/eventStatus";
+import { getCancellationPolicyForEvent } from "@/app/actions/eventCancellation";
+import { getFaqsForEventEditor } from "@/app/actions/eventFaqs";
+import { getAddonsForEventEditor } from "@/app/actions/eventAddons";
 import { EditEventForm } from "@/components/events/EditEventForm";
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,12 +42,15 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   // pre-filled here.
   const isHost = event.host_id === user.id;
 
-  const [ticketTypes, formFields, dateEntries, { count: registrationCount }, meetingLink] = await Promise.all([
+  const [ticketTypes, formFields, dateEntries, { count: registrationCount }, meetingLink, { policy: cancellationPolicy }, faqs, addons] = await Promise.all([
     getEventTicketTypes(supabase, id),
     getEventFormFields(supabase, id),
     getEventDateEntries(supabase, id),
     supabase.from("form_responses").select("*", { count: "exact", head: true }).eq("owner_type", "event").eq("owner_id", id),
     isHost ? getEventMeetingLink(supabase, id) : Promise.resolve(null),
+    getCancellationPolicyForEvent(id),
+    getFaqsForEventEditor(id),
+    getAddonsForEventEditor(id),
   ]);
 
   return (
@@ -66,6 +72,9 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
           dateEntries={dateEntries}
           hasRegistrations={(registrationCount ?? 0) > 0}
           initialMeetingLink={meetingLink}
+          initialCancellationPolicy={cancellationPolicy}
+          initialFaqs={faqs}
+          initialAddons={addons}
         />
       </div>
     </div>

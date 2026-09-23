@@ -253,6 +253,13 @@ export const eventRegistrationSchema = z.object({
   // (0055). Defaults to 1 so every existing call site that doesn't pass
   // this keeps behaving exactly as before.
   quantity: z.number().int().min(1).max(10).default(1),
+  // Add-on selections -- addon_id/quantity only, never a price: the real
+  // price is always re-read from event_addons server-side in
+  // registerForEvent, so a tampered request can't buy an add-on for less.
+  addons: z
+    .array(z.object({ addon_id: z.string().uuid(), quantity: z.number().int().min(1).max(10) }))
+    .max(20)
+    .default([]),
 });
 
 export type EventRegistrationInput = z.infer<typeof eventRegistrationSchema>;

@@ -15,6 +15,9 @@ import {
   IconGif,
   IconMicrophone,
   IconShare2,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconEyeOff,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -22,6 +25,8 @@ import {
   acceptProfileDmThread,
   declineProfileDmThread,
   deleteProfileDmMessage,
+  deleteProfileDmMessages,
+  hideProfileDmMessageForMe,
 } from "@/app/actions/profileDm";
 import { markDmThreadRead } from "@/app/actions/dmReads";
 import { uploadChatAttachment, uploadVoiceNote } from "@/lib/uploadChatAttachment";
@@ -69,7 +74,9 @@ export function ProfileDmThreadView({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [replyTo, setReplyTo] = useState<ProfileDmMessage | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
-  const [forwardingContent, setForwardingContent] = useState<string | null>(null);
+  const [forwardingContent, setForwardingContent] = useState<string | string[] | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
   const [decisionPending, startDecisionTransition] = useTransition();
@@ -215,6 +222,63 @@ export function ProfileDmThreadView({
     });
   }
 
+  // "Delete for you" -- works on ANY message (yours or theirs), unlike
+  // handleDelete above (sender-only hard delete, "delete for everyone").
+  function handleHideForMe(messageId: string) {
+    setError("");
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    startTransition(async () => {
+      const result = await hideProfileDmMessageForMe(messageId);
+      if (result.error) {
+        setError(result.error);
+        setMessages(previous);
+      }
+    });
+  }
+
+  function toggleSelect(messageId: string) {
+    setSelectMode(true);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  }
+
+  function cancelSelect() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  // Selecting other people's messages is allowed (needed to forward them),
+  // but bulk delete only ever touches the caller's own -- selectedDeletable
+  // below already filters to sender_id === currentUserId, so this silently
+  // skips anything selected that isn't the user's rather than blocking the
+  // selection itself.
+  function handleBulkDelete() {
+    if (!selectedDeletable.length) return;
+    setError("");
+    const ids = selectedDeletable;
+    const previous = messages;
+    setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
+    cancelSelect();
+    startTransition(async () => {
+      const result = await deleteProfileDmMessages(ids);
+      if (result.error) {
+        setError(result.error);
+        setMessages(previous);
+      }
+    });
+  }
+
+  function handleBulkForward() {
+    if (!selectedForwardable.length) return;
+    setForwardingContent(selectedForwardable.length === 1 ? selectedForwardable[0] : selectedForwardable);
+    cancelSelect();
+  }
+
   function handleAccept() {
     setError("");
     const previous = status;
@@ -274,9 +338,45 @@ export function ProfileDmThreadView({
 
   const canCompose = status === "accepted" || (status === "pending" && isRequester);
   const lastMessage = messages[messages.length - 1];
+  const selectedDeletable = messages.filter((m) => selectedIds.has(m.id) && m.sender_id === currentUserId).map((m) => m.id);
+  const selectedForwardable = messages.filter((m) => selectedIds.has(m.id) && m.content).map((m) => m.content as string);
 
   return (
     <div className="card-elevated flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-bg2">
+      {selectMode && (
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-bg2 px-4 py-2.5">
+          <button
+            type="button"
+            onClick={cancelSelect}
+            aria-label="Cancel selection"
+            className="flex items-center gap-1 text-[13px] text-text3 hover:text-text2"
+          >
+            <IconX size={16} />
+            Cancel
+          </button>
+          <span className="text-[13px] font-semibold text-text">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBulkForward}
+              disabled={!selectedForwardable.length}
+              aria-label="Forward selected messages"
+              className="p-1 text-text3 hover:text-green disabled:cursor-default disabled:opacity-40 disabled:hover:text-text3"
+            >
+              <IconShare2 size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={!selectedDeletable.length || pending}
+              aria-label="Delete selected messages"
+              className="p-1 text-text3 hover:text-pink disabled:cursor-default disabled:opacity-40 disabled:hover:text-text3"
+            >
+              <IconTrash size={18} />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-1 flex-col justify-end gap-2 overflow-y-auto bg-bg p-4">
         {messages.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
@@ -289,6 +389,7 @@ export function ProfileDmThreadView({
             const repliedMessage = m.reply_to_message_id ? messages.find((x) => x.id === m.reply_to_message_id) : null;
             const isLastMine = isMine && m.id === lastMessage?.id;
             const showSeen = isLastMine && !!otherReadAt && otherReadAt >= m.created_at;
+            const isSelected = selectedIds.has(m.id);
 
             return (
               <div key={m.id} className={`group flex flex-col ${isMine ? "items-end" : "items-start"}`}>
@@ -298,9 +399,12 @@ export function ProfileDmThreadView({
                 <div className={`flex items-end gap-1.5 ${isMine ? "flex-row-reverse" : ""}`}>
                   <MessageAvatar name={otherParticipant.display_name} avatarUrl={otherParticipant.avatar_url} show={!isMine} />
                   <div
+                    onClick={selectMode ? () => toggleSelect(m.id) : undefined}
                     className={`inline-block max-w-[75%] overflow-hidden rounded-2xl text-[14px] leading-relaxed ${
                       isMine ? "rounded-br-sm bg-green text-green-dark" : "rounded-bl-sm bg-bg2 text-text shadow-card"
-                    } ${m.attachment_type ? "" : "px-4 py-2.5"}`}
+                    } ${m.attachment_type ? "" : "px-4 py-2.5"} ${selectMode ? "cursor-pointer" : ""} ${
+                      isSelected ? "ring-2 ring-green ring-offset-1 ring-offset-bg" : ""
+                    }`}
                   >
                     {m.reply_to_message_id && (
                       <div className="mx-2.5 mt-2.5 rounded-card-sm border-l-2 border-current/40 bg-black/5 px-2 py-1 text-[12px] opacity-80">
@@ -320,34 +424,60 @@ export function ProfileDmThreadView({
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition group-hover:opacity-100">
+                  <div
+                    className={`flex shrink-0 items-center gap-0.5 self-center transition ${
+                      selectMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  >
                     <button
                       type="button"
-                      onClick={() => setReplyTo(m)}
-                      aria-label="Reply"
+                      onClick={() => toggleSelect(m.id)}
+                      aria-label={isSelected ? "Deselect message" : "Select message"}
                       className="p-1 text-text3 hover:text-green"
                     >
-                      <IconArrowBackUp size={14} />
+                      {isSelected ? <IconSquareCheckFilled size={14} className="text-green" /> : <IconSquare size={14} />}
                     </button>
-                    {m.content && (
-                      <button
-                        type="button"
-                        onClick={() => setForwardingContent(m.content)}
-                        aria-label="Share message"
-                        className="p-1 text-text3 hover:text-green"
-                      >
-                        <IconShare2 size={14} />
-                      </button>
-                    )}
-                    {isMine && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(m.id)}
-                        aria-label="Delete message"
-                        className="p-1 text-text3 hover:text-pink"
-                      >
-                        <IconTrash size={14} />
-                      </button>
+                    {!selectMode && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setReplyTo(m)}
+                          aria-label="Reply"
+                          className="p-1 text-text3 hover:text-green"
+                        >
+                          <IconArrowBackUp size={14} />
+                        </button>
+                        {m.content && (
+                          <button
+                            type="button"
+                            onClick={() => setForwardingContent(m.content)}
+                            aria-label="Forward message"
+                            className="p-1 text-text3 hover:text-green"
+                          >
+                            <IconShare2 size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleHideForMe(m.id)}
+                          aria-label="Delete for you"
+                          title="Delete for you"
+                          className="p-1 text-text3 hover:text-pink"
+                        >
+                          <IconEyeOff size={14} />
+                        </button>
+                        {isMine && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(m.id)}
+                            aria-label="Delete for everyone"
+                            title="Delete for everyone"
+                            className="p-1 text-text3 hover:text-pink"
+                          >
+                            <IconTrash size={14} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

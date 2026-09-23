@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { IconMenu2, IconLifebuoy, IconPhone, IconInfoCircle, IconFileText, IconShieldLock, IconReceiptRefund } from "@tabler/icons-react";
+import { IconMenu2, IconLifebuoy, IconPhone, IconInfoCircle, IconFileText, IconShieldLock, IconReceiptRefund, IconHelpCircle } from "@tabler/icons-react";
 
 // Same click-outside-to-close pattern as NotificationBell -- houses the
 // support/legal links that used to live in the footer (Footer.tsx now only
@@ -59,6 +59,9 @@ export function MoreMenu({ dark = false }: { dark?: boolean } = {}) {
             <IconLifebuoy size={16} />
             Support
           </a>
+          <MenuLink href="/faqs" icon={IconHelpCircle} onClick={() => setOpen(false)} dark={dark}>
+            Help &amp; FAQ
+          </MenuLink>
           <a
             href="tel:+918310109935"
             className={`flex items-center gap-2.5 px-4 py-2.5 text-[14px] font-medium transition ${

@@ -107,6 +107,7 @@ export function EditCommunityForm({ community }: { community: Community }) {
             onChange={setDescription}
             placeholder="What's this community about?"
             imageUpload={{ bucket: "community-images", entityId: community.id }}
+            allowVideo
           />
         </Field>
 

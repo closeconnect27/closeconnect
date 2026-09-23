@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconX, IconPlus, IconVideo, IconLoader2 } from "@tabler/icons-react";
-import { RichTextEditor } from "@/components/ui/RichTextEditor";
-import { serializeDescriptionContent } from "@/lib/validation/richText";
+import { RichTextEditor, type RichTextEditorHandle } from "@/components/ui/RichTextEditor";
+import { serializeDescriptionContent, isEditorContentEmpty, type EditorContentValue } from "@/lib/validation/richText";
 import { createPost, createPoll, createVideoPost } from "@/app/actions/feed";
 import { createClient } from "@/lib/supabase/client";
 import type { PostableCommunity } from "@/lib/queries/feed";
@@ -26,7 +26,8 @@ function todayIso() {
 export function NewPostForm({ communities }: { communities: PostableCommunity[] }) {
   const router = useRouter();
   const [communityId, setCommunityId] = useState<string | null>(communities.length === 1 ? communities[0].id : null);
-  const [content, setContent] = useState<{ json: object | null; text: string }>({ json: null, text: "" });
+  const [content, setContent] = useState<EditorContentValue>({ json: null, text: "" });
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -83,7 +84,7 @@ export function NewPostForm({ communities }: { communities: PostableCommunity[] 
     setPollOptions((prev) => (prev.length > 2 ? prev.filter((_, i) => i !== index) : prev));
   }
 
-  function handlePost() {
+  async function handlePost() {
     if (!communityId) {
       setError("Choose which community to post as.");
       return;
@@ -138,12 +139,20 @@ export function NewPostForm({ communities }: { communities: PostableCommunity[] 
       return;
     }
 
+    // Read the live editor directly, not React state -- see richText.ts's
+    // isEditorContentEmpty comment for why this replaced the earlier
+    // ref+300ms-wait workaround.
+    const finalContent = editorRef.current?.getContent() ?? content;
+    if (isEditorContentEmpty(finalContent)) {
+      setError("Write something to post, or add a photo");
+      return;
+    }
     setError("");
     startTransition(async () => {
       const result = await createPost({
         community_id: communityId,
-        content: content.text,
-        content_content: serializeDescriptionContent(content.json),
+        content: finalContent.text,
+        content_content: serializeDescriptionContent(finalContent.json),
         event_id: eventId,
       });
       if (result.error) setError(result.error);
@@ -279,6 +288,7 @@ export function NewPostForm({ communities }: { communities: PostableCommunity[] 
       ) : (
         <>
           <RichTextEditor
+            ref={editorRef}
             content={content.json}
             onChange={setContent}
             placeholder="Write something…"

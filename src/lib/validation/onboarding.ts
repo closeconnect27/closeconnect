@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { usernameField } from "@/lib/validation/username";
 
 // 18+ per CloseConnect's own Terms/Privacy Policy -- deliberately higher
 // than the COPPA-minimum floor (13) many social platforms use, since the
@@ -17,11 +18,9 @@ function isNotTooOld(dob: Date) {
 }
 
 export const onboardingSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9_]{3,20}$/, "3-20 characters: lowercase letters, numbers, and underscores only"),
+  // Shared with profile-edit's updateProfileSchema (validation/username.ts) --
+  // same format everywhere a username is ever written.
+  username: usernameField,
   dateOfBirth: z
     .string()
     .refine((s) => !Number.isNaN(Date.parse(s)), "Enter a valid date")

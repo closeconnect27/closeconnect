@@ -52,6 +52,25 @@ export async function getReferrerBreakdown(supabase: SupabaseClient, targetType:
   return [...counts.entries()].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
 }
 
+/** Web vs app -- same shape as getReferrerBreakdown, grouped by platform
+ * (0138) instead of referrer_source. Every row was implicitly "web" until
+ * the mobile app started writing its own page_views rows tagged 'app'. */
+export async function getPlatformBreakdown(supabase: SupabaseClient, targetType: "community" | "event", targetId: string) {
+  const { data, error } = await supabase
+    .from("page_views")
+    .select("platform")
+    .eq("target_type", targetType)
+    .eq("target_id", targetId);
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const platform = (row.platform as string) ?? "web";
+    counts.set(platform, (counts.get(platform) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([platform, count]) => ({ platform, count })).sort((a, b) => b.count - a.count);
+}
+
 export type JoinRequestMetrics = {
   byDay: { date: string; pending: number; approved: number; rejected: number }[];
   totals: { pending: number; approved: number; rejected: number };
@@ -192,4 +211,142 @@ export async function getMostActiveMembers(supabase: SupabaseClient, communityId
     displayName: nameById.get(userId) ?? "Someone",
     messageCount: countByUser.get(userId)!,
   })) as ActiveMember[];
+}
+
+export type TopEvent = { eventId: string; eventName: string; registrations: number; views: number };
+
+/** Which of this community's events actually drove registrations --
+ * same two-step "get the community's events, then batch-query the generic
+ * form_responses/page_views tables for those event ids" shape as
+ * getJoinRequestMetrics/getMostActiveMembers, since neither table has a
+ * community_id of its own to filter on directly. */
+export async function getTopEventsByRegistrations(supabase: SupabaseClient, communityId: string, limit = 5): Promise<TopEvent[]> {
+  const { data: events, error: eventsError } = await supabase
+    .from("events")
+    .select("id, event_name")
+    .eq("community_id", communityId);
+  if (eventsError) throw eventsError;
+  if (!events || events.length === 0) return [];
+
+  const eventIds = events.map((e) => e.id);
+
+  const { data: registrations, error: registrationsError } = await supabase
+    .from("form_responses")
+    .select("owner_id")
+    .eq("owner_type", "event")
+    .in("owner_id", eventIds);
+  if (registrationsError) throw registrationsError;
+
+  const { data: views, error: viewsError } = await supabase
+    .from("page_views")
+    .select("target_id")
+    .eq("target_type", "event")
+    .in("target_id", eventIds);
+  if (viewsError) throw viewsError;
+
+  const registrationsByEvent = new Map<string, number>();
+  for (const row of registrations ?? []) {
+    const eventId = row.owner_id as string;
+    registrationsByEvent.set(eventId, (registrationsByEvent.get(eventId) ?? 0) + 1);
+  }
+  const viewsByEvent = new Map<string, number>();
+  for (const row of views ?? []) {
+    const eventId = row.target_id as string;
+    viewsByEvent.set(eventId, (viewsByEvent.get(eventId) ?? 0) + 1);
+  }
+
+  return events
+    .map((e) => ({
+      eventId: e.id as string,
+      eventName: e.event_name as string,
+      registrations: registrationsByEvent.get(e.id) ?? 0,
+      views: viewsByEvent.get(e.id) ?? 0,
+    }))
+    .sort((a, b) => b.registrations - a.registrations)
+    .slice(0, limit);
+}
+
+export type TopPost = { postId: string; excerpt: string; reactionCount: number; commentCount: number; totalEngagement: number };
+
+/** Which posts actually got interacted with -- reactions + comments, each
+ * counted with its own batched .in("post_id", ids) query against the two
+ * per-post tables, same two-step-then-merge shape as getTopEventsByRegistrations
+ * above. excerpt truncation matches the existing ~80-char inline slice
+ * convention (queries/reports.ts's message-content preview) rather than a
+ * new shared helper. */
+export async function getTopPostsByEngagement(supabase: SupabaseClient, communityId: string, limit = 5): Promise<TopPost[]> {
+  const { data: posts, error: postsError } = await supabase
+    .from("community_posts")
+    .select("id, content, created_at")
+    .eq("community_id", communityId);
+  if (postsError) throw postsError;
+  if (!posts || posts.length === 0) return [];
+
+  const postIds = posts.map((p) => p.id);
+
+  const { data: reactions, error: reactionsError } = await supabase
+    .from("community_post_reactions")
+    .select("post_id")
+    .in("post_id", postIds);
+  if (reactionsError) throw reactionsError;
+
+  const { data: comments, error: commentsError } = await supabase
+    .from("community_post_comments")
+    .select("post_id")
+    .in("post_id", postIds);
+  if (commentsError) throw commentsError;
+
+  const reactionsByPost = new Map<string, number>();
+  for (const row of reactions ?? []) {
+    const postId = row.post_id as string;
+    reactionsByPost.set(postId, (reactionsByPost.get(postId) ?? 0) + 1);
+  }
+  const commentsByPost = new Map<string, number>();
+  for (const row of comments ?? []) {
+    const postId = row.post_id as string;
+    commentsByPost.set(postId, (commentsByPost.get(postId) ?? 0) + 1);
+  }
+
+  return posts
+    .map((p) => {
+      const reactionCount = reactionsByPost.get(p.id) ?? 0;
+      const commentCount = commentsByPost.get(p.id) ?? 0;
+      const content = p.content as string;
+      return {
+        postId: p.id as string,
+        excerpt: content.length > 80 ? `${content.slice(0, 80)}…` : content,
+        reactionCount,
+        commentCount,
+        totalEngagement: reactionCount + commentCount,
+      };
+    })
+    .sort((a, b) => b.totalEngagement - a.totalEngagement)
+    .slice(0, limit);
+}
+
+/** Registrations vs check-ins across ALL of this community's events combined
+ * (not per-event -- keep it simple, per spec). checked_in_count (0055) is
+ * summed against the total form_responses row count for the same event ids
+ * getTopEventsByRegistrations resolves. */
+export async function getEventCheckInRate(supabase: SupabaseClient, communityId: string): Promise<{ registrations: number; checkedIn: number }> {
+  const { data: events, error: eventsError } = await supabase
+    .from("events")
+    .select("id")
+    .eq("community_id", communityId);
+  if (eventsError) throw eventsError;
+  if (!events || events.length === 0) return { registrations: 0, checkedIn: 0 };
+
+  const { data: registrations, error: registrationsError } = await supabase
+    .from("form_responses")
+    .select("checked_in_count")
+    .eq("owner_type", "event")
+    .in(
+      "owner_id",
+      events.map((e) => e.id),
+    );
+  if (registrationsError) throw registrationsError;
+
+  const rows = registrations ?? [];
+  const checkedIn = rows.reduce((sum, row) => sum + ((row.checked_in_count as number) ?? 0), 0);
+  return { registrations: rows.length, checkedIn };
 }

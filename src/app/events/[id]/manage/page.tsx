@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { IconDownload, IconUsers, IconCircleCheck, IconHeart, IconUserX, IconChartBar } from "@tabler/icons-react";
+import { IconDownload, IconUsers, IconCircleCheck, IconHeart, IconUserX, IconChartBar, IconBan } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById, getEventRegistrations, getEventTicketTypes, getEventFormFields } from "@/lib/queries/events";
@@ -63,9 +63,14 @@ export default async function ManageEventPage({
     dmThreads.length > 0 ? await getDmReadTimestamps(supabase, user.id, "event", dmThreads.map((t) => t.id)) : new Map<string, string>();
 
   // Counted in TICKETS (sum of quantity), not registration rows -- a group
-  // booking of 4 is 4 people, not 1, for every stat below (0055).
-  const totalTickets = registrations.reduce((sum, r) => sum + r.quantity, 0);
-  const checkedInCount = registrations.reduce((sum, r) => sum + r.checked_in_count, 0);
+  // booking of 4 is 4 people, not 1, for every stat below (0055). A
+  // cancelled registration is excluded from every stat here (it's no
+  // longer really "registered") but still appears in the full list below,
+  // with its own cancelled/refund badge.
+  const activeRegistrations = registrations.filter((r) => r.status !== "cancelled");
+  const cancelledRegistrations = registrations.filter((r) => r.status === "cancelled");
+  const totalTickets = activeRegistrations.reduce((sum, r) => sum + r.quantity, 0);
+  const checkedInCount = activeRegistrations.reduce((sum, r) => sum + r.checked_in_count, 0);
   // A "no-show" is only a meaningful, final number once the event has
   // actually happened -- before then, someone who hasn't checked in yet
   // just hasn't arrived, not skipped it. No new column: derived purely from
@@ -73,7 +78,10 @@ export default async function ManageEventPage({
   // elsewhere in this codebase (host/dashboard, profile past/upcoming).
   const eventHasPassed = event.event_date !== null && event.event_date < todayIso();
   const noShowCount = totalTickets - checkedInCount;
-  const paidCount = registrations.filter((r) => r.payment_status === "paid").reduce((sum, r) => sum + r.quantity, 0);
+  const paidCount = activeRegistrations.filter((r) => r.payment_status === "paid").reduce((sum, r) => sum + r.quantity, 0);
+  const refundedPaise = cancelledRegistrations.reduce((sum, r) => sum + (r.refund_amount_paise ?? 0), 0);
+  const pendingRefundCount = cancelledRegistrations.filter((r) => r.refund_status === "pending" || r.refund_status === "processing").length;
+  const failedRefundCount = cancelledRegistrations.filter((r) => r.refund_status === "failed").length;
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -107,7 +115,19 @@ export default async function ManageEventPage({
           <StatCard icon={IconUsers} label="Registered" value={totalTickets} />
           <StatCard icon={IconCircleCheck} label="Checked in" value={checkedInCount} />
           {eventHasPassed && <StatCard icon={IconUserX} label="No-show" value={noShowCount} />}
+          {cancelledRegistrations.length > 0 && <StatCard icon={IconBan} label="Cancelled" value={cancelledRegistrations.length} />}
         </div>
+
+        {cancelledRegistrations.length > 0 && (
+          <div className="mt-4 rounded-card-sm border border-border bg-bg2 p-4 text-[13px]">
+            <p className="mb-2 font-bold text-text">Cancellations &amp; refunds</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-text2">
+              <span>Total refunded: ₹{(refundedPaise / 100).toLocaleString("en-IN")}</span>
+              {pendingRefundCount > 0 && <span>{pendingRefundCount} refund{pendingRefundCount === 1 ? "" : "s"} in progress</span>}
+              {failedRefundCount > 0 && <span className="text-pink">{failedRefundCount} refund{failedRefundCount === 1 ? "" : "s"} failed</span>}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4">
           <EventFunnel
@@ -142,7 +162,7 @@ export default async function ManageEventPage({
         {ticketTypes.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {ticketTypes.map((t) => {
-              const count = registrations.filter((r) => r.ticket_type_id === t.id).reduce((sum, r) => sum + r.quantity, 0);
+              const count = activeRegistrations.filter((r) => r.ticket_type_id === t.id).reduce((sum, r) => sum + r.quantity, 0);
               return (
                 <span key={t.id} className="rounded-full border border-border2 px-3 py-1 text-[12px] text-text2">
                   {t.name}: {count}

@@ -28,6 +28,7 @@ export async function getProfileDetails(supabase: SupabaseClient, profileId: str
 export type PublicProfileBasic = {
   id: string;
   display_name: string;
+  username: string | null;
   avatar_url: string | null;
   host_rating: number;
   /** Companion to host_rating (0054) -- lets the UI tell "0 because no
@@ -59,7 +60,7 @@ export async function getPublicProfileBasic(supabase: SupabaseClient, profileId:
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, avatar_url, host_rating, host_rating_count, is_founding_host, bio, bio_content, profile_visibility, is_verified, verified_phone, verified_email",
+      "id, display_name, username, avatar_url, host_rating, host_rating_count, is_founding_host, bio, bio_content, profile_visibility, is_verified, verified_phone, verified_email",
     )
     .eq("id", profileId)
     .maybeSingle();

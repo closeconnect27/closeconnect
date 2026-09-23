@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { forwardRef, useImperativeHandle, useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
@@ -77,6 +77,16 @@ const MAX_VIDEOS = 1;
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
+/** Imperative escape hatch for a caller that needs the editor's CURRENT
+ * content synchronously at some later moment (e.g. right before a submit)
+ * instead of trusting whatever the last onChange happened to report. See
+ * NewPostForm/EditPostForm's handlePost/handleSave for why this exists --
+ * onChange is unthrottled and always fresh, so it was never the source of
+ * the "write something to post" bug, but validating a COPY of the content
+ * (React state, however carefully mirrored/re-synced/delayed) is
+ * structurally racy in a way reading the live editor directly isn't. */
+export type RichTextEditorHandle = { getContent: () => { json: object; text: string } };
+
 /**
  * Shared rich text editor for community/event descriptions and (a
  * restricted configuration of) profile bios -- text formatting, colors,
@@ -88,16 +98,7 @@ const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
  * and a plain-text extract for search/preview use), not HTML -- avoids
  * ever needing to sanitize arbitrary HTML on render.
  */
-export function RichTextEditor({
-  content,
-  onChange,
-  placeholder = "Write something…",
-  imageUpload,
-  allowImages = true,
-  maxImages = MAX_IMAGES,
-  allowVideo = false,
-  maxVideos = MAX_VIDEOS,
-}: {
+export const RichTextEditor = forwardRef<RichTextEditorHandle, {
   content: object | null;
   onChange: (value: { json: object; text: string }) => void;
   placeholder?: string;
@@ -111,7 +112,16 @@ export function RichTextEditor({
    * feed posts, bio). */
   allowVideo?: boolean;
   maxVideos?: number;
-}) {
+}>(function RichTextEditor({
+  content,
+  onChange,
+  placeholder = "Write something…",
+  imageUpload,
+  allowImages = true,
+  maxImages = MAX_IMAGES,
+  allowVideo = false,
+  maxVideos = MAX_VIDEOS,
+}, ref) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +135,27 @@ export function RichTextEditor({
     ],
     content: content ?? "",
     immediatelyRender: false,
+    // ^ this component re-renders on every keystroke (onUpdate below lifts
+    // state to the parent, which re-renders and passes new props back
+    // down) -- with no deps array, @tiptap/react's useEditor defaults to
+    // `[]` internally in a way that means "no deps to gate on," so on
+    // EVERY render it re-diffs options and, since `extensions` above is a
+    // brand-new array/instances every render (richTextExtensions() and
+    // Placeholder.configure() both construct fresh objects), the diff
+    // never matches -- editor.setOptions() fires on every single
+    // keystroke, forcing a synchronous view.updateState() resync. That's
+    // real, wasted work on every keystroke, and a redundant view resync
+    // firing right as ProseMirror is mid-transaction from that same
+    // keystroke is exactly the kind of thing that can race and drop the
+    // just-typed character from the model -- a very plausible mechanism
+    // for "the editor shows text but getText()/submit says empty," worse
+    // right after mount (typing fast, right away) than later. Passing an
+    // explicit deps array here (placeholder is the only thing that
+    // actually needs to recreate the editor) routes useEditor down its
+    // other, cheap "did deps actually change" path instead, so a plain
+    // re-render from typing no longer touches the editor's options at
+    // all. See RichTextEditorHandle's DOM-textContent fallback below for
+    // the belt-and-suspenders half of this fix.
     onUpdate: ({ editor }) => {
       onChange({ json: editor.getJSON(), text: editor.getText() });
     },
@@ -170,7 +201,30 @@ export function RichTextEditor({
         return true;
       },
     },
-  });
+  }, [placeholder]);
+
+  // Reads the live editor directly, not any React state copy of it --
+  // called synchronously at submit time by NewPostForm/EditPostForm (and
+  // any other caller that needs it), so there's no timing window between
+  // "what's on screen" and "what gets validated/sent."
+  //
+  // text falls back to the contenteditable's own DOM textContent when
+  // ProseMirror's getText() comes back empty -- the two should never
+  // disagree, but getText() reads ProseMirror's MODEL, and the useEditor
+  // setOptions-churn bug above (now fixed) is a real example of how that
+  // model can end up a keystroke behind what's actually rendered on
+  // screen. Reading the DOM directly is what the user (and a screenshot)
+  // would call "empty," so it's the more trustworthy signal for this one
+  // yes/no check specifically -- the JSON sent to the server still comes
+  // from getJSON()/getText(), this only affects whether the empty-content
+  // error blocks a submit the user can plainly see has text in it.
+  useImperativeHandle(ref, () => ({
+    getContent: () => {
+      const text = editor?.getText() ?? "";
+      const domText = editor && !editor.isDestroyed ? editor.view.dom.textContent ?? "" : "";
+      return { json: editor?.getJSON() ?? {}, text: text.trim() ? text : domText };
+    },
+  }), [editor]);
 
   if (!editor) return null;
 
@@ -447,7 +501,7 @@ export function RichTextEditor({
       </div>
     </div>
   );
-}
+});
 
 function ToolbarButton({
   active,

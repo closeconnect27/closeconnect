@@ -66,13 +66,18 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
                 Meetups, workshops, and socials hosted by communities near you — filter by what fits your week.
               </p>
             </div>
-            <Link
-              href={user ? "/events/new" : "/login?redirect=/events/new"}
-              className="btn-primary shrink-0 px-4 py-2.5 text-[13px]"
-            >
-              <span className="hidden sm:inline">Host an event</span>
-              <span className="sm:hidden">Host</span>
-            </Link>
+            <div className="flex shrink-0 gap-2">
+              {user && (
+                <Link href="/events/my-events" className="btn-secondary px-4 py-2.5 text-[13px]">
+                  <span className="hidden sm:inline">My events</span>
+                  <span className="sm:hidden">Mine</span>
+                </Link>
+              )}
+              <Link href={user ? "/events/new" : "/login?redirect=/events/new"} className="btn-primary px-4 py-2.5 text-[13px]">
+                <span className="hidden sm:inline">Host an event</span>
+                <span className="sm:hidden">Host</span>
+              </Link>
+            </div>
           </div>
         </div>
       </WebOnly>

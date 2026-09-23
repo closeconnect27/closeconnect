@@ -169,6 +169,36 @@ export async function getProfileDmThreadMessages(supabase: SupabaseClient, threa
   );
 }
 
+export async function getIsThreadMuted(supabase: SupabaseClient, threadId: string, userId: string): Promise<boolean> {
+  const { data } = await supabase.from("profile_dm_thread_mutes").select("thread_id").eq("thread_id", threadId).eq("user_id", userId).maybeSingle();
+  return !!data;
+}
+
+export type DmMediaItem = {
+  id: string;
+  attachment_path: string;
+  attachment_type: Exclude<ProfileDmAttachmentType, never>;
+  attachment_name: string | null;
+  attachment_url: string | null;
+};
+
+/** Every message in this thread that carries an attachment, newest first --
+ * the "Media & links" panel's own data. */
+export async function getProfileDmThreadAttachments(supabase: SupabaseClient, threadId: string): Promise<DmMediaItem[]> {
+  const { data, error } = await supabase
+    .from("profile_dm_messages")
+    .select("id, attachment_path, attachment_type, attachment_name")
+    .eq("thread_id", threadId)
+    .not("attachment_path", "is", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = (data ?? []) as unknown as Array<{ id: string; attachment_path: string; attachment_type: ProfileDmAttachmentType; attachment_name: string | null }>;
+  return Promise.all(
+    rows.map(async (r) => ({ ...r, attachment_url: await resolveDmAttachmentUrl(supabase, r.attachment_path, r.attachment_type) })),
+  );
+}
+
 /** attachment_type "gif" stores the full Giphy CDN URL directly in
  * attachment_path (not a chat-attachments storage path) -- signing it
  * through resolveAttachmentUrl would just fail, so it's used as-is. Every

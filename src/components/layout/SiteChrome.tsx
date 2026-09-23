@@ -54,7 +54,10 @@ function SiteChromeInner({
   // rather than competing for room around a small fixed-height chat box.
   // The page's own "← Back to community" link already covers what Header
   // would have (a way back out).
-  const isChatPage = /^\/communities\/[^/]+\/groups\/[^/]+$/.test(pathname);
+  // /messages (the DM inbox, list + open thread side by side) is the same
+  // deal -- a WhatsApp-Web-style split pane needs the full viewport height
+  // to lay out correctly, not the normal padded/scrolling page flow.
+  const isChatPage = /^\/communities\/[^/]+\/groups\/[^/]+$/.test(pathname) || /^\/messages(\/.*)?$/.test(pathname);
   // /login is the native app's actual entry screen now (see /app's
   // redirect gate) -- a header with its own redundant "Sign in" button
   // floating above the sign-in card itself reads as an oversight, and a
@@ -113,9 +116,14 @@ function SiteChromeInner({
       {/* pb-16 clears the fixed BottomNav on mobile so page content never
           sits underneath it; sm:pb-0 since BottomNav hides itself there.
           Only needed when BottomNav is actually rendered (not isHome,
-          not isImmersivePage). */}
+          not isImmersivePage). isImmersivePage gets the same hard-capped
+          h-viewport-safe as isHome -- a chat layout (messages' split pane,
+          a group's thread) needs a real bounded height to lay out against,
+          the same reasoning isHome's own comment already gives; without
+          it there's nothing stopping the page from just growing past the
+          viewport instead of scrolling internally. */}
       <div
-        className={`flex min-h-0 flex-1 flex-col ${isHome ? "h-viewport-safe overflow-hidden" : isImmersivePage ? "" : "pb-16 sm:pb-0"}`}
+        className={`flex min-h-0 flex-1 flex-col ${isHome || isImmersivePage ? "h-viewport-safe overflow-hidden" : "pb-16 sm:pb-0"}`}
       >
         {children}
         {/* The native app hides this entirely -- a persistent

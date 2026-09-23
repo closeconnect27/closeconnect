@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand dark background, matches src/app/globals.css's bg token and
+         capacitor.config.ts's SplashScreen.backgroundColor. The Android
+         12+ system splash screen (Theme.SplashScreen, styles.xml) needs
+         its own color resource here; it can't reference the drawable
+         Capacitor's own JS-configurable splash uses. -->
+    <color name="splash_background">#0A0A0A</color>
+</resources>

@@ -54,6 +54,12 @@ function toCsv(registrations: EventRegistration[], formFields: FormField[]) {
     "Quantity",
     "Registered at",
     "Checked in count",
+    "Status",
+    "Refund amount",
+    "Cancellation charge",
+    "Refund status",
+    "Add-ons",
+    "Add-ons total",
     ...formFields.map((f) => f.label),
   ];
   const rows = registrations.map((r) => [
@@ -63,6 +69,12 @@ function toCsv(registrations: EventRegistration[], formFields: FormField[]) {
     String(r.quantity),
     new Date(r.created_at).toISOString(),
     `${r.checked_in_count}/${r.quantity}`,
+    r.status,
+    r.refund_amount_paise != null ? (r.refund_amount_paise / 100).toFixed(2) : "",
+    r.cancellation_charge_paise != null ? (r.cancellation_charge_paise / 100).toFixed(2) : "",
+    r.status === "cancelled" ? r.refund_status : "",
+    r.form_response_addons.map((a) => `${a.name_snapshot}${a.quantity > 1 ? ` x${a.quantity}` : ""}`).join("; "),
+    r.form_response_addons.length > 0 ? (r.form_response_addons.reduce((sum, a) => sum + a.unit_price_paise * a.quantity, 0) / 100).toFixed(2) : "",
     ...formFields.map((f) => r.response_data[f.id] ?? ""),
   ]);
   return [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n");

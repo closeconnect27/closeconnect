@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconUsers, IconCalendarEvent, IconInbox, IconTicket, IconPlus, IconShieldLock } from "@tabler/icons-react";
+import { IconUsers, IconCalendarEvent, IconInbox, IconTicket, IconPlus, IconShieldLock, IconCashBanknote } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
@@ -62,6 +62,10 @@ export default async function HostDashboardPage() {
                 <span className="hidden sm:inline">Admin</span>
               </Link>
             )}
+            <Link href="/host/payments" className="btn-secondary px-4 py-2.5 text-[13px]">
+              <IconCashBanknote size={14} />
+              <span className="hidden sm:inline">Payments</span>
+            </Link>
             <Link href="/create" className="btn-primary px-4 py-2.5 text-[13px]">
               <IconPlus size={14} />
               <span className="hidden sm:inline">Create</span>

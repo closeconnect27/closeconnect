@@ -38,12 +38,21 @@ export async function updateProfile(
     .from("profiles")
     .update({
       display_name: data.display_name,
+      username: data.username,
       bio: data.bio || null,
       bio_content: data.bio_content ?? null,
       profile_visibility: data.profile_visibility,
     })
     .eq("id", user.id);
-  if (profileError) return { error: profileError.message };
+  if (profileError) {
+    // 23505 = unique_violation -- the `username` unique index (0092), same
+    // race completeOnboarding (onboarding.ts) already guards against: someone
+    // else claimed this username between load and submit.
+    if (profileError.code === "23505") {
+      return { error: "That username is already taken." };
+    }
+    return { error: profileError.message };
+  }
 
   const { error: detailsError } = await supabase
     .from("profile_details")

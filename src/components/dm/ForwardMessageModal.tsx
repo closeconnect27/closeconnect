@@ -7,22 +7,23 @@ import { createClient } from "@/lib/supabase/client";
 type OtherProfile = { id: string; display_name: string; avatar_url: string | null };
 type ThreadOption = { id: string; other: OtherProfile };
 
-// "Share message" -- forwards a message's TEXT into one of the sender's own
-// other profile-DM threads. Text only, deliberately: an attachment's
-// storage path lives under its ORIGINAL thread's folder
+// "Forward message" -- forwards one or more messages' TEXT into one of the
+// sender's own other profile-DM threads. Text only, deliberately: an
+// attachment's storage path lives under its ORIGINAL thread's folder
 // (dm/profile/{threadId}/...), and that thread's storage RLS policy only
 // admits participants of THAT thread -- copying the row into a different
 // thread would leave the new thread's other participant unable to fetch
-// the file, so this sidesteps that rather than shipping a share button
+// the file, so this sidesteps that rather than shipping a forward button
 // that silently breaks for the recipient. Mirrors mobile's own
-// ForwardMessageModal.
+// ForwardMessageModal. `content` accepts an array for the multiselect bulk
+// case -- each string becomes its own row, inserted in order.
 export function ForwardMessageModal({
   content,
   currentThreadId,
   currentUserId,
   onClose,
 }: {
-  content: string;
+  content: string | string[];
   currentThreadId: string;
   currentUserId: string;
   onClose: () => void;
@@ -64,9 +65,17 @@ export function ForwardMessageModal({
   async function handleSendTo(threadId: string) {
     setSendingTo(threadId);
     const supabase = createClient();
-    const { error } = await supabase.from("profile_dm_messages").insert({ thread_id: threadId, sender_id: currentUserId, content });
+    const contents = Array.isArray(content) ? content : [content];
+    let failed = false;
+    for (const text of contents) {
+      const { error } = await supabase.from("profile_dm_messages").insert({ thread_id: threadId, sender_id: currentUserId, content: text });
+      if (error) {
+        failed = true;
+        break;
+      }
+    }
     setSendingTo(null);
-    if (!error) setSentTo((prev) => new Set(prev).add(threadId));
+    if (!failed) setSentTo((prev) => new Set(prev).add(threadId));
   }
 
   return (
@@ -76,7 +85,7 @@ export function ForwardMessageModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
-          <span className="font-heading text-[14px] font-bold text-text">Share to…</span>
+          <span className="font-heading text-[14px] font-bold text-text">Forward to…</span>
           <button type="button" onClick={onClose} aria-label="Close" className="text-text3 hover:text-text2">
             <IconX size={18} />
           </button>
@@ -84,7 +93,7 @@ export function ForwardMessageModal({
         {threads === null ? (
           <p className="px-4 py-8 text-center text-[13px] text-text3">Loading…</p>
         ) : threads.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13px] text-text3">No other conversations to share to yet.</p>
+          <p className="px-4 py-8 text-center text-[13px] text-text3">No other conversations to forward to yet.</p>
         ) : (
           <div className="max-h-[60vh] overflow-y-auto py-1.5">
             {threads.map((t) => {

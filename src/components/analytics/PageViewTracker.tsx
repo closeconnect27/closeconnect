@@ -41,6 +41,11 @@ export function PageViewTracker({
         viewer_id: viewerId,
         viewer_session: getViewerSession(),
         referrer_source: classifyReferrer(document.referrer),
+        // Explicit even though the column defaults to this (0138) -- this
+        // component is the web app's own view tracker, so it's worth being
+        // obvious at a glance which platform these rows represent now that
+        // the mobile app also writes to page_views.
+        platform: "web",
       })
       .then(({ error }) => {
         if (error && error.code !== "23505") {

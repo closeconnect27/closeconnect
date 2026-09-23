@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+    </style>
+
+
+    <!-- Theme.SplashScreen is Android 12+'s own system splash API (from the
+         core-splashscreen dependency in app/build.gradle), a DIFFERENT
+         mechanism from Capacitor's own JS-configurable SplashScreen plugin
+         (capacitor.config.ts). It only understands its own
+         windowSplashScreen* attributes, not a plain android:background
+         override (which is what this used before, silently ignored on
+         API 31+, falling back to a plain launcher icon on a default light
+         background instead of the branded launch this was meant to give).
+         windowSplashScreenAnimatedIcon also gets the OS's own subtle
+         built-in reveal animation for free. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+</resources>

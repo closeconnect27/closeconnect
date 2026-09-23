@@ -3,12 +3,17 @@ import { TextStyle, Color, FontFamily, FontSize } from "@tiptap/extension-text-s
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Link } from "@tiptap/extension-link";
 import { ImageResize as ResizableImage } from "tiptap-extension-resize-image";
+import { Video } from "@/lib/tiptap/video";
 
 // Shared between the editable RichTextEditor and the read-only
 // RichTextView -- both need the exact same schema to parse/render the
 // same stored JSON correctly. ResizableImage replaces the base Image
 // extension entirely (it wraps/extends it), so StarterKit's own image
-// support stays off to avoid a duplicate node name.
+// support stays off to avoid a duplicate node name. Video is registered
+// here (schema-wide) even though only community descriptions can insert
+// one (RichTextEditor's allowVideo prop) -- every reader of this schema
+// still needs to know the node type to render (or even just parse) a doc
+// that has one.
 export function richTextExtensions() {
   return [
     StarterKit.configure({ link: false }),
@@ -19,5 +24,6 @@ export function richTextExtensions() {
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Link.configure({ openOnClick: false, autolink: true }),
     ResizableImage.configure({ inline: false }),
+    Video,
   ];
 }

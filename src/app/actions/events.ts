@@ -13,7 +13,6 @@ import {
   createEventSchema,
   updateEventSchema,
   updateEventTicketsAndFormSchema,
-  eventRegistrationSchema,
   type CreateEventInput,
   type UpdateEventInput,
   type UpdateEventTicketsAndFormInput,
@@ -24,8 +23,10 @@ import {
   getHostableCommunities,
   getEventTicketTypes,
 } from "@/lib/queries/events";
+import { getRegistrationAddonTotalPaise } from "@/lib/eventAddonBilling";
+import { registerForEventCore } from "@/lib/eventRegistrationCore";
 import { deserializeDescriptionContent } from "@/lib/validation/richText";
-import { createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { createRazorpayOrder, verifyRazorpaySignature, getRazorpayPaymentFee } from "@/lib/razorpay";
 import { isEventPast } from "@/lib/eventStatus";
 
 type DateEntryInput = {
@@ -205,104 +206,20 @@ export async function createEvent(
   return { error: null, eventId: event.id };
 }
 
+/** Thin web wrapper -- validation/pricing/insert logic lives in
+ * registerForEventCore so the mobile API route
+ * (app/api/mobile/events/[id]/register) can call the exact same code with
+ * a bearer-token client instead of this cookie-based one. Registration
+ * requires a real account (SPEC.md's earlier guest-friendly decision is
+ * reversed) -- redirects to sign-in rather than erroring, same as every
+ * other requireUser() call site, though the UI already gates this form
+ * behind isLoggedIn so this mainly guards direct action calls. */
 export async function registerForEvent(eventId: string, input: EventRegistrationInput) {
-  // Registration requires a real account (SPEC.md's earlier guest-friendly
-  // decision is reversed) -- redirects to sign-in rather than erroring, same
-  // as every other requireUser() call site, though the UI already gates
-  // this form behind isLoggedIn so this mainly guards direct action calls.
   const user = await requireUser();
-
-  const parsed = eventRegistrationSchema.safeParse(input);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
   const supabase = await createClient();
-
-  // Re-check "required" server-side against the event's own question
-  // definitions -- never trust the client to have enforced this.
-  const fields = await getEventFormFields(supabase, eventId);
-  for (const field of fields) {
-    if (field.is_required && !parsed.data.answers[field.id]?.trim()) {
-      return { error: `"${field.label}" is required` };
-    }
-  }
-
-  // Needed both for the price (free tickets skip payment entirely --
-  // payment_status starts 'paid', not the column default 'unpaid', so a
-  // free RSVP doesn't sit in the funnel dashboard looking like an unpaid
-  // one forever) and for the payment link's own description/amount.
-  const ticketTypes = await getEventTicketTypes(supabase, eventId);
-  const ticketType = ticketTypes.find((t) => t.id === parsed.data.ticket_type_id);
-  if (!ticketType) return { error: "That ticket type no longer exists" };
-  const isPaid = ticketType.price > 0;
-
-  const { data: registration, error } = await supabase
-    .from("form_responses")
-    .insert({
-      owner_type: "event",
-      owner_id: eventId,
-      ticket_type_id: parsed.data.ticket_type_id,
-      respondent_id: user.id,
-      // Email comes from the verified session, never client input -- a
-      // registrant can't spoof someone else's email.
-      response_data: { name: parsed.data.name, email: user.email, ...parsed.data.answers },
-      status: "approved",
-      payment_status: isPaid ? "unpaid" : "paid",
-      quantity: parsed.data.quantity,
-    })
-    .select("id")
-    .single();
-
-  if (error || !registration) {
-    if (error?.message.includes("wait a moment")) return { error: error.message };
-    // Raised by enforce_ticket_capacity() (0030) -- already user-facing text.
-    if (error?.message.includes("sold out")) return { error: error.message };
-    return { error: error?.message ?? "Could not complete registration" };
-  }
-
-  revalidatePath(`/events/${eventId}`);
-  // The UI's "A confirmation has been sent to your email" line pre-dates
-  // this -- it was display text with no actual send behind it (found while
-  // auditing this exact claim). Awaited, not fire-and-forget -- Cloudflare
-  // Workers can terminate an un-awaited promise the instant this action's
-  // response is sent, killing the fetch to Resend before it completes. A
-  // failure here still doesn't fail the registration itself (only logs).
-  //
-  // Paid tickets get nothing here -- Razorpay Standard Checkout opens in
-  // the very same visit right after this returns, and the real
-  // "you're registered" email/notification only fires from
-  // verifyRazorpayPayment once payment actually clears. Sending it here
-  // would be exactly the bug the old manual-UPI flow had: confirming a spot
-  // before any money had moved.
-  if (!isPaid) {
-    if (user.email) {
-      try {
-        await sendRegistrationConfirmationEmail(supabase, { email: user.email, eventId, registrantName: parsed.data.name });
-      } catch (e) {
-        console.error("Failed to send registration confirmation email:", e);
-      }
-    }
-    // Self-notification (recipient = the acting user) -- inserted directly
-    // under this request's own RLS-scoped client, allowed by
-    // notifications_insert_self (0061), unlike every other notification
-    // type which goes through a security definer trigger instead. Paid
-    // tickets get their "You're registered!" notification from
-    // verifyRazorpayPayment once the payment actually clears, not here.
-    await supabase.from("notifications").insert({
-      user_id: user.id,
-      type: "event_registered",
-      title: "You're registered!",
-      body: ticketType.name,
-      link: `/events/${eventId}`,
-    });
-  }
-  trackServerEvent("event_registered", user.id, {
-    event_id: eventId,
-    ticket_type_id: parsed.data.ticket_type_id,
-    is_paid: isPaid,
-  });
-  return { error: null, registrationId: registration.id, isPaid };
+  const result = await registerForEventCore(supabase, user.id, user.email, eventId, input);
+  if (!result.error) revalidatePath(`/events/${eventId}`);
+  return result;
 }
 
 /** Standard Checkout, step 1: creates the Razorpay order this registration
@@ -336,9 +253,16 @@ export async function createRazorpayOrderForRegistration(eventId: string, regist
 
   const ticketTypes = await getEventTicketTypes(supabase, eventId);
   const ticketType = ticketTypes.find((t) => t.id === reg.ticket_type_id);
-  if (!ticketType || ticketType.price <= 0) return { error: "This ticket doesn't require payment" };
+  if (!ticketType) return { error: "That ticket type no longer exists" };
 
-  const amountPaise = Math.round(ticketType.price * reg.quantity * 100);
+  // Ticket price plus this registration's own snapshotted add-on total
+  // (form_response_addons, frozen by registerForEvent at booking time) --
+  // the same two components verifyRazorpayPayment and the payment.captured
+  // webhook both recompute the exact same way, so what Razorpay is asked
+  // to charge here can never disagree with what gets recorded as paid.
+  const addonTotalPaise = await getRegistrationAddonTotalPaise(supabase, registrationId);
+  const amountPaise = Math.round(ticketType.price * reg.quantity * 100) + addonTotalPaise;
+  if (amountPaise <= 0) return { error: "This ticket doesn't require payment" };
   if (amountPaise < 100) return { error: "This amount is below Razorpay's minimum payable amount" };
 
   const { error: throttleError } = await supabase
@@ -392,7 +316,7 @@ export async function verifyRazorpayPayment(
 
   const { data: reg, error: fetchError } = await supabase
     .from("form_responses")
-    .select("respondent_id, payment_status, razorpay_order_id, response_data")
+    .select("respondent_id, payment_status, razorpay_order_id, response_data, ticket_type_id, quantity")
     .eq("id", registrationId)
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
@@ -431,10 +355,29 @@ export async function verifyRazorpayPayment(
   // this write, that "unpaid" condition no longer matches and .select()
   // returns zero rows -- caught below to skip sending a second confirmation
   // email/notification for the same payment.
+  // Recomputed the exact same way createRazorpayOrderForRegistration priced
+  // this order in the first place -- not re-read from Razorpay's own
+  // response, so it's guaranteed to be the amount our own signature check
+  // just verified was actually charged for.
+  const ticketTypes = await getEventTicketTypes(supabase, eventId);
+  const ticketType = ticketTypes.find((t) => t.id === reg.ticket_type_id);
+  const addonTotalPaise = await getRegistrationAddonTotalPaise(supabase, registrationId);
+  const amountPaidPaise = ticketType ? Math.round(ticketType.price * reg.quantity * 100) + addonTotalPaise : null;
+
+  // Best-effort -- the organizer settlement calculation deducts the real
+  // gateway fee if it's here, and just treats it as 0 if this lookup
+  // failed. Payment confirmation itself must never be blocked by it.
+  let gatewayFeePaise: number | null = null;
+  try {
+    gatewayFeePaise = (await getRazorpayPaymentFee(razorpay_payment_id)).feePaise;
+  } catch (e) {
+    console.error("Failed to fetch Razorpay payment fee:", e);
+  }
+
   const admin = createAdminClient();
   const { data: updated, error: updateError } = await admin
     .from("form_responses")
-    .update({ payment_status: "paid", razorpay_payment_id })
+    .update({ payment_status: "paid", razorpay_payment_id, amount_paid_paise: amountPaidPaise, gateway_fee_paise: gatewayFeePaise })
     .eq("id", registrationId)
     .eq("payment_status", "unpaid")
     .select("id");

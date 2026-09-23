@@ -11,8 +11,7 @@ export default function TermsOfServicePage() {
       <div className="mt-6 flex flex-col gap-6 text-[15px] leading-relaxed text-text">
         <p>
           Welcome to CloseConnect. These Terms of Service (&quot;Terms&quot;) govern your use of the CloseConnect mobile
-          application and website (the &quot;Service&quot;), operated as a proprietorship business (Udyam Registration Number:
-          UDYAM-KR-03-0741080). By using the Service, you agree to these Terms.
+          application and website (the &quot;Service&quot;). By using the Service, you agree to these Terms.
         </p>
 
         <Section title="1. About the Service">

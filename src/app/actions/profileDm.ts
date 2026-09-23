@@ -155,6 +155,60 @@ export async function deleteProfileDmMessage(messageId: string) {
   return { error: null };
 }
 
+// Bulk counterpart for multiselect delete -- same RLS gate
+// (profile_dm_messages_delete_own, 0123) applies per row via .in(), so a
+// sender deleting many of their own messages at once needs no new policy.
+export async function deleteProfileDmMessages(messageIds: string[]) {
+  const user = await requireUser();
+  if (!messageIds.length) return { error: null };
+  const supabase = await createClient();
+
+  const { error, count } = await supabase
+    .from("profile_dm_messages")
+    .delete({ count: "exact" })
+    .in("id", messageIds)
+    .eq("sender_id", user.id);
+
+  if (error) return { error: error.message };
+  if (!count) return { error: "You can only delete your own messages" };
+  return { error: null };
+}
+
+// "Delete for you" -- hides one message from just the caller's own view
+// (profile_dm_message_hides, 0140) without touching the other
+// participant's copy. Unlike deleteProfileDmMessage below, this works on
+// ANY message in a thread the caller is a participant of, not just their
+// own -- RLS (profile_dm_message_hides_insert_own, 0140) is the real gate.
+export async function hideProfileDmMessageForMe(messageId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("profile_dm_message_hides").upsert({ message_id: messageId, user_id: user.id }, { onConflict: "message_id,user_id" });
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+// Per-thread mute -- suppresses the push notification only (0140's
+// on_profile_dm_message_sent checks this); the thread keeps showing
+// normally everywhere else.
+export async function muteProfileDmThread(threadId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("profile_dm_thread_mutes").upsert({ thread_id: threadId, user_id: user.id }, { onConflict: "thread_id,user_id" });
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function unmuteProfileDmThread(threadId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("profile_dm_thread_mutes").delete().eq("thread_id", threadId).eq("user_id", user.id);
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
 // "Delete chat" -- per-user (RLS-backed via profile_dm_thread_hides_insert/
 // update_own, 0136), not a shared hard delete: removes the thread from the
 // caller's own inbox without touching the other participant's copy or the

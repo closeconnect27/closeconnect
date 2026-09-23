@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isValidLinkedInUrl, isValidGithubUrl, isValidInstagramUrl } from "@/lib/validators/links";
 import { isCategorySlug } from "@/lib/categories";
 import { bioContentField } from "@/lib/validation/richText";
+import { usernameField } from "@/lib/validation/username";
 
 // Forms convert an empty input to `undefined` before this runs (matching
 // the cityField/extra_cities pattern in validation/community.ts), so a
@@ -19,6 +20,10 @@ export const updateProfileSchema = z.object({
   // separate "display name" vs. "real name" concept in this schema, just
   // this single column.
   display_name: z.string().trim().min(2, "Name must be at least 2 characters").max(60),
+  // Same format as onboarding's one-time username field (validation/username.ts)
+  // -- collected there first, but editable afterward here since a collision
+  // or typo at signup would otherwise be permanent.
+  username: usernameField,
   bio: z.string().trim().max(500).optional(),
   bio_content: bioContentField,
   occupation: z.string().trim().max(100).optional(),

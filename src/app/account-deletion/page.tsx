@@ -90,8 +90,7 @@ export default function AccountDeletionPage() {
             <a href="/privacy" className="text-green underline">
               Privacy Policy
             </a>{" "}
-            for more on how CloseConnect (operated as a proprietorship business, Udyam Registration Number:
-            UDYAM-KR-03-0741080) handles your data, or email{" "}
+            for more on how CloseConnect handles your data, or email{" "}
             <a href="mailto:support@closeconnect.in" className="text-green underline">
               support@closeconnect.in
             </a>

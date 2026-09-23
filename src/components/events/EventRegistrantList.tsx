@@ -75,9 +75,18 @@ export function EventRegistrantList({
                     {r.response_data.email}
                     {r.event_ticket_types && ` · ${r.event_ticket_types.name}`}
                   </p>
+                  {r.form_response_addons.length > 0 && (
+                    <p className="truncate text-[12px] text-text3">
+                      + {r.form_response_addons.map((a) => `${a.name_snapshot}${a.quantity > 1 ? ` x${a.quantity}` : ""}`).join(", ")}
+                    </p>
+                  )}
                 </div>
 
-                {r.quantity === 1 ? (
+                {r.status === "cancelled" ? (
+                  <span className="shrink-0 rounded-full border border-pink/40 bg-pink-tint px-3 py-1.5 text-[11px] font-bold text-pink">
+                    Cancelled{r.cancelled_by === "attendee" ? " by attendee" : ""}
+                  </span>
+                ) : r.quantity === 1 ? (
                   <button
                     onClick={() => adjustCheckIn(r, r.checked_in_count > 0 ? -1 : 1)}
                     disabled={pendingId === r.id}
@@ -117,6 +126,25 @@ export function EventRegistrantList({
                   </div>
                 )}
               </div>
+
+              {r.status === "cancelled" && (r.refund_amount_paise ?? 0) > 0 && (
+                <div className="flex flex-col gap-1 rounded-card-sm bg-bg3 px-3 py-2 text-[12px]">
+                  <p>
+                    <span className="text-text3">Refund: </span>
+                    <span className="text-text2">₹{((r.refund_amount_paise ?? 0) / 100).toLocaleString("en-IN")}</span>
+                  </p>
+                  {(r.cancellation_charge_paise ?? 0) > 0 && (
+                    <p>
+                      <span className="text-text3">Cancellation charge (kept): </span>
+                      <span className="text-text2">₹{((r.cancellation_charge_paise ?? 0) / 100).toLocaleString("en-IN")}</span>
+                    </p>
+                  )}
+                  <p>
+                    <span className="text-text3">Refund status: </span>
+                    <span className="text-text2 capitalize">{r.refund_status}</span>
+                  </p>
+                </div>
+              )}
 
               {formFields.length > 0 && (
                 <div className="flex flex-col gap-1 rounded-card-sm bg-bg3 px-3 py-2">

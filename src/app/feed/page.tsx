@@ -45,10 +45,12 @@ export default async function FeedPage() {
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Link href="/feed/my-posts" className="btn-secondary px-4 py-2.5 text-[13px]">
-                <span className="hidden sm:inline">My posts</span>
-                <span className="sm:hidden">Mine</span>
-              </Link>
+              {user && (
+                <Link href="/feed/my-posts" className="btn-secondary px-4 py-2.5 text-[13px]">
+                  <span className="hidden sm:inline">My posts</span>
+                  <span className="sm:hidden">Mine</span>
+                </Link>
+              )}
               <Link href={user ? "/feed/new" : "/login?redirect=/feed/new"} className="btn-primary px-4 py-2.5 text-[13px]">
                 <IconPlus size={14} />
                 <span className="hidden sm:inline">New post</span>

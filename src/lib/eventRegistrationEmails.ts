@@ -152,6 +152,60 @@ export async function sendEventCancelledEmail(
   });
 }
 
+/** Sent to the ATTENDEE the moment THEY cancel their own registration
+ * (cancelMyRegistration) -- states the actual refund/charge split from the
+ * policy snapshot that applied at booking time, never a generic "you'll
+ * get a refund" (calculateCancellationRefund has already computed the real
+ * numbers by the time this is called). Distinct from sendEventCancelledEmail
+ * above, which is for the ORGANIZER cancelling the whole event. */
+export async function sendRegistrationCancelledEmail(
+  supabase: SupabaseClient,
+  { email, eventId, registrantName, refundAmountPaise, cancellationChargePaise }: { email: string; eventId: string; registrantName: string; refundAmountPaise: number; cancellationChargePaise: number },
+) {
+  const fields = await getEventEmailFields(supabase, eventId);
+  if (!fields) return;
+
+  const name = escapeHtml(registrantName);
+  const eventName = escapeHtml(fields.eventName);
+
+  await sendEmail({
+    to: email,
+    subject: `Cancelled: ${fields.eventName}`,
+    html: renderEmailShell({
+      preheader: `Your registration for ${fields.eventName} has been cancelled.`,
+      bodyHtml: `
+        <p style="margin:0 0 8px;font-size:17px;">Hey ${name} 👋</p>
+        <p style="margin:0 0 20px;">Your registration for <strong>${eventName}</strong> has been cancelled.</p>
+        ${
+          refundAmountPaise > 0
+            ? emailCallout(`Refund: ₹${(refundAmountPaise / 100).toLocaleString("en-IN")}${cancellationChargePaise > 0 ? `<br/>Cancellation charge (per the event's policy): ₹${(cancellationChargePaise / 100).toLocaleString("en-IN")}` : ""}<br/><span style="color:#6b6f6b;">Refunds typically land back on your original payment method within 5&ndash;7 business days.</span>`)
+            : `<p style="margin:0 0 20px;color:#6b6f6b;">Per the event's cancellation policy, this registration isn't eligible for a refund.</p>`
+        }
+      `,
+    }),
+  });
+}
+
+/** Sent once an automated refund actually completes (the Razorpay webhook,
+ * not the moment cancelMyRegistration merely calls the refund API) --
+ * distinct from sendRegistrationCancelledEmail above, since a refund can
+ * take a little time to actually process after cancellation is confirmed. */
+export async function sendRefundProcessedEmail({ email, registrantName, amountPaise }: { email: string; registrantName: string; amountPaise: number }) {
+  const name = escapeHtml(registrantName);
+  await sendEmail({
+    to: email,
+    subject: `Refund processed -- ₹${(amountPaise / 100).toLocaleString("en-IN")}`,
+    html: renderEmailShell({
+      preheader: `₹${(amountPaise / 100).toLocaleString("en-IN")} has been refunded to your original payment method.`,
+      bodyHtml: `
+        <p style="margin:0 0 8px;font-size:17px;">Hey ${name} 👋</p>
+        <p style="margin:0 0 20px;">Your refund of <strong>₹${(amountPaise / 100).toLocaleString("en-IN")}</strong> has been processed.</p>
+        <p style="margin:0;color:#6b6f6b;">It typically lands back on your original payment method within 5&ndash;7 business days.</p>
+      `,
+    }),
+  });
+}
+
 export async function sendEventUpdatedEmail(
   supabase: SupabaseClient,
   { email, eventId, registrantName }: { email: string; eventId: string; registrantName: string },

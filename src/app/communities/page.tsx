@@ -61,6 +61,12 @@ export default async function CommunitiesPage({ searchParams }: { searchParams: 
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
+              {user && (
+                <Link href="/communities/my-communities" className="btn-secondary px-4 py-2.5 text-[13px]">
+                  <span className="hidden sm:inline">My communities</span>
+                  <span className="sm:hidden">Mine</span>
+                </Link>
+              )}
               <Link href="/communities/submit" className="btn-secondary px-4 py-2.5 text-[13px]">
                 <span className="hidden sm:inline">List a community</span>
                 <span className="sm:hidden">List</span>

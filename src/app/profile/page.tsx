@@ -150,6 +150,9 @@ export default async function ProfilePage() {
             <a href="mailto:support@closeconnect.in" className="transition hover:text-text2">
               Support
             </a>
+            <Link href="/faqs" className="transition hover:text-text2">
+              Help &amp; FAQ
+            </Link>
             <Link href="/terms" className="transition hover:text-text2">
               Terms of Service
             </Link>

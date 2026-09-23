@@ -10,7 +10,18 @@ export async function blockUser(targetId: string) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("blocked_users").insert({ blocker_id: user.id, blocked_id: targetId });
-  if (error) return { error: error.message };
+  if (error) {
+    // 23505 = unique_violation on (blocker_id, blocked_id) -- already
+    // blocked (e.g. a stale UI somewhere still showing "Block" after a
+    // block that already went through). Friendlier than the raw Postgres
+    // message, and non-fatal: just treat it as success rather than
+    // surfacing an error for a state that's already what the user wanted.
+    if (error.code === "23505") {
+      revalidatePath(`/profile/${targetId}`);
+      return { error: null };
+    }
+    return { error: error.message };
+  }
 
   // A block is retroactive for the *relationship* even though the DB
   // check (is_blocked_pair) only gates NEW follows/DMs -- an existing

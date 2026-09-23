@@ -412,6 +412,12 @@ textarea:focus-visible,
   border-radius: var(--radius-card-sm);
   display: block;
 }
+.rich-text-editor .ProseMirror video,
+.rich-text-view .ProseMirror video {
+  max-width: 100%;
+  border-radius: var(--radius-card-sm);
+  display: block;
+}
 .rich-text-view .ProseMirror {
   cursor: default;
 }

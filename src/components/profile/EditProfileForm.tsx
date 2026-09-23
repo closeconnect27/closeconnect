@@ -45,6 +45,7 @@ export function EditProfileForm({
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(basic.display_name);
+  const [username, setUsername] = useState(basic.username ?? "");
   const [bio, setBio] = useState({ json: basic.bio_content, text: basic.bio ?? "" });
   const [occupation, setOccupation] = useState(details.occupation ?? "");
   const [company, setCompany] = useState(details.company ?? "");
@@ -75,6 +76,7 @@ export function EditProfileForm({
 
     const input = {
       display_name: displayName,
+      username,
       bio: bio.text || undefined,
       bio_content: bio.json,
       occupation: occupation || undefined,
@@ -134,6 +136,19 @@ export function EditProfileForm({
           className={inputClass}
         />
         <p className="text-[11px] text-text3">Shown everywhere your profile appears -- communities, events, chat.</p>
+      </Field>
+
+      <Field label="Username">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value.toLowerCase())}
+          required
+          minLength={3}
+          maxLength={20}
+          pattern="[a-z0-9_]+"
+          className={inputClass}
+        />
+        <p className="text-[11px] text-text3">3-20 characters: lowercase letters, numbers, and underscores. Must be unique.</p>
       </Field>
 
       <Field label="Bio (up to 500 characters)">

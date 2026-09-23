@@ -6,7 +6,15 @@ import { updateEventSchema, updateEventTicketsAndFormSchema } from "@/lib/valida
 import { serializeDescriptionContent } from "@/lib/validation/richText";
 import type { FormFieldDraft } from "@/lib/validation/forms";
 import { updateEvent, updateEventTicketsAndForm } from "@/app/actions/events";
+import { saveCancellationPolicy } from "@/app/actions/eventCancellation";
 import { TicketTypeBuilder, parsePrice, type TicketTypeDraft } from "@/components/events/TicketTypeBuilder";
+import { CancellationPolicyBuilder, draftToRules, type CancellationPolicyDraft } from "@/components/events/CancellationPolicyBuilder";
+import type { CancellationPolicySnapshot } from "@/lib/eventCancellation";
+import { FaqBuilder } from "@/components/events/FaqBuilder";
+import { saveFaqsForEvent } from "@/app/actions/eventFaqs";
+import type { EventFaq } from "@/lib/eventFaqs";
+import { AddonBuilder, type AddonDraft } from "@/components/events/AddonBuilder";
+import { saveAddonsForEvent, type AddonInput } from "@/app/actions/eventAddons";
 import { EventDateEntryBuilder, type EventDateEntryDraft } from "@/components/events/EventDateEntryBuilder";
 import { FormBuilder } from "@/components/forms/FormBuilder";
 import { CityMultiSelect } from "@/components/ui/CityMultiSelect";
@@ -38,6 +46,9 @@ export function EditEventForm({
   dateEntries,
   hasRegistrations,
   initialMeetingLink,
+  initialCancellationPolicy,
+  initialFaqs,
+  initialAddons,
 }: {
   event: EventDetail;
   ticketTypes: EventTicketType[];
@@ -49,6 +60,9 @@ export function EditEventForm({
   // is host/admin-gated already, so in practice a null here just means
   // "not set yet."
   initialMeetingLink: string | null | undefined;
+  initialCancellationPolicy: CancellationPolicySnapshot;
+  initialFaqs: EventFaq[];
+  initialAddons: (AddonInput & { id: string })[];
 }) {
   const [eventName, setEventName] = useState(event.event_name);
   const [description, setDescription] = useState({
@@ -104,6 +118,70 @@ export function EditEventForm({
   const [ticketsError, setTicketsError] = useState("");
   const [ticketsPending, startTicketsTransition] = useTransition();
   const [ticketsSaved, setTicketsSaved] = useState(false);
+
+  const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicyDraft>({
+    enabled: initialCancellationPolicy.enabled,
+    rules: initialCancellationPolicy.rules.map((r) => ({ hoursBefore: String(r.hours_before), refundPercentage: String(r.refund_percentage) })),
+  });
+  const [policyError, setPolicyError] = useState("");
+  const [policyPending, startPolicyTransition] = useTransition();
+  const [policySaved, setPolicySaved] = useState(false);
+
+  function handlePolicySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPolicyError("");
+    setPolicySaved(false);
+    startPolicyTransition(async () => {
+      const result = await saveCancellationPolicy(event.id, { enabled: cancellationPolicy.enabled, rules: draftToRules(cancellationPolicy) });
+      if (result?.error) setPolicyError(result.error);
+      else setPolicySaved(true);
+    });
+  }
+
+  const [faqs, setFaqs] = useState<EventFaq[]>(initialFaqs);
+  const [faqError, setFaqError] = useState("");
+  const [faqPending, startFaqTransition] = useTransition();
+  const [faqSaved, setFaqSaved] = useState(false);
+
+  // Independent form/save button, same reasoning as handlePolicySubmit --
+  // an FAQ edit never touches registration/payment state, so there's no
+  // reason to gate it behind the ticket-types freeze or the main form's
+  // save cycle.
+  function handleFaqSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFaqError("");
+    setFaqSaved(false);
+    startFaqTransition(async () => {
+      const result = await saveFaqsForEvent(event.id, faqs);
+      if (result?.error) setFaqError(result.error);
+      else setFaqSaved(true);
+    });
+  }
+
+  const [addons, setAddons] = useState<AddonDraft[]>(
+    initialAddons.map((a) => ({ id: a.id, name: a.name, price: String(a.price), quantity_available: a.quantity_available != null ? String(a.quantity_available) : "", is_active: a.is_active })),
+  );
+  const [addonsError, setAddonsError] = useState("");
+  const [addonsPending, startAddonsTransition] = useTransition();
+  const [addonsSaved, setAddonsSaved] = useState(false);
+
+  // Independent form/save button -- add-ons are never frozen after
+  // registrations exist (AddonBuilder's own comment: per-row upsert
+  // preserves addon_id continuity for historical orders), so there's no
+  // reason to gate this behind the ticket-types freeze either.
+  function handleAddonsSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAddonsError("");
+    setAddonsSaved(false);
+    startAddonsTransition(async () => {
+      const result = await saveAddonsForEvent(
+        event.id,
+        addons.map((a) => ({ id: a.id, name: a.name, price: parsePrice(a.price), quantity_available: a.quantity_available ? Number(a.quantity_available) : null, is_active: a.is_active })),
+      );
+      if (result?.error) setAddonsError(result.error);
+      else setAddonsSaved(true);
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -298,6 +376,47 @@ export function EditEventForm({
           {pending ? "Saving…" : "Save changes"}
         </button>
       </form>
+
+      <div className="border-t border-border pt-6">
+        <h2 className="mb-1 font-heading text-[16px] font-bold">Cancellation &amp; refund policy</h2>
+        <p className="mb-4 text-[13px] text-text2">
+          Applied to every booking at the moment it&apos;s confirmed -- changing this later never affects bookings already made.
+        </p>
+        <form onSubmit={handlePolicySubmit} className="flex flex-col gap-4">
+          <CancellationPolicyBuilder value={cancellationPolicy} onChange={setCancellationPolicy} />
+          {policyError && <p className="text-[13px] text-pink">{policyError}</p>}
+          {policySaved && <p className="text-[13px] text-green">Saved.</p>}
+          <button type="submit" disabled={policyPending} className="btn-primary self-start px-6 py-2.5 text-[14px]">
+            {policyPending ? "Saving…" : "Save policy"}
+          </button>
+        </form>
+      </div>
+
+      <div className="border-t border-border pt-6">
+        <h2 className="mb-1 font-heading text-[16px] font-bold">FAQ</h2>
+        <p className="mb-4 text-[13px] text-text2">Shown as an expandable list on the event page.</p>
+        <form onSubmit={handleFaqSubmit} className="flex flex-col gap-4">
+          <FaqBuilder value={faqs} onChange={setFaqs} />
+          {faqError && <p className="text-[13px] text-pink">{faqError}</p>}
+          {faqSaved && <p className="text-[13px] text-green">Saved.</p>}
+          <button type="submit" disabled={faqPending} className="btn-primary self-start px-6 py-2.5 text-[14px]">
+            {faqPending ? "Saving…" : "Save FAQ"}
+          </button>
+        </form>
+      </div>
+
+      <div className="border-t border-border pt-6">
+        <h2 className="mb-1 font-heading text-[16px] font-bold">Add-ons</h2>
+        <p className="mb-4 text-[13px] text-text2">Optional paid extras attendees can add to their order -- editable anytime, even after people have registered.</p>
+        <form onSubmit={handleAddonsSubmit} className="flex flex-col gap-4">
+          <AddonBuilder addons={addons} onChange={setAddons} />
+          {addonsError && <p className="text-[13px] text-pink">{addonsError}</p>}
+          {addonsSaved && <p className="text-[13px] text-green">Saved.</p>}
+          <button type="submit" disabled={addonsPending} className="btn-primary self-start px-6 py-2.5 text-[14px]">
+            {addonsPending ? "Saving…" : "Save add-ons"}
+          </button>
+        </form>
+      </div>
 
       <div className="border-t border-border pt-6">
         <h2 className="mb-1 font-heading text-[16px] font-bold">Ticket types &amp; registration questions</h2>

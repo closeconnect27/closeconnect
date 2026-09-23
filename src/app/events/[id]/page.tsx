@@ -7,11 +7,13 @@ import { getCommunityById, communitySlugOrId } from "@/lib/queries/communities";
 import {
   getEventById,
   getEventTicketTypes,
+  getEventAddons,
   getEventFormFields,
   getEventDateEntries,
   getTicketAvailability,
   getMyEventCheckIn,
   getMyRegistrationCount,
+  getMyLatestRegistration,
   getEventMeetingLink,
 } from "@/lib/queries/events";
 import { getMyInterestStatus } from "@/lib/queries/interests";
@@ -21,6 +23,10 @@ import { getPublicProfileBasic } from "@/lib/queries/profileDetails";
 import { isEventPast } from "@/lib/eventStatus";
 import { getCategoryVisual } from "@/lib/categories";
 import { EventRegistration } from "@/components/events/EventRegistration";
+import { CancellationPolicyText } from "@/components/events/CancellationPolicyBuilder";
+import { getCancellationPolicyForEvent } from "@/app/actions/eventCancellation";
+import { FaqAccordion } from "@/components/events/FaqAccordion";
+import { getFaqsForEvent } from "@/app/actions/eventFaqs";
 import { InterestedButton } from "@/components/events/InterestedButton";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
 import { EventFeedbackSection } from "@/components/events/EventFeedbackSection";
@@ -83,6 +89,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   const [
     ticketTypes,
+    addons,
     formFields,
     dateEntries,
     availability,
@@ -91,10 +98,14 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     myFeedback,
     feedbackList,
     myRegistrationCount,
+    myLatestRegistration,
     meetingLink,
     myProfile,
+    cancellationPolicy,
+    faqs,
   ] = await Promise.all([
     getEventTicketTypes(supabase, id),
+    getEventAddons(supabase, id),
     getEventFormFields(supabase, id),
     getEventDateEntries(supabase, id),
     getTicketAvailability(supabase, id),
@@ -103,6 +114,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     user ? getMyEventFeedback(supabase, id, user.id) : Promise.resolve(null),
     getEventFeedbackList(supabase, id),
     user ? getMyRegistrationCount(supabase, id, user.id) : Promise.resolve(0),
+    user ? getMyLatestRegistration(supabase, id, user.id) : Promise.resolve(null),
     // event_meeting_links' own RLS (0069) is the real gate -- host or a
     // confirmed/paid registrant gets the real link back, anyone else
     // (including a logged-out visitor) gets null, same as "no link set
@@ -111,7 +123,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     // Registration's own "Name" field (EventRegistration) reads this instead
     // of asking a signed-in registrant to type it -- they already have one.
     user ? getPublicProfileBasic(supabase, user.id) : Promise.resolve(null),
-    ]);
+    getCancellationPolicyForEvent(id),
+    getFaqsForEvent(id),
+  ]);
 
   // "Contact host" -- an attendee's own thread (0074), never fetched for
   // the host themselves (they get the inbox on the manage page instead,
@@ -419,11 +433,33 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 email={user?.email}
                 displayName={myProfile?.display_name}
                 alreadyRegisteredCount={myRegistrationCount}
+                initialRegistration={myLatestRegistration}
                 calendarLink={calendarLink}
+                cancellationPolicy={cancellationPolicy.policy}
+                faqs={faqs}
+                addons={addons}
               />
             </>
           )}
         </div>
+
+        {/* Section 7: visible before checkout, never buried in a separate
+            settings page -- shown regardless of whether the viewer can
+            currently register (host, already-past, cancelled, etc.), same
+            posture as the ticket price list above. */}
+        {ticketTypes.length > 0 && (
+          <div className="mt-6 rounded-card-sm border border-border bg-bg2 p-4">
+            <h3 className="mb-2 font-heading text-[13px] font-bold">Cancellation &amp; Refund Policy</h3>
+            <CancellationPolicyText enabled={cancellationPolicy.policy.enabled} rules={cancellationPolicy.policy.rules} usingDefault={cancellationPolicy.usingDefault} />
+          </div>
+        )}
+
+        {faqs.length > 0 && (
+          <div className="mt-6">
+            <h3 className="mb-2 font-heading text-[13px] font-bold">FAQ</h3>
+            <FaqAccordion faqs={faqs} eventId={event.id} />
+          </div>
+        )}
 
         {event.event_date && (
           <div className="mt-8">

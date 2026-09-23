@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getEventTicketTypes } from "@/lib/queries/events";
 import { createRazorpayOrder } from "@/lib/razorpay";
+import { getRegistrationAddonTotalPaise } from "@/lib/eventAddonBilling";
 
 // Mobile-only counterpart of createRazorpayOrderForRegistration
 // (src/app/actions/events.ts) -- same logic verbatim, just authenticated via
@@ -51,9 +52,14 @@ export async function POST(request: NextRequest) {
 
   const ticketTypes = await getEventTicketTypes(supabase, eventId);
   const ticketType = ticketTypes.find((t) => t.id === reg.ticket_type_id);
-  if (!ticketType || ticketType.price <= 0) return NextResponse.json({ error: "This ticket doesn't require payment" }, { status: 400 });
+  if (!ticketType) return NextResponse.json({ error: "That ticket type no longer exists" }, { status: 400 });
 
-  const amountPaise = Math.round(ticketType.price * reg.quantity * 100);
+  // Ticket price plus this registration's own snapshotted add-on total --
+  // same computation as web's createRazorpayOrderForRegistration, so a
+  // mobile-originated order can never disagree with a web-originated one.
+  const addonTotalPaise = await getRegistrationAddonTotalPaise(supabase, registrationId);
+  const amountPaise = Math.round(ticketType.price * reg.quantity * 100) + addonTotalPaise;
+  if (amountPaise <= 0) return NextResponse.json({ error: "This ticket doesn't require payment" }, { status: 400 });
   if (amountPaise < 100) return NextResponse.json({ error: "This amount is below Razorpay's minimum payable amount" }, { status: 400 });
 
   const { error: throttleError } = await supabase

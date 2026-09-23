@@ -14,11 +14,16 @@ import {
   getNewMembersByMonth,
   getMostActiveMembers,
   getReferrerBreakdown,
+  getPlatformBreakdown,
+  getTopEventsByRegistrations,
+  getTopPostsByEngagement,
+  getEventCheckInRate,
 } from "@/lib/queries/analytics";
 import { StatCard } from "@/components/ui/StatCard";
 import { DailyBarChart } from "@/components/analytics/DailyBarChart";
 import { PercentageBar } from "@/components/analytics/PercentageBar";
 import { ReferrerBreakdown } from "@/components/analytics/ReferrerBreakdown";
+import { PlatformBreakdown } from "@/components/analytics/PlatformBreakdown";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function CommunityAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,13 +54,28 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
     redirect(`/communities/${id}`);
   }
 
-  const [viewCount, viewsByDay, joinMetrics, newMembersByMonth, activeMembers, referrerBreakdown] = await Promise.all([
+  const [
+    viewCount,
+    viewsByDay,
+    joinMetrics,
+    newMembersByMonth,
+    activeMembers,
+    referrerBreakdown,
+    platformBreakdown,
+    topEvents,
+    topPosts,
+    checkInRate,
+  ] = await Promise.all([
     getViewCount(supabase, "community", id),
     getViewsByDay(supabase, "community", id),
     getJoinRequestMetrics(supabase, id),
     getNewMembersByMonth(supabase, id),
     getMostActiveMembers(supabase, id),
     getReferrerBreakdown(supabase, "community", id),
+    getPlatformBreakdown(supabase, "community", id),
+    getTopEventsByRegistrations(supabase, id),
+    getTopPostsByEngagement(supabase, id),
+    getEventCheckInRate(supabase, id),
   ]);
 
   const acceptanceRate = computeAcceptanceRate(joinMetrics.totals);
@@ -65,6 +85,10 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
   // which would make the rate silently wrong over time.
   const totalJoinAttempts = joinMetrics.totals.pending + joinMetrics.totals.approved + joinMetrics.totals.rejected;
   const conversionRate = computeConversionRate(viewCount, totalJoinAttempts);
+  // Registrations -> actual attendance, across all of this community's
+  // events combined (not per-event, per spec). Same null-not-0 div-by-zero
+  // convention as computeConversionRate/computeAcceptanceRate above.
+  const checkInPct = checkInRate.registrations === 0 ? null : Math.round((checkInRate.checkedIn / checkInRate.registrations) * 100);
 
   return (
     <div className="flex-1 px-4 pb-16 pt-8 sm:px-6">
@@ -74,7 +98,7 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
         </Link>
         <h1 className="font-heading text-[18px] font-bold leading-tight">{community.name} — Analytics</h1>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard icon={IconChartBar} label="Total views" value={viewCount} />
           <StatCard icon={IconUsers} label="Members" value={community.member_count} />
           <StatCard icon={IconInbox} label="Pending join requests" value={joinMetrics.totals.pending} />
@@ -88,6 +112,7 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
             label="Views -> join rate"
             value={`${conversionRate === null ? 0 : Math.round(conversionRate * 100)}%`}
           />
+          {checkInPct !== null && <StatCard icon={IconChartBar} label="Check-in rate" value={`${checkInPct}%`} />}
         </div>
 
         <section className="mt-8">
@@ -101,6 +126,13 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
           <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Where visitors come from</h2>
           <div className="card-elevated rounded-card bg-bg2 p-4">
             <ReferrerBreakdown data={referrerBreakdown} />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Views by platform</h2>
+          <div className="card-elevated rounded-card bg-bg2 p-4">
+            <PlatformBreakdown data={platformBreakdown} />
           </div>
         </section>
 
@@ -143,6 +175,51 @@ export default async function CommunityAnalyticsPage({ params }: { params: Promi
             </div>
           )}
         </section>
+
+        {topEvents.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Top events</h2>
+            <div className="flex flex-col gap-2">
+              {topEvents.map((e, i) => (
+                <div key={e.eventId} className="card-elevated flex items-center justify-between gap-3 rounded-card bg-bg2 p-3">
+                  <Link
+                    href={`/events/${e.eventId}`}
+                    className="flex min-w-0 items-center gap-2 truncate text-[13px] font-medium text-text transition hover:text-green hover:underline"
+                  >
+                    <span className="font-mono text-[11px] text-text3">#{i + 1}</span>
+                    <span className="truncate">{e.eventName}</span>
+                  </Link>
+                  <span className="shrink-0 text-[12px] text-text3">
+                    {e.registrations} registrations · {e.views} views
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {topPosts.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Top posts</h2>
+            <div className="flex flex-col gap-2">
+              {topPosts.map((p, i) => (
+                <Link
+                  key={p.postId}
+                  href={`/feed/${p.postId}`}
+                  className="card-elevated flex items-center justify-between gap-3 rounded-card bg-bg2 p-3"
+                >
+                  <span className="flex min-w-0 items-center gap-2 truncate text-[13px] font-medium text-text">
+                    <span className="font-mono text-[11px] text-text3">#{i + 1}</span>
+                    <span className="truncate">{p.excerpt}</span>
+                  </span>
+                  <span className="shrink-0 text-[12px] text-text3">
+                    {p.reactionCount} reactions · {p.commentCount} comments
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

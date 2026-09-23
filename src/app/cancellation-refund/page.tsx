@@ -11,8 +11,7 @@ export default function CancellationRefundPolicyPage() {
       <div className="mt-6 flex flex-col gap-6 text-[15px] leading-relaxed text-text">
         <p>
           This Cancellation &amp; Refund Policy applies to event registrations and ticket purchases made through
-          CloseConnect (the &quot;Service&quot;), operated as a proprietorship business (Udyam Registration Number:
-          UDYAM-KR-03-0741080). All amounts referenced in this policy are in Indian Rupees (INR) strictly.
+          CloseConnect (the &quot;Service&quot;). All amounts referenced in this policy are in Indian Rupees (INR) strictly.
         </p>
 
         <Section title="1. How Payments Are Processed">
