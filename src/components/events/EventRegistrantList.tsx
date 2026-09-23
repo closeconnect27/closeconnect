@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconSearch, IconMinus, IconPlus } from "@tabler/icons-react";
 import { setCheckInCount } from "@/app/actions/events";
+import { refundAddonLine } from "@/app/actions/eventCancellation";
 import type { EventRegistration } from "@/lib/queries/events";
 import type { FormField } from "@/lib/queries/membership";
 
@@ -24,6 +25,8 @@ export function EventRegistrantList({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingAddonId, setPendingAddonId] = useState<string | null>(null);
+  const [addonError, setAddonError] = useState<{ id: string; message: string } | null>(null);
   const [, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
@@ -44,6 +47,17 @@ export function EventRegistrantList({
       const result = await setCheckInCount(eventId, r.id, next);
       setPendingId(null);
       if (!result.error) router.refresh();
+    });
+  }
+
+  function refundAddon(addonLineId: string) {
+    setAddonError(null);
+    setPendingAddonId(addonLineId);
+    startTransition(async () => {
+      const result = await refundAddonLine(addonLineId);
+      setPendingAddonId(null);
+      if (result.error) setAddonError({ id: addonLineId, message: result.error });
+      else router.refresh();
     });
   }
 
@@ -75,11 +89,6 @@ export function EventRegistrantList({
                     {r.response_data.email}
                     {r.event_ticket_types && ` · ${r.event_ticket_types.name}`}
                   </p>
-                  {r.form_response_addons.length > 0 && (
-                    <p className="truncate text-[12px] text-text3">
-                      + {r.form_response_addons.map((a) => `${a.name_snapshot}${a.quantity > 1 ? ` x${a.quantity}` : ""}`).join(", ")}
-                    </p>
-                  )}
                 </div>
 
                 {r.status === "cancelled" ? (
@@ -143,6 +152,33 @@ export function EventRegistrantList({
                     <span className="text-text3">Refund status: </span>
                     <span className="text-text2 capitalize">{r.refund_status}</span>
                   </p>
+                </div>
+              )}
+
+              {r.form_response_addons.length > 0 && (
+                <div className="flex flex-col gap-1.5 rounded-card-sm bg-bg3 px-3 py-2">
+                  <p className="text-[11px] font-bold uppercase text-text3">Add-ons</p>
+                  {r.form_response_addons.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between gap-2 text-[12px]">
+                      <span className={a.status === "refunded" ? "text-text3 line-through" : "text-text2"}>
+                        {a.name_snapshot}
+                        {a.quantity > 1 ? ` x${a.quantity}` : ""} · ₹{((a.unit_price_paise * a.quantity) / 100).toLocaleString("en-IN")}
+                      </span>
+                      {a.status === "refunded" ? (
+                        <span className="shrink-0 text-[11px] font-bold text-green">Refunded</span>
+                      ) : r.status !== "cancelled" && r.payment_status === "paid" && a.unit_price_paise > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => refundAddon(a.id)}
+                          disabled={pendingAddonId === a.id}
+                          className="shrink-0 text-[11px] font-bold text-pink transition hover:underline disabled:opacity-50"
+                        >
+                          {pendingAddonId === a.id ? "Refunding…" : "Refund"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                  {addonError && r.form_response_addons.some((a) => a.id === addonError.id) && <p className="text-[11px] text-pink">{addonError.message}</p>}
                 </div>
               )}
 

@@ -357,6 +357,7 @@ export function EventRegistration({
                     <span className="font-bold text-text">{a.name}</span>
                     <span className="ml-2 text-text3">₹{a.price}</span>
                     {remaining != null && <span className="ml-2 text-[11px] text-text3">{remaining} left</span>}
+                    {!a.is_refundable && <span className="ml-2 text-[11px] text-text3">· non-refundable</span>}
                   </span>
                   <div className="flex items-center gap-2">
                     <button

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { previewCancellationCore, cancelMyRegistrationCore, saveCancellationPolicyCore, type SaveCancellationPolicyInput } from "@/lib/eventCancellationCore";
+import { previewCancellationCore, cancelMyRegistrationCore, saveCancellationPolicyCore, refundAddonLineCore, type SaveCancellationPolicyInput } from "@/lib/eventCancellationCore";
 import { DEFAULT_CANCELLATION_POLICY, type CancellationPolicyRule, type CancellationPolicySnapshot } from "@/lib/eventCancellation";
 
 // ===========================================================================
@@ -73,6 +73,24 @@ export async function cancelMyRegistration(registrationId: string, reason?: stri
     revalidatePath(`/events/${result.eventId}`);
     revalidatePath(`/events/${result.eventId}/manage`);
     revalidatePath("/events/my-events");
+  }
+  return result;
+}
+
+// ===========================================================================
+// ORGANIZER-INITIATED SINGLE-ADD-ON REFUND
+// ===========================================================================
+
+/** Host (or admin) refunds one purchased add-on line without cancelling
+ * the attendee's ticket -- section 27/68. Thin web wrapper; the real logic
+ * (host/admin ownership check, idempotency, Razorpay call, ledger/audit
+ * writes) lives in refundAddonLineCore. */
+export async function refundAddonLine(addonLineId: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const result = await refundAddonLineCore(supabase, user.id, addonLineId);
+  if (!result.error) {
+    revalidatePath(`/events/${result.eventId}/manage`);
   }
   return result;
 }

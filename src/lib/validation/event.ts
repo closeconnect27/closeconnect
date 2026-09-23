@@ -70,6 +70,18 @@ const meetingLinkField = z
   .refine(isSafeHttpsUrl, "Meeting link must be a valid https:// URL")
   .optional();
 
+// Audience filters (0098) -- min/max age + an optional gender restriction,
+// with a per-event choice of whether it's just a displayed suggestion or an
+// actually-enforced requirement. All optional; a host who never touches
+// this section gets the column defaults (null/null/null/'suggested').
+const audienceFilterFields = {
+  min_age: z.number().int().min(0).max(120).optional(),
+  max_age: z.number().int().min(0).max(120).optional(),
+  gender_restriction: z.enum(["male", "female", "other"]).optional(),
+  audience_enforcement: z.enum(["required", "suggested"]).default("suggested"),
+};
+const audienceFilterRefine = (e: { min_age?: number; max_age?: number }) => e.min_age === undefined || e.max_age === undefined || e.min_age <= e.max_age;
+
 export const createEventSchema = z
   .object({
     // Generated client-side (crypto.randomUUID()) before the form even
@@ -109,6 +121,7 @@ export const createEventSchema = z
     community_id: z.string().uuid().optional(),
     ticket_types: z.array(ticketTypeSchema).min(1, "At least one ticket type is required").max(10),
     form_fields: formFieldsSchema.default([]),
+    ...audienceFilterFields,
   })
   // Online events aren't tied to any physical city -- city selection only
   // applies to (and is only required for) an offline/in-person event.
@@ -150,7 +163,8 @@ export const createEventSchema = z
   .refine((e) => e.event_mode !== "online" || !!e.meeting_link?.trim(), {
     message: "Meeting link is required for an online event",
     path: ["meeting_link"],
-  });
+  })
+  .refine(audienceFilterRefine, { message: "Minimum age can't be greater than maximum age", path: ["min_age"] });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
@@ -186,6 +200,7 @@ export const updateEventSchema = z
     all_cities: allCitiesField,
     category: z.string().refine(isCategorySlug, "Choose a valid category"),
     extra_categories: extraCategoriesField,
+    ...audienceFilterFields,
   })
   // Online events aren't tied to any physical city -- city selection only
   // applies to (and is only required for) an offline/in-person event.
@@ -225,7 +240,8 @@ export const updateEventSchema = z
   .refine((e) => e.event_mode !== "online" || !!e.meeting_link?.trim(), {
     message: "Meeting link is required for an online event",
     path: ["meeting_link"],
-  });
+  })
+  .refine(audienceFilterRefine, { message: "Minimum age can't be greater than maximum age", path: ["min_age"] });
 
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 

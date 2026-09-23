@@ -9,6 +9,7 @@ export type AddonDraft = {
   price: string;
   quantity_available: string;
   is_active: boolean;
+  is_refundable: boolean;
 };
 
 const inputClass = "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-2.5 text-[14px] transition focus:border-green";
@@ -24,7 +25,7 @@ const inputClass = "w-full rounded-card-sm border border-border2 bg-bg3 px-4 py-
  */
 export function AddonBuilder({ addons, onChange }: { addons: AddonDraft[]; onChange: (addons: AddonDraft[]) => void }) {
   function addAddon() {
-    onChange([...addons, { name: "", price: "0", quantity_available: "", is_active: true }]);
+    onChange([...addons, { name: "", price: "0", quantity_available: "", is_active: true, is_refundable: true }]);
   }
   function updateAddon(i: number, patch: Partial<AddonDraft>) {
     onChange(addons.map((a, idx) => (idx === i ? { ...a, ...patch } : a)));
@@ -83,10 +84,17 @@ export function AddonBuilder({ addons, onChange }: { addons: AddonDraft[]; onCha
             </label>
           </div>
 
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12px] text-text2">
-            <input type="checkbox" checked={a.is_active} onChange={(e) => updateAddon(i, { is_active: e.target.checked })} />
-            On sale -- visible to attendees at checkout
-          </label>
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-text2">
+              <input type="checkbox" checked={a.is_active} onChange={(e) => updateAddon(i, { is_active: e.target.checked })} />
+              On sale -- visible to attendees at checkout
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-text2">
+              <input type="checkbox" checked={a.is_refundable} onChange={(e) => updateAddon(i, { is_refundable: e.target.checked })} />
+              Refundable if a registrant cancels
+            </label>
+            {!a.is_refundable && <p className="text-[11px] text-text3">This add-on will never be refunded, even if the event&apos;s cancellation policy would otherwise refund the ticket in full.</p>}
+          </div>
 
           {parsePrice(a.price) > 0 && <p className="mt-2 text-[11px] text-text3">Added to the registrant&apos;s Razorpay payment along with their ticket.</p>}
         </div>

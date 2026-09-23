@@ -140,6 +140,10 @@ export async function createEvent(
       extra_categories: data.extra_categories,
       unsplash_image_url: photo.imageUrl,
       unsplash_photo_id: photo.photoId,
+      min_age: data.min_age ?? null,
+      max_age: data.max_age ?? null,
+      gender_restriction: data.gender_restriction ?? null,
+      audience_enforcement: data.audience_enforcement,
     })
     .select()
     .single();
@@ -526,6 +530,10 @@ export async function updateEvent(
       all_cities: data.all_cities,
       category: data.category,
       extra_categories: data.extra_categories,
+      min_age: data.min_age ?? null,
+      max_age: data.max_age ?? null,
+      gender_restriction: data.gender_restriction ?? null,
+      audience_enforcement: data.audience_enforcement,
     })
     .eq("id", eventId);
 

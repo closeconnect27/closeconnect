@@ -122,6 +122,92 @@ export async function getEventRegistrationMetrics(supabase: SupabaseClient, even
   return { byDay, total: (data ?? []).length };
 }
 
+export type AddonMetric = {
+  addonId: string | null; // null = the add-on was later deleted (not archived); name_snapshot is all that's left of it
+  name: string;
+  price: number | null; // live event_addons.price -- null for a deleted add-on, which only has historical unit prices
+  quantityAvailable: number | null;
+  unitsSold: number;
+  revenuePaise: number;
+  refundsPaise: number;
+  isActive: boolean | null; // null for a deleted add-on
+};
+
+export type EventAddonMetrics = {
+  addons: AddonMetric[];
+  totalAddonRevenuePaise: number;
+  totalRefundsPaise: number;
+  attachRate: number | null; // fraction of paid bookings that included at least one add-on
+  averageAddonSpendPaise: number; // total add-on revenue / paid bookings (0 if no paid bookings)
+};
+
+/** Section 89 of the spec this was built from: units sold/revenue/refunds
+ * per add-on, plus attach rate and average add-on spend across the whole
+ * event. "Sold"/"Revenue" only ever count a still-active (non-refunded)
+ * form_response_addons line on a PAID registration -- an abandoned/unpaid
+ * checkout never actually charged anyone for the add-on it briefly held,
+ * and a refunded line's money has already been given back, so neither
+ * belongs in a live revenue number (refundsPaise reports it separately
+ * instead). A deleted (not archived) add-on still shows up here, grouped
+ * by its name_snapshot, since its historical sales are still real -- only
+ * a currently-configured add-on gets price/quantityAvailable/isActive. */
+export async function getEventAddonMetrics(supabase: SupabaseClient, eventId: string): Promise<EventAddonMetrics> {
+  const [{ data: liveAddons }, { data: lines }, { data: paidRegs }] = await Promise.all([
+    supabase.from("event_addons").select("id, name, price, quantity_available, is_active").eq("event_id", eventId).order("sort_order"),
+    supabase
+      .from("form_response_addons")
+      .select("registration_id, addon_id, name_snapshot, unit_price_paise, quantity, status, refund_amount_paise, form_responses!inner(owner_id, owner_type, payment_status)")
+      .eq("form_responses.owner_id", eventId)
+      .eq("form_responses.owner_type", "event")
+      .eq("form_responses.payment_status", "paid"),
+    supabase.from("form_responses").select("id").eq("owner_type", "event").eq("owner_id", eventId).eq("payment_status", "paid"),
+  ]);
+
+  type LineRow = { registration_id: string; addon_id: string | null; name_snapshot: string; unit_price_paise: number; quantity: number; status: string; refund_amount_paise: number };
+  const rows = (lines ?? []) as unknown as LineRow[];
+
+  const byKey = new Map<string, { addonId: string | null; name: string; unitsSold: number; revenuePaise: number; refundsPaise: number }>();
+  for (const r of rows) {
+    const key = r.addon_id ?? `deleted:${r.name_snapshot}`;
+    const entry = byKey.get(key) ?? { addonId: r.addon_id, name: r.name_snapshot, unitsSold: 0, revenuePaise: 0, refundsPaise: 0 };
+    if (r.status === "active") {
+      entry.unitsSold += r.quantity;
+      entry.revenuePaise += r.unit_price_paise * r.quantity;
+    }
+    entry.refundsPaise += r.refund_amount_paise;
+    byKey.set(key, entry);
+  }
+
+  const addons: AddonMetric[] = (liveAddons ?? []).map((a) => {
+    const stats = byKey.get(a.id) ?? { unitsSold: 0, revenuePaise: 0, refundsPaise: 0 };
+    byKey.delete(a.id);
+    return {
+      addonId: a.id,
+      name: a.name,
+      price: a.price,
+      quantityAvailable: a.quantity_available,
+      unitsSold: stats.unitsSold,
+      revenuePaise: stats.revenuePaise,
+      refundsPaise: stats.refundsPaise,
+      isActive: a.is_active,
+    };
+  });
+  // Whatever's left in byKey is a deleted add-on's historical sales, not
+  // represented by any current event_addons row.
+  for (const stats of byKey.values()) {
+    addons.push({ addonId: null, name: stats.name, price: null, quantityAvailable: null, unitsSold: stats.unitsSold, revenuePaise: stats.revenuePaise, refundsPaise: stats.refundsPaise, isActive: null });
+  }
+
+  const totalAddonRevenuePaise = addons.reduce((sum, a) => sum + a.revenuePaise, 0);
+  const totalRefundsPaise = addons.reduce((sum, a) => sum + a.refundsPaise, 0);
+  const paidBookingCount = (paidRegs ?? []).length;
+  const bookingsWithAddons = new Set(rows.filter((r) => r.status === "active").map((r) => r.registration_id)).size;
+  const attachRate = paidBookingCount === 0 ? null : bookingsWithAddons / paidBookingCount;
+  const averageAddonSpendPaise = paidBookingCount === 0 ? 0 : Math.round(totalAddonRevenuePaise / paidBookingCount);
+
+  return { addons, totalAddonRevenuePaise, totalRefundsPaise, attachRate, averageAddonSpendPaise };
+}
+
 /** Computed at query time, never stored -- conversion drifts as both inputs
  * change, so a cached value would just go stale. Returns null rather than
  * dividing by zero when there's no view data yet. */

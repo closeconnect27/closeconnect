@@ -87,6 +87,62 @@ export function calculateCancellationRefund(
   return { eligible: refundAmountPaise > 0, refundPercentage, refundAmountPaise, cancellationChargePaise, matchedRule, hoursUntilEvent };
 }
 
+export type AddonLineForRefund = { id: string; nameSnapshot: string; amountPaise: number; isRefundable: boolean };
+
+export type ItemizedAddonRefund = { id: string; nameSnapshot: string; amountPaise: number; refundAmountPaise: number; refundable: boolean };
+
+export type ItemizedCancellationCalculation = CancellationCalculation & {
+  ticketAmountPaise: number;
+  ticketRefundAmountPaise: number;
+  addonLines: ItemizedAddonRefund[];
+  addonRefundAmountPaise: number;
+};
+
+/** Same policy/tier matching as calculateCancellationRefund, but applied
+ * separately to the ticket amount and to each purchased add-on line, so a
+ * non-refundable add-on (event_addons.is_refundable = false, e.g. a
+ * T-shirt already printed) never gets refunded regardless of how
+ * generous the event's own cancellation-policy tier is at the moment of
+ * cancellation -- while a refundable add-on follows the exact same
+ * percentage the ticket itself gets. refundAmountPaise/
+ * cancellationChargePaise on the returned object are ALWAYS the sum of
+ * the itemized lines (ticketRefundAmountPaise + addonRefundAmountPaise),
+ * never recomputed from the blended total, so a caller that only reads
+ * the top-level fields (existing callers, before this itemized version
+ * existed) still gets a number consistent with the itemized breakdown. */
+export function calculateItemizedCancellationRefund(
+  ticketAmountPaise: number,
+  addonLines: AddonLineForRefund[],
+  eventStartInstant: Date | null,
+  policy: CancellationPolicySnapshot | null,
+  now: Date = new Date(),
+): ItemizedCancellationCalculation {
+  const totalPaidPaise = ticketAmountPaise + addonLines.reduce((sum, a) => sum + a.amountPaise, 0);
+  const base = calculateCancellationRefund(totalPaidPaise, eventStartInstant, policy, now);
+
+  const ticketRefundAmountPaise = Math.round(ticketAmountPaise * (base.refundPercentage / 100));
+  const addonLineRefunds: ItemizedAddonRefund[] = addonLines.map((a) => ({
+    id: a.id,
+    nameSnapshot: a.nameSnapshot,
+    amountPaise: a.amountPaise,
+    refundable: a.isRefundable,
+    refundAmountPaise: a.isRefundable ? Math.round(a.amountPaise * (base.refundPercentage / 100)) : 0,
+  }));
+  const addonRefundAmountPaise = addonLineRefunds.reduce((sum, a) => sum + a.refundAmountPaise, 0);
+  const refundAmountPaise = ticketRefundAmountPaise + addonRefundAmountPaise;
+
+  return {
+    ...base,
+    refundAmountPaise,
+    cancellationChargePaise: Math.max(0, totalPaidPaise - refundAmountPaise),
+    eligible: refundAmountPaise > 0,
+    ticketAmountPaise,
+    ticketRefundAmountPaise,
+    addonLines: addonLineRefunds,
+    addonRefundAmountPaise,
+  };
+}
+
 /** Validates/normalizes organizer-entered rules before they're saved --
  * every hours_before must be a non-negative number, every refund_percentage
  * within [0, 100], and no two rules can share the same hours_before (an

@@ -41,8 +41,16 @@ export function SettlementHistory({ settlements }: { settlements: SettlementView
             <span className={`shrink-0 text-[12px] font-bold ${STATUS_COLOR[s.status] ?? "text-text3"}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-text2">
-            <span>Gross: {rupees(s.grossSalesPaise)}</span>
-            {s.refundAmountPaise > 0 && <span>Refunds: {rupees(s.refundAmountPaise)}</span>}
+            <span>
+              Gross: {rupees(s.grossSalesPaise)}
+              {s.addonRevenuePaise > 0 && <span className="text-text3"> (tickets {rupees(s.ticketRevenuePaise)} + add-ons {rupees(s.addonRevenuePaise)})</span>}
+            </span>
+            {s.refundAmountPaise > 0 && (
+              <span>
+                Refunds: {rupees(s.refundAmountPaise)}
+                {s.addonRefundPaise > 0 && <span className="text-text3"> (tickets {rupees(s.ticketRefundPaise)} + add-ons {rupees(s.addonRefundPaise)})</span>}
+              </span>
+            )}
             {s.platformFeePaise > 0 && <span>Platform fee: {rupees(s.platformFeePaise)}</span>}
             <span className="font-bold text-text">Net payout: {rupees(s.netPayablePaise)}</span>
           </div>

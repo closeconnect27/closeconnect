@@ -3,6 +3,7 @@ import { IconUsers, IconCalendarEvent, IconInbox, IconTicket, IconPlus, IconShie
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMyCommunities, getMyEvents } from "@/lib/queries/dashboard";
+import { isEventPast } from "@/lib/eventStatus";
 import { communitySlugOrId } from "@/lib/queries/communities";
 import { getPendingJoinRequests, getCommunityFormFields } from "@/lib/queries/membership";
 import { StatCard } from "@/components/ui/StatCard";
@@ -10,11 +11,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { HostCommunityRow } from "@/components/host/HostCommunityRow";
 import { HostEventRow } from "@/components/host/HostEventRow";
 import { PendingRequests } from "@/components/communities/PendingRequests";
-
-function todayIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export default async function HostDashboardPage() {
   const user = await requireUser();
@@ -39,12 +35,16 @@ export default async function HostDashboardPage() {
   const needsAttention = pendingByCommunity.filter((p) => p.requests.length > 0);
   const totalPending = needsAttention.reduce((sum, p) => sum + p.requests.length, 0);
 
-  const today = todayIso();
+  // isEventPast (not an ad hoc server-local-time comparison) is the single
+  // source of truth for "has this happened yet" everywhere in this app --
+  // a comparison built from the server process's own local timezone
+  // disagreed with it near midnight IST whenever the runtime wasn't
+  // already pinned to IST (e.g. Cloudflare Workers' UTC clock).
   const draftEvents = events.filter((e) => e.event_date === null);
   const upcomingEvents = events
-    .filter((e): e is typeof e & { event_date: string } => e.event_date !== null && e.event_date >= today)
+    .filter((e): e is typeof e & { event_date: string } => e.event_date !== null && !isEventPast(e))
     .sort((a, b) => a.event_date.localeCompare(b.event_date));
-  const pastEvents = events.filter((e) => e.event_date !== null && e.event_date < today);
+  const pastEvents = events.filter((e) => e.event_date !== null && isEventPast(e));
   const totalRegistrants = events.reduce((sum, e) => sum + e.registeredCount, 0);
 
   return (

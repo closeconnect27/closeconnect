@@ -73,6 +73,10 @@ export function NewEventForm({
   const [faqs, setFaqs] = useState<EventFaq[]>([]);
   const [addons, setAddons] = useState<AddonDraft[]>([]);
   const [formFields, setFormFields] = useState<FormFieldDraft[]>([]);
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
+  const [genderRestriction, setGenderRestriction] = useState<"male" | "female" | "other" | null>(null);
+  const [audienceEnforcement, setAudienceEnforcement] = useState<"required" | "suggested">("suggested");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -118,6 +122,10 @@ export function NewEventForm({
         quantity_available: t.quantity_available ? Number(t.quantity_available) : undefined,
       })),
       form_fields: formFields,
+      min_age: minAge.trim() ? Number(minAge.trim()) : undefined,
+      max_age: maxAge.trim() ? Number(maxAge.trim()) : undefined,
+      gender_restriction: genderRestriction ?? undefined,
+      audience_enforcement: audienceEnforcement,
     };
 
     const parsed = createEventSchema.safeParse(input);
@@ -160,7 +168,7 @@ export function NewEventForm({
       if (addons.length > 0) {
         const addonsResult = await saveAddonsForEvent(
           result.eventId,
-          addons.map((a) => ({ name: a.name, price: parsePrice(a.price), quantity_available: a.quantity_available ? Number(a.quantity_available) : null, is_active: a.is_active })),
+          addons.map((a) => ({ name: a.name, price: parsePrice(a.price), quantity_available: a.quantity_available ? Number(a.quantity_available) : null, is_active: a.is_active, is_refundable: a.is_refundable })),
         );
         if (addonsResult.error) {
           setError(`Event created, but the add-ons failed to save: ${addonsResult.error}`);
@@ -316,6 +324,63 @@ export function NewEventForm({
 
           <Field label="Registration questions (optional)">
             <FormBuilder fields={formFields} onChange={setFormFields} />
+          </Field>
+
+          <Field label="Intended audience (optional)">
+            <div className="flex gap-3">
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={minAge}
+                onChange={(e) => setMinAge(e.target.value)}
+                placeholder="Min age"
+                className={inputClass}
+              />
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={maxAge}
+                onChange={(e) => setMaxAge(e.target.value)}
+                placeholder="Max age"
+                className={inputClass}
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(["male", "female", "other"] as const).map((g) => (
+                <button
+                  type="button"
+                  key={g}
+                  onClick={() => setGenderRestriction(genderRestriction === g ? null : g)}
+                  className={
+                    genderRestriction === g
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                  }
+                >
+                  {g === "male" ? "Men" : g === "female" ? "Women" : "Other"}
+                </button>
+              ))}
+            </div>
+            {(minAge || maxAge || genderRestriction) && (
+              <div className="mt-2 flex gap-2">
+                {(["suggested", "required"] as const).map((mode) => (
+                  <button
+                    type="button"
+                    key={mode}
+                    onClick={() => setAudienceEnforcement(mode)}
+                    className={
+                      audienceEnforcement === mode
+                        ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                        : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                    }
+                  >
+                    {mode === "suggested" ? "Suggested only" : "Require match"}
+                  </button>
+                ))}
+              </div>
+            )}
           </Field>
 
           {error && <p className="text-[13px] text-pink">{error}</p>}

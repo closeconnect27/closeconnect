@@ -15,6 +15,7 @@ export const PLATFORM_FEE_PERCENT = 0;
 export type SettlementStatus = "pending" | "eligible" | "processing" | "processed" | "failed" | "on_hold";
 
 type RegistrationMoneyRow = {
+  id: string;
   status: string;
   amount_paid_paise: number | null;
   refund_amount_paise: number | null;
@@ -38,18 +39,44 @@ export async function computeEventSettlement(admin: SupabaseClient, eventId: str
 
   const { data: rows } = await admin
     .from("form_responses")
-    .select("status, amount_paid_paise, refund_amount_paise, gateway_fee_paise")
+    .select("id, status, amount_paid_paise, refund_amount_paise, gateway_fee_paise")
     .eq("owner_type", "event")
     .eq("owner_id", eventId)
     .eq("payment_status", "paid");
   const moneyRows = (rows ?? []) as RegistrationMoneyRow[];
 
   const grossSalesPaise = moneyRows.reduce((sum, r) => sum + (r.amount_paid_paise ?? 0), 0);
-  const refundAmountPaise = moneyRows.filter((r) => r.status === "cancelled").reduce((sum, r) => sum + (r.refund_amount_paise ?? 0), 0);
+  // refund_amount_paise is the authoritative "refunded so far" figure for
+  // a registration regardless of WHY -- a full attendee/organizer
+  // cancellation (status becomes 'cancelled') or a host refunding just one
+  // add-on line while the booking stays active (0154: refundAddonLineCore
+  // never touches status). Filtering this sum to status === 'cancelled'
+  // (as an earlier version of this function did, before add-on-line
+  // refunds existed) would silently drop every standalone add-on refund
+  // from the payable calculation -- summing every paid row's own
+  // refund_amount_paise, not just cancelled ones, is what actually stays
+  // correct for both cases.
+  const refundAmountPaise = moneyRows.reduce((sum, r) => sum + (r.refund_amount_paise ?? 0), 0);
   const gatewayFeePaise = moneyRows.reduce((sum, r) => sum + (r.gateway_fee_paise ?? 0), 0);
   const netEligibleSalesPaise = Math.max(0, grossSalesPaise - refundAmountPaise);
   const platformFeePaise = Math.round((netEligibleSalesPaise * PLATFORM_FEE_PERCENT) / 100);
   const netPayablePaise = Math.max(0, netEligibleSalesPaise - platformFeePaise - gatewayFeePaise);
+
+  // Ticket vs add-on breakdown (section 71/73): derived from the same
+  // paid registrations, never a second independent calculation --
+  // addonRevenuePaise/addonRefundPaise are summed directly from
+  // form_response_addons (the one place add-on money is snapshotted/
+  // tracked, same source getRegistrationAddonTotalPaise reads), and
+  // ticket_* is always grossSalesPaise/refundAmountPaise MINUS the add-on
+  // share, so ticketRevenuePaise + addonRevenuePaise === grossSalesPaise
+  // and ticketRefundPaise + addonRefundPaise === refundAmountPaise hold by
+  // construction, not by two numbers happening to agree.
+  const registrationIds = moneyRows.map((r) => r.id);
+  const { data: addonRows } = registrationIds.length > 0 ? await admin.from("form_response_addons").select("unit_price_paise, quantity, refund_amount_paise").in("registration_id", registrationIds) : { data: [] };
+  const addonRevenuePaise = (addonRows ?? []).reduce((sum, a) => sum + (a.unit_price_paise as number) * (a.quantity as number), 0);
+  const addonRefundPaise = (addonRows ?? []).reduce((sum, a) => sum + (a.refund_amount_paise as number), 0);
+  const ticketRevenuePaise = Math.max(0, grossSalesPaise - addonRevenuePaise);
+  const ticketRefundPaise = Math.max(0, refundAmountPaise - addonRefundPaise);
 
   const { data: existing } = await admin.from("organizer_settlements").select("id, status, payout_account_id").eq("event_id", eventId).maybeSingle();
   const locked = existing?.status === "processing" || existing?.status === "processed";
@@ -92,6 +119,10 @@ export async function computeEventSettlement(admin: SupabaseClient, eventId: str
         refund_amount_paise: refundAmountPaise,
         platform_fee_paise: platformFeePaise,
         net_payable_paise: netPayablePaise,
+        ticket_revenue_paise: ticketRevenuePaise,
+        addon_revenue_paise: addonRevenuePaise,
+        ticket_refund_paise: ticketRefundPaise,
+        addon_refund_paise: addonRefundPaise,
         status,
         updated_at: new Date().toISOString(),
       },
@@ -108,7 +139,7 @@ export async function computeEventSettlement(admin: SupabaseClient, eventId: str
     actorRole: "system",
     action: "settlement_computed",
     amountPaise: netPayablePaise,
-    metadata: { grossSalesPaise, refundAmountPaise, platformFeePaise, gatewayFeePaise, status },
+    metadata: { grossSalesPaise, refundAmountPaise, platformFeePaise, gatewayFeePaise, ticketRevenuePaise, addonRevenuePaise, ticketRefundPaise, addonRefundPaise, status },
   });
 
   return { error: null, settlementId: settlement.id, status };

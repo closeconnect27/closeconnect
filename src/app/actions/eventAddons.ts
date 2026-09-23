@@ -4,14 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
-export type AddonInput = { id?: string; name: string; price: number; quantity_available: number | null; is_active: boolean };
+export type AddonInput = { id?: string; name: string; price: number; quantity_available: number | null; is_active: boolean; is_refundable: boolean };
 
 /** Host-only view -- every add-on regardless of is_active, for the
  * organizer's own editor (same split as getFaqsForEvent/
  * getFaqsForEventEditor). RLS (is_event_host) is the real gate. */
 export async function getAddonsForEventEditor(eventId: string): Promise<(AddonInput & { id: string })[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("event_addons").select("id, name, price, quantity_available, is_active").eq("event_id", eventId).order("sort_order");
+  const { data } = await supabase.from("event_addons").select("id, name, price, quantity_available, is_active, is_refundable").eq("event_id", eventId).order("sort_order");
   return (data ?? []) as (AddonInput & { id: string })[];
 }
 
@@ -45,7 +45,7 @@ export async function saveAddonsForEvent(eventId: string, addons: AddonInput[]) 
   }
 
   for (const [i, a] of cleaned.entries()) {
-    const row = { event_id: eventId, name: a.name, price: a.price, quantity_available: a.quantity_available, is_active: a.is_active, sort_order: i };
+    const row = { event_id: eventId, name: a.name, price: a.price, quantity_available: a.quantity_available, is_active: a.is_active, is_refundable: a.is_refundable, sort_order: i };
     if (a.id && existingIds.has(a.id)) {
       const { error } = await supabase.from("event_addons").update(row).eq("id", a.id);
       if (error) return { error: error.message };

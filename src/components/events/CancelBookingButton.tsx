@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import { IconX } from "@tabler/icons-react";
 import { previewCancellationForRegistration, cancelMyRegistration } from "@/app/actions/eventCancellation";
 
+type AddonLine = { id: string; nameSnapshot: string; amountPaise: number; refundAmountPaise: number; refundable: boolean };
+
 type Preview = {
   eligible: boolean;
   refundPercentage: number;
   refundAmountPaise: number;
   cancellationChargePaise: number;
   amountPaidPaise: number;
+  ticketAmountPaise: number;
+  ticketRefundAmountPaise: number;
+  addonLines: AddonLine[];
+  addonRefundAmountPaise: number;
 };
 
 /** Section 10 of the spec this was built from: a two-step "preview the
@@ -77,10 +83,32 @@ export function CancelBookingButton({ registrationId }: { registrationId: string
                   <p className="text-[13px] text-text2">This was a free registration -- there&apos;s nothing to refund.</p>
                 ) : preview.refundAmountPaise > 0 ? (
                   <div className="rounded-card-sm bg-bg3 p-4 text-[13px]">
-                    <div className="flex justify-between">
-                      <span className="text-text2">Refund</span>
-                      <span className="font-bold text-green">₹{(preview.refundAmountPaise / 100).toLocaleString("en-IN")}</span>
-                    </div>
+                    {preview.addonLines.length > 0 ? (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-text2">Ticket refund</span>
+                          <span className="font-bold text-text">₹{(preview.ticketRefundAmountPaise / 100).toLocaleString("en-IN")}</span>
+                        </div>
+                        {preview.addonLines.map((a) => (
+                          <div key={a.id} className="flex justify-between">
+                            <span className="text-text2">
+                              {a.nameSnapshot}
+                              {!a.refundable && <span className="text-text3"> (non-refundable)</span>}
+                            </span>
+                            <span className="text-text">₹{(a.refundAmountPaise / 100).toLocaleString("en-IN")}</span>
+                          </div>
+                        ))}
+                        <div className="mt-1 flex justify-between border-t border-border pt-1.5">
+                          <span className="font-bold text-text">Total refund</span>
+                          <span className="font-bold text-green">₹{(preview.refundAmountPaise / 100).toLocaleString("en-IN")}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-text2">Refund</span>
+                        <span className="font-bold text-green">₹{(preview.refundAmountPaise / 100).toLocaleString("en-IN")}</span>
+                      </div>
+                    )}
                     {preview.cancellationChargePaise > 0 && (
                       <div className="mt-1.5 flex justify-between">
                         <span className="text-text2">Cancellation charge</span>

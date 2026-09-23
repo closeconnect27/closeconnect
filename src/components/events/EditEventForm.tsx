@@ -95,6 +95,10 @@ export function EditEventForm({
   const [categories, setCategories] = useState<CategorySlug[]>(
     [event.category, ...(event.extra_categories ?? [])].filter((c): c is CategorySlug => !!c),
   );
+  const [minAge, setMinAge] = useState(event.min_age != null ? String(event.min_age) : "");
+  const [maxAge, setMaxAge] = useState(event.max_age != null ? String(event.max_age) : "");
+  const [genderRestriction, setGenderRestriction] = useState<"male" | "female" | "other" | null>(event.gender_restriction);
+  const [audienceEnforcement, setAudienceEnforcement] = useState<"required" | "suggested">(event.audience_enforcement);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -159,7 +163,14 @@ export function EditEventForm({
   }
 
   const [addons, setAddons] = useState<AddonDraft[]>(
-    initialAddons.map((a) => ({ id: a.id, name: a.name, price: String(a.price), quantity_available: a.quantity_available != null ? String(a.quantity_available) : "", is_active: a.is_active })),
+    initialAddons.map((a) => ({
+      id: a.id,
+      name: a.name,
+      price: String(a.price),
+      quantity_available: a.quantity_available != null ? String(a.quantity_available) : "",
+      is_active: a.is_active,
+      is_refundable: a.is_refundable,
+    })),
   );
   const [addonsError, setAddonsError] = useState("");
   const [addonsPending, startAddonsTransition] = useTransition();
@@ -176,7 +187,14 @@ export function EditEventForm({
     startAddonsTransition(async () => {
       const result = await saveAddonsForEvent(
         event.id,
-        addons.map((a) => ({ id: a.id, name: a.name, price: parsePrice(a.price), quantity_available: a.quantity_available ? Number(a.quantity_available) : null, is_active: a.is_active })),
+        addons.map((a) => ({
+          id: a.id,
+          name: a.name,
+          price: parsePrice(a.price),
+          quantity_available: a.quantity_available ? Number(a.quantity_available) : null,
+          is_active: a.is_active,
+          is_refundable: a.is_refundable,
+        })),
       );
       if (result?.error) setAddonsError(result.error);
       else setAddonsSaved(true);
@@ -217,6 +235,10 @@ export function EditEventForm({
       all_cities: eventMode === "online" ? false : allCities,
       category: categories[0] || "",
       extra_categories: categories.slice(1),
+      min_age: minAge.trim() ? Number(minAge.trim()) : undefined,
+      max_age: maxAge.trim() ? Number(maxAge.trim()) : undefined,
+      gender_restriction: genderRestriction ?? undefined,
+      audience_enforcement: audienceEnforcement,
     };
 
     const parsed = updateEventSchema.safeParse(input);
@@ -368,6 +390,63 @@ export function EditEventForm({
 
         <Field label="Categories (up to 5)">
           <CategoryMultiSelect values={categories} onChange={setCategories} />
+        </Field>
+
+        <Field label="Intended audience (optional)">
+          <div className="flex gap-3">
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={minAge}
+              onChange={(e) => setMinAge(e.target.value)}
+              placeholder="Min age"
+              className={inputClass}
+            />
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={maxAge}
+              onChange={(e) => setMaxAge(e.target.value)}
+              placeholder="Max age"
+              className={inputClass}
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(["male", "female", "other"] as const).map((g) => (
+              <button
+                type="button"
+                key={g}
+                onClick={() => setGenderRestriction(genderRestriction === g ? null : g)}
+                className={
+                  genderRestriction === g
+                    ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                    : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                }
+              >
+                {g === "male" ? "Men" : g === "female" ? "Women" : "Other"}
+              </button>
+            ))}
+          </div>
+          {(minAge || maxAge || genderRestriction) && (
+            <div className="mt-2 flex gap-2">
+              {(["suggested", "required"] as const).map((mode) => (
+                <button
+                  type="button"
+                  key={mode}
+                  onClick={() => setAudienceEnforcement(mode)}
+                  className={
+                    audienceEnforcement === mode
+                      ? "rounded-full border border-green bg-green px-4 py-2 text-[12px] font-medium text-green-dark transition"
+                      : "rounded-full border border-border2 px-4 py-2 text-[12px] font-medium text-text2 transition hover:border-green hover:text-green"
+                  }
+                >
+                  {mode === "suggested" ? "Suggested only" : "Require match"}
+                </button>
+              ))}
+            </div>
+          )}
         </Field>
 
         {error && <p className="text-[13px] text-pink">{error}</p>}

@@ -275,6 +275,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
+        {(event.min_age || event.max_age || event.gender_restriction) && (
+          <p className="mt-2 text-[13px] text-text3">
+            Intended for {event.gender_restriction ? (event.gender_restriction === "male" ? "men" : event.gender_restriction === "female" ? "women" : "other genders") : "everyone"}
+            {(event.min_age || event.max_age) &&
+              ` · ${event.min_age && event.max_age ? `ages ${event.min_age}–${event.max_age}` : event.min_age ? `${event.min_age}+` : `up to ${event.max_age}`}`}
+            {event.audience_enforcement === "required" ? " (required)" : " (suggested)"}
+          </p>
+        )}
+
         {event.event_mode === "offline" && (
           <EventVenueMap lat={event.venue_lat} lng={event.venue_lng} address={event.venue ?? ""} />
         )}

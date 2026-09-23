@@ -158,6 +158,10 @@ export type SettlementView = {
   refundAmountPaise: number;
   platformFeePaise: number;
   netPayablePaise: number;
+  ticketRevenuePaise: number;
+  addonRevenuePaise: number;
+  ticketRefundPaise: number;
+  addonRefundPaise: number;
   status: string;
   failureReason: string | null;
   processedAt: string | null;
@@ -186,7 +190,9 @@ export async function getMySettlements(): Promise<SettlementView[]> {
 
   const { data: rows } = await admin
     .from("organizer_settlements")
-    .select("id, event_id, gross_sales_paise, refund_amount_paise, platform_fee_paise, net_payable_paise, status, failure_reason, processed_at, events(event_name)")
+    .select(
+      "id, event_id, gross_sales_paise, refund_amount_paise, platform_fee_paise, net_payable_paise, ticket_revenue_paise, addon_revenue_paise, ticket_refund_paise, addon_refund_paise, status, failure_reason, processed_at, events(event_name)",
+    )
     .eq("organizer_id", user.id)
     .order("updated_at", { ascending: false });
 
@@ -198,6 +204,10 @@ export async function getMySettlements(): Promise<SettlementView[]> {
     refundAmountPaise: r.refund_amount_paise as number,
     platformFeePaise: r.platform_fee_paise as number,
     netPayablePaise: r.net_payable_paise as number,
+    ticketRevenuePaise: r.ticket_revenue_paise as number,
+    addonRevenuePaise: r.addon_revenue_paise as number,
+    ticketRefundPaise: r.ticket_refund_paise as number,
+    addonRefundPaise: r.addon_refund_paise as number,
     status: r.status as string,
     failureReason: r.failure_reason as string | null,
     processedAt: r.processed_at as string | null,
@@ -225,7 +235,7 @@ export async function getAllSettlementsForAdmin(): Promise<AdminSettlementView[]
   const { data: rows } = await admin
     .from("organizer_settlements")
     .select(
-      "id, event_id, organizer_id, gross_sales_paise, refund_amount_paise, platform_fee_paise, net_payable_paise, status, failure_reason, processed_at, events(event_name), organizer_payout_accounts(bank_name, account_number_last4)",
+      "id, event_id, organizer_id, gross_sales_paise, refund_amount_paise, platform_fee_paise, net_payable_paise, ticket_revenue_paise, addon_revenue_paise, ticket_refund_paise, addon_refund_paise, status, failure_reason, processed_at, events(event_name), organizer_payout_accounts(bank_name, account_number_last4)",
     )
     .order("updated_at", { ascending: false });
 
@@ -244,6 +254,10 @@ export async function getAllSettlementsForAdmin(): Promise<AdminSettlementView[]
       refundAmountPaise: r.refund_amount_paise as number,
       platformFeePaise: r.platform_fee_paise as number,
       netPayablePaise: r.net_payable_paise as number,
+      ticketRevenuePaise: r.ticket_revenue_paise as number,
+      addonRevenuePaise: r.addon_revenue_paise as number,
+      ticketRefundPaise: r.ticket_refund_paise as number,
+      addonRefundPaise: r.addon_refund_paise as number,
       status: r.status as string,
       failureReason: r.failure_reason as string | null,
       processedAt: r.processed_at as string | null,

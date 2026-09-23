@@ -5,8 +5,9 @@ import { trackServerEvent } from "@/lib/mixpanel/server";
 import { sendRegistrationCancelledEmail } from "@/lib/eventRegistrationEmails";
 import { logCancellationAudit } from "@/lib/cancellationAuditLog";
 import { computeEventSettlement } from "@/lib/organizerSettlement";
+import { getRegistrationAddonLines } from "@/lib/eventAddonBilling";
 import {
-  calculateCancellationRefund,
+  calculateItemizedCancellationRefund,
   getEventStartInstant,
   validateCancellationRules,
   type CancellationPolicyRule,
@@ -63,7 +64,15 @@ export async function previewCancellationCore(supabase: SupabaseClient, userId: 
   if (eventStart && eventStart.getTime() <= Date.now()) return { error: "This event has already started, so cancellation is no longer available.", result: null };
 
   const amountPaidPaise = reg.amount_paid_paise ?? 0;
-  const result = calculateCancellationRefund(amountPaidPaise, eventStart, reg.cancellation_policy_snapshot as CancellationPolicySnapshot | null);
+  const addonLines = await getRegistrationAddonLines(supabase, registrationId);
+  const addonTotalPaise = addonLines.reduce((sum, a) => sum + a.amountPaise, 0);
+  const ticketAmountPaise = Math.max(0, amountPaidPaise - addonTotalPaise);
+  const result = calculateItemizedCancellationRefund(
+    ticketAmountPaise,
+    addonLines.map((a) => ({ id: a.id, nameSnapshot: a.nameSnapshot, amountPaise: a.amountPaise, isRefundable: a.isRefundable })),
+    eventStart,
+    reg.cancellation_policy_snapshot as CancellationPolicySnapshot | null,
+  );
   return { error: null, result: { ...result, amountPaidPaise } };
 }
 
@@ -86,7 +95,15 @@ export async function cancelMyRegistrationCore(supabase: SupabaseClient, userId:
   if (eventStart && eventStart.getTime() <= Date.now()) return { error: "This event has already started, so cancellation is no longer available." };
 
   const amountPaidPaise = reg.amount_paid_paise ?? 0;
-  const calc = calculateCancellationRefund(amountPaidPaise, eventStart, reg.cancellation_policy_snapshot as CancellationPolicySnapshot | null);
+  const addonLines = await getRegistrationAddonLines(supabase, registrationId);
+  const addonTotalPaise = addonLines.reduce((sum, a) => sum + a.amountPaise, 0);
+  const ticketAmountPaise = Math.max(0, amountPaidPaise - addonTotalPaise);
+  const calc = calculateItemizedCancellationRefund(
+    ticketAmountPaise,
+    addonLines.map((a) => ({ id: a.id, nameSnapshot: a.nameSnapshot, amountPaise: a.amountPaise, isRefundable: a.isRefundable })),
+    eventStart,
+    reg.cancellation_policy_snapshot as CancellationPolicySnapshot | null,
+  );
 
   const admin = createAdminClient();
   const { data: updated } = await admin
@@ -105,6 +122,17 @@ export async function cancelMyRegistrationCore(supabase: SupabaseClient, userId:
     .select("id")
     .maybeSingle();
   if (!updated) return { error: "This booking was already updated -- refresh and try again." };
+
+  // Line-item breakdown (section 27/68: an add-on's own refund status,
+  // independent of whether the ticket itself stays active) -- every
+  // refundable line got its share of the same percentage the ticket did;
+  // a non-refundable line's refundAmountPaise is always 0, so this only
+  // ever marks a line 'refunded' when money actually moved for it.
+  for (const line of calc.addonLines) {
+    if (line.refundAmountPaise > 0) {
+      await admin.from("form_response_addons").update({ refund_amount_paise: line.refundAmountPaise, status: "refunded" }).eq("id", line.id);
+    }
+  }
 
   const responseData = reg.response_data as unknown as { name?: string; email?: string } | null;
 
@@ -281,4 +309,139 @@ export async function saveCancellationPolicyCore(supabase: SupabaseClient, userI
     metadata: { enabled: true, tier_count: rules.length, rules },
   });
   return { error: null };
+}
+
+// ===========================================================================
+// ORGANIZER-INITIATED SINGLE-ADD-ON REFUND (section 27/68 "Partial Refund")
+// ===========================================================================
+
+/** A host refunding just one purchased add-on line (e.g. an item that
+ * turned out to be unavailable) WITHOUT cancelling the attendee's ticket
+ * or touching the rest of the order -- deliberately independent of the
+ * event's own cancellation-policy percentage (that policy only ever
+ * governs an attendee choosing to cancel, same posture cancelEventForHost
+ * already establishes for organizer-initiated action): the host is
+ * choosing to refund this specific line in full, not applying a
+ * time-based tier to it. `supabase` must already be authenticated as the
+ * calling user; host/admin ownership is checked directly against the
+ * event's host_id below (RLS on form_response_addons has no host-write
+ * policy at all -- see 0153's own comment -- so this function, not RLS,
+ * is the real authorization gate, exactly like cancelEventForHost's own
+ * host_id comparison). */
+export async function refundAddonLineCore(supabase: SupabaseClient, userId: string, addonLineId: string) {
+  const { data: line } = await supabase
+    .from("form_response_addons")
+    .select("id, registration_id, name_snapshot, unit_price_paise, quantity, status")
+    .eq("id", addonLineId)
+    .maybeSingle();
+  if (!line) return { error: "Add-on purchase not found." };
+  if (line.status === "refunded") return { error: "This add-on has already been refunded." };
+
+  const { data: reg } = await supabase
+    .from("form_responses")
+    .select("id, owner_id, respondent_id, status, payment_status, razorpay_payment_id, refund_amount_paise, response_data")
+    .eq("id", line.registration_id)
+    .maybeSingle();
+  if (!reg) return { error: "Registration not found." };
+  if (reg.status === "cancelled") return { error: "This booking is already cancelled -- its refund already covers every add-on on it." };
+  if (reg.payment_status !== "paid" || !reg.razorpay_payment_id) return { error: "This booking was never paid for, so there's nothing to refund." };
+
+  const { data: event } = await supabase.from("events").select("event_name, host_id").eq("id", reg.owner_id).maybeSingle();
+  if (!event) return { error: "Event not found." };
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
+  if (event.host_id !== userId && !profile?.is_admin) return { error: "You don't have permission to refund this." };
+
+  const amountPaise = (line.unit_price_paise as number) * (line.quantity as number);
+  if (amountPaise <= 0) return { error: "This add-on has nothing to refund." };
+
+  const admin = createAdminClient();
+  // cancellationAuditLog's actor_role is only ever attendee/organizer/
+  // system (no separate 'admin' value at the DB level) -- an admin acting
+  // here logs as 'organizer' with actorIsAdmin noted in metadata, same
+  // resolution payoutAuditLog's own broader 'admin' role doesn't need
+  // because this table predates admin-initiated refunds.
+  const isAdminActor = event.host_id !== userId;
+  const { data: locked } = await admin.from("form_response_addons").update({ status: "refunded", refund_amount_paise: amountPaise }).eq("id", addonLineId).eq("status", "active").select("id").maybeSingle();
+  if (!locked) return { error: "This add-on was already refunded -- refresh and try again." };
+
+  await logCancellationAudit(admin, {
+    eventId: reg.owner_id,
+    registrationId: reg.id,
+    actorId: userId,
+    actorRole: "organizer",
+    action: "refund_initiated",
+    amountPaise,
+    metadata: { addonLineId, addonName: line.name_snapshot, scope: "addon_line", actorIsAdmin: isAdminActor },
+  });
+
+  const { data: refundRow } = await admin
+    .from("event_registration_refunds")
+    .insert({ registration_id: reg.id, amount_paise: amountPaise, status: "processing", reason: `Add-on refund: ${line.name_snapshot}` })
+    .select("id")
+    .single();
+
+  try {
+    const refund = await createRazorpayRefund({
+      paymentId: reg.razorpay_payment_id,
+      amountPaise,
+      notes: { registration_id: reg.id, addon_line_id: addonLineId, reason: "addon_line_refund" },
+    });
+    const processed = refund.status === "processed";
+    await admin
+      .from("event_registration_refunds")
+      .update({ razorpay_refund_id: refund.id, status: processed ? "completed" : "processing", completed_at: processed ? new Date().toISOString() : null })
+      .eq("id", refundRow!.id);
+    // Cumulative: this is one line among possibly several refunds already
+    // recorded against the same registration (another add-on line refunded
+    // earlier, say) -- add to whatever's already there rather than
+    // overwriting it, same reasoning cancelMyRegistrationCore's single
+    // whole-order write doesn't need but this incremental one does.
+    await admin
+      .from("form_responses")
+      .update({ refund_amount_paise: (reg.refund_amount_paise ?? 0) + amountPaise, refund_status: processed ? "processed" : "processing" })
+      .eq("id", reg.id);
+    if (processed) {
+      await logCancellationAudit(admin, {
+        eventId: reg.owner_id,
+        registrationId: reg.id,
+        actorRole: "organizer",
+        action: "refund_completed",
+        amountPaise,
+        metadata: { addonLineId, addonName: line.name_snapshot, razorpayRefundId: refund.id, actorIsAdmin: isAdminActor },
+      });
+    }
+  } catch (e) {
+    console.error("Razorpay refund failed for add-on line refund:", e);
+    await admin.from("event_registration_refunds").update({ status: "failed" }).eq("id", refundRow!.id);
+    await admin.from("form_response_addons").update({ status: "active", refund_amount_paise: 0 }).eq("id", addonLineId);
+    await logCancellationAudit(admin, {
+      eventId: reg.owner_id,
+      registrationId: reg.id,
+      actorRole: "organizer",
+      action: "refund_failed",
+      amountPaise,
+      metadata: { addonLineId, addonName: line.name_snapshot, error: e instanceof Error ? e.message : String(e), actorIsAdmin: isAdminActor },
+    });
+    return { error: "The refund couldn't be processed. Please try again or contact support." };
+  }
+
+  if (reg.respondent_id) {
+    await admin.from("notifications").insert({
+      user_id: reg.respondent_id,
+      type: "refund_processed",
+      title: "Add-on refunded",
+      body: `${line.name_snapshot} (₹${(amountPaise / 100).toLocaleString("en-IN")}) was refunded for ${event.event_name}. Your ticket is still valid.`,
+      link: `/events/${reg.owner_id}`,
+    });
+  }
+
+  try {
+    await computeEventSettlement(admin, reg.owner_id);
+  } catch (e) {
+    console.error("Failed to recompute organizer settlement after add-on refund:", e);
+  }
+
+  trackServerEvent("addon_refunded", userId, { event_id: reg.owner_id, registration_id: reg.id, addon_line_id: addonLineId, amount_paise: amountPaise });
+
+  return { error: null, eventId: reg.owner_id as string, amountRefundedPaise: amountPaise };
 }

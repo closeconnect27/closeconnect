@@ -83,6 +83,14 @@ export type EventDetail = Omit<EventListItem, "host" | "community"> & {
     is_founding_host: boolean;
   } | null;
   community: { id: string; slug: string; name: string } | null;
+  /** Intended-audience filters (0098) -- min_age/max_age/gender_restriction
+   * are display-only signals unless audience_enforcement is 'required', in
+   * which case they're an actual eligibility gate on registration. All
+   * optional; most events have none of these set. */
+  min_age: number | null;
+  max_age: number | null;
+  gender_restriction: "male" | "female" | "other" | null;
+  audience_enforcement: "required" | "suggested";
 };
 
 export type EventRegistration = {
@@ -110,7 +118,7 @@ export type EventRegistration = {
   ticket_type_id: string | null;
   event_ticket_types: { name: string } | null;
   profiles: { display_name: string } | null;
-  form_response_addons: { name_snapshot: string; unit_price_paise: number; quantity: number }[];
+  form_response_addons: { id: string; name_snapshot: string; unit_price_paise: number; quantity: number; status: "active" | "refunded"; refund_amount_paise: number }[];
 };
 
 export type EventFilters = {
@@ -249,6 +257,7 @@ export type EventAddon = {
   price: number;
   quantity_available: number | null;
   is_active: boolean;
+  is_refundable: boolean;
   sort_order: number;
 };
 
@@ -317,7 +326,7 @@ export async function getEventRegistrations(supabase: SupabaseClient, eventId: s
   const { data, error } = await supabase
     .from("form_responses")
     .select(
-      "id, respondent_id, response_data, status, checked_in_at, cancelled_at, cancelled_by, refund_status, refund_amount_paise, cancellation_charge_paise, checked_in_count, quantity, payment_status, payment_reference, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name), form_response_addons(name_snapshot, unit_price_paise, quantity)",
+      "id, respondent_id, response_data, status, checked_in_at, cancelled_at, cancelled_by, refund_status, refund_amount_paise, cancellation_charge_paise, checked_in_count, quantity, payment_status, payment_reference, created_at, ticket_type_id, event_ticket_types(name), profiles(display_name), form_response_addons(id, name_snapshot, unit_price_paise, quantity, status, refund_amount_paise)",
     )
     .eq("owner_type", "event")
     .eq("owner_id", eventId)

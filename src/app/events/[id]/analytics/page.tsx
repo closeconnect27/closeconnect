@@ -4,7 +4,7 @@ import { IconChartBar, IconTicket, IconEye } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getEventById } from "@/lib/queries/events";
-import { getViewCount, getViewsByDay, getEventRegistrationMetrics, computeConversionRate, getReferrerBreakdown } from "@/lib/queries/analytics";
+import { getViewCount, getViewsByDay, getEventRegistrationMetrics, computeConversionRate, getReferrerBreakdown, getEventAddonMetrics } from "@/lib/queries/analytics";
 import { StatCard } from "@/components/ui/StatCard";
 import { DailyBarChart } from "@/components/analytics/DailyBarChart";
 import { ReferrerBreakdown } from "@/components/analytics/ReferrerBreakdown";
@@ -29,11 +29,12 @@ export default async function EventAnalyticsPage({ params }: { params: Promise<{
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
   if (event.host_id !== user.id && !profile?.is_admin) redirect(`/events/${id}`);
 
-  const [viewCount, viewsByDay, registrationMetrics, referrerBreakdown] = await Promise.all([
+  const [viewCount, viewsByDay, registrationMetrics, referrerBreakdown, addonMetrics] = await Promise.all([
     getViewCount(supabase, "event", id),
     getViewsByDay(supabase, "event", id),
     getEventRegistrationMetrics(supabase, id),
     getReferrerBreakdown(supabase, "event", id),
+    getEventAddonMetrics(supabase, id),
   ]);
 
   const conversionRate = computeConversionRate(viewCount, registrationMetrics.total);
@@ -76,6 +77,47 @@ export default async function EventAnalyticsPage({ params }: { params: Promise<{
             <ReferrerBreakdown data={referrerBreakdown} />
           </div>
         </section>
+
+        {addonMetrics.addons.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-wide text-text3">Add-ons</h2>
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-4">
+              <StatCard icon={IconChartBar} label="Add-on revenue" value={`₹${(addonMetrics.totalAddonRevenuePaise / 100).toLocaleString("en-IN")}`} />
+              <StatCard icon={IconChartBar} label="Attach rate" value={addonMetrics.attachRate === null ? "—" : `${Math.round(addonMetrics.attachRate * 100)}%`} />
+              <StatCard icon={IconChartBar} label="Avg. add-on spend" value={`₹${(addonMetrics.averageAddonSpendPaise / 100).toLocaleString("en-IN")}`} />
+            </div>
+            <div className="card-elevated mt-4 overflow-hidden rounded-card bg-bg2">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase text-text3">
+                    <th className="px-4 py-2 font-semibold">Add-on</th>
+                    <th className="px-4 py-2 font-semibold">Price</th>
+                    <th className="px-4 py-2 font-semibold">Sold</th>
+                    <th className="px-4 py-2 font-semibold">Remaining</th>
+                    <th className="px-4 py-2 font-semibold">Revenue</th>
+                    <th className="px-4 py-2 font-semibold">Refunds</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {addonMetrics.addons.map((a) => (
+                    <tr key={a.addonId ?? a.name} className={a.isActive === false ? "opacity-60" : ""}>
+                      <td className="px-4 py-2 font-bold text-text">
+                        {a.name}
+                        {a.addonId === null && <span className="ml-1.5 font-normal text-text3">(deleted)</span>}
+                        {a.isActive === false && <span className="ml-1.5 font-normal text-text3">(off sale)</span>}
+                      </td>
+                      <td className="px-4 py-2 text-text2">{a.price != null ? `₹${a.price.toLocaleString("en-IN")}` : "—"}</td>
+                      <td className="px-4 py-2 text-text2">{a.unitsSold}</td>
+                      <td className="px-4 py-2 text-text2">{a.quantityAvailable != null ? Math.max(0, a.quantityAvailable - a.unitsSold) : "Unlimited"}</td>
+                      <td className="px-4 py-2 text-text2">₹{(a.revenuePaise / 100).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-2 text-text2">{a.refundsPaise > 0 ? `₹${(a.refundsPaise / 100).toLocaleString("en-IN")}` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

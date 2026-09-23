@@ -6,6 +6,36 @@ import { trackServerEvent } from "@/lib/mixpanel/server";
 import { eventRegistrationSchema, type EventRegistrationInput } from "@/lib/validation/event";
 import type { CancellationPolicySnapshot } from "@/lib/eventCancellation";
 
+/** Mirrors mobile's own checkAudienceMatch (event/[id]/index.tsx) exactly --
+ * kept here too, not just there, because that one only ever runs
+ * client-side before the app calls this same core function: a request
+ * hitting registerForEventCore directly (the mobile API route, or a
+ * crafted request against either platform) previously skipped it entirely,
+ * so a 'required' audience filter (0098) was never actually enforced,
+ * only ever displayed/checked by a client that chose to. This is the
+ * actual gate now; the client-side checks remain as a faster, friendlier
+ * pre-check, not the source of truth. */
+async function checkAudienceEligibility(
+  supabase: SupabaseClient,
+  userId: string,
+  event: { min_age: number | null; max_age: number | null; gender_restriction: string | null; audience_enforcement: string },
+): Promise<string | null> {
+  if (event.audience_enforcement !== "required") return null;
+  if (!event.min_age && !event.max_age && !event.gender_restriction) return null;
+
+  const { data: profile } = await supabase.from("profiles").select("date_of_birth, gender").eq("id", userId).maybeSingle();
+  if (event.gender_restriction && profile?.gender !== event.gender_restriction) {
+    return "This event is restricted to a specific audience you don't match.";
+  }
+  if (event.min_age || event.max_age) {
+    if (!profile?.date_of_birth) return "This event requires an age on your profile -- please add your date of birth.";
+    const age = Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    if (event.min_age && age < event.min_age) return `This event requires a minimum age of ${event.min_age}.`;
+    if (event.max_age && age > event.max_age) return `This event requires a maximum age of ${event.max_age}.`;
+  }
+  return null;
+}
+
 // Core registration logic, factored out of the web "use server" action
 // (app/actions/events.ts's registerForEvent) so the mobile API route
 // (app/api/mobile/events/[id]/register) can call the exact same code with
@@ -22,6 +52,11 @@ export async function registerForEventCore(supabase: SupabaseClient, userId: str
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input", registrationId: null, isPaid: null };
   }
+
+  const { data: event } = await supabase.from("events").select("min_age, max_age, gender_restriction, audience_enforcement").eq("id", eventId).maybeSingle();
+  if (!event) return { error: "Event not found", registrationId: null, isPaid: null };
+  const audienceError = await checkAudienceEligibility(supabase, userId, event);
+  if (audienceError) return { error: audienceError, registrationId: null, isPaid: null };
 
   const fields = await getEventFormFields(supabase, eventId);
   for (const field of fields) {
