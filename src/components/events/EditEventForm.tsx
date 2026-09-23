@@ -500,9 +500,36 @@ export function EditEventForm({
       <div className="border-t border-border pt-6">
         <h2 className="mb-1 font-heading text-[16px] font-bold">Ticket types &amp; registration questions</h2>
         {hasRegistrations ? (
-          <p className="text-[13px] text-text2">
-            Locked -- someone has already registered, so ticket types and questions can no longer change.
-          </p>
+          <div className="mt-4 flex flex-col gap-6">
+            <p className="text-[13px] text-text2">
+              Locked -- someone has already registered, so ticket types and questions can no longer change. This is what&apos;s saved:
+            </p>
+            <Field label="Ticket types">
+              <div className="flex flex-col gap-1.5">
+                {tickets.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-card-sm border border-border2 px-4 py-2.5 text-[13px]">
+                    <span className="text-text">{t.name}</span>
+                    <span className="text-text3">
+                      {Number(t.price) > 0 ? `₹${t.price}` : "Free"}
+                      {t.quantity_available && ` · ${t.quantity_available} available`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Field>
+            {draftFormFields.length > 0 && (
+              <Field label="Registration questions">
+                <div className="flex flex-col gap-1.5">
+                  {draftFormFields.map((f, i) => (
+                    <div key={i} className="rounded-card-sm border border-border2 px-4 py-2.5 text-[13px] text-text">
+                      {f.label}
+                      {f.is_required && <span className="ml-1 text-text3">(required)</span>}
+                    </div>
+                  ))}
+                </div>
+              </Field>
+            )}
+          </div>
         ) : (
           <form onSubmit={handleTicketsSubmit} className="mt-4 flex flex-col gap-6">
             <Field label="Ticket types">

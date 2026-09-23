@@ -50,7 +50,25 @@ export function EventVenueMap({
     };
   }, [hasCoords, lat, lng]);
 
-  if (!hasCoords) return null;
+  if (!hasCoords) {
+    if (!address) return null;
+    // No coordinates (venue was typed rather than picked from the
+    // autocomplete suggestions) -- still offer a search-by-address link
+    // instead of showing nothing, matching the mobile app's fallback.
+    const addressSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    return (
+      <div className="mt-3 overflow-hidden rounded-card-sm border border-border2">
+        <a
+          href={addressSearchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-16 items-center justify-center gap-2 bg-bg2 text-[13px] font-medium text-green hover:underline"
+        >
+          Open {address} in Google Maps
+        </a>
+      </div>
+    );
+  }
 
   const mapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 

@@ -26,6 +26,7 @@ import { EventRegistration } from "@/components/events/EventRegistration";
 import { CancellationPolicyText } from "@/components/events/CancellationPolicyBuilder";
 import { getCancellationPolicyForEvent } from "@/app/actions/eventCancellation";
 import { FaqAccordion } from "@/components/events/FaqAccordion";
+import { HostEventReviewSummary } from "@/components/events/HostEventReviewSummary";
 import { getFaqsForEvent } from "@/app/actions/eventFaqs";
 import { InterestedButton } from "@/components/events/InterestedButton";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
@@ -409,13 +410,16 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               to publish it.
             </p>
           ) : isHost ? (
-            <p className="rounded-card-sm border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
-              You&apos;re hosting this event -- see{" "}
-              <Link href={`/events/${event.id}/manage`} className="font-bold text-green">
-                Manage
-              </Link>{" "}
-              for registrants and check-in.
-            </p>
+            <>
+              <p className="rounded-card-sm border border-border bg-bg2 px-4 py-3 text-[13px] text-text3">
+                You&apos;re hosting this event -- see{" "}
+                <Link href={`/events/${event.id}/manage`} className="font-bold text-green">
+                  Manage
+                </Link>{" "}
+                for registrants and check-in.
+              </p>
+              <HostEventReviewSummary ticketTypes={ticketTypes} addons={addons} formFields={formFields} />
+            </>
           ) : event.status === "cancelled" ? (
             <p className="rounded-card-sm border border-pink/40 bg-pink-tint px-4 py-3 text-[13px] font-medium text-pink">
               This event has been cancelled.
