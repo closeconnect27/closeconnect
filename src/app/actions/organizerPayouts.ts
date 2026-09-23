@@ -19,9 +19,18 @@ export type PayoutAccountView = {
   verifiedAt: string | null;
 };
 
-/** The organizer's own current (is_primary && is_active) payout account --
- * masked, never the encrypted/decrypted number itself (section 6: "Never
- * expose the full account number to the frontend after saving"). */
+/** The organizer's own current payout account -- whatever's is_active,
+ * regardless of is_primary (which only flips true once Razorpay actually
+ * verifies it -- see the fund_account.validation.* webhook). Filtering on
+ * is_primary here was a real bug: a freshly-added account sits
+ * verification_pending/is_primary=false for however long the async
+ * verification takes, during which this returned null and the "Payments
+ * & Payouts" page looked like nothing had been saved at all -- reported
+ * as "payouts section is not visible properly." savePayoutAccountCore
+ * always deactivates the previous account before inserting a new one, so
+ * there's only ever at most one is_active row to find here. Masked,
+ * never the encrypted/decrypted number itself (section 6: "Never expose
+ * the full account number to the frontend after saving"). */
 export async function getMyPayoutAccount(): Promise<PayoutAccountView | null> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -29,7 +38,6 @@ export async function getMyPayoutAccount(): Promise<PayoutAccountView | null> {
     .from("organizer_payout_accounts")
     .select("id, bank_name, account_number_last4, account_holder_name, verification_status, verification_failure_reason, verified_at")
     .eq("organizer_id", user.id)
-    .eq("is_primary", true)
     .eq("is_active", true)
     .maybeSingle();
   if (!data) return null;

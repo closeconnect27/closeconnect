@@ -24,11 +24,14 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Invalid or expired session" }, { status: 401 });
 
+  // is_active only, not is_primary -- see getMyPayoutAccount's comment
+  // (app/actions/organizerPayouts.ts): is_primary only flips true once
+  // Razorpay verification completes, so filtering on it here hid a
+  // freshly-added, still-pending account entirely.
   const { data: accountRow } = await supabase
     .from("organizer_payout_accounts")
     .select("id, bank_name, account_number_last4, account_holder_name, verification_status, verification_failure_reason, verified_at")
     .eq("organizer_id", user.id)
-    .eq("is_primary", true)
     .eq("is_active", true)
     .maybeSingle();
   const account = accountRow
